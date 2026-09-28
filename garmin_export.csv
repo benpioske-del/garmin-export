@@ -1,4 +1,4 @@
-Activity Type,Date,Favorite,Title,Distance,Calories,Time,Avg HR,Max HR,Avg Run Cadence,Max Run Cadence,Avg Pace,Best Pace,Total Ascent,Total Descent,Avg Stride Length,Training Stress Score®,Steps,Decompression,Best Lap Time,Number of Laps,Moving Time,Elapsed Time,Min Elevation,Max Elevation,_source_file
+Activity Type,Date,Favorite,Title,Distance,Calories,Time,Avg HR,Max HR,Avg Run Cadence,Max Run Cadence,Avg Pace,Best Pace,Total Ascent,Total Descent,Avg Stride Length,Training Stress Score,Steps,Decompression,Best Lap Time,Number of Laps,Moving Time,Elapsed Time,Min Elevation,Max Elevation,_source_file
 Running,2026-04-14 14:01:36,false,,13.10,1540,01:59:46,167,182,179,197,9:09,5:56,251,254,0.98,0.0,21414,No,00:00:53.9,14,01:59:31,01:59:47,706,850,Activities (1).csv
 Running,2026-04-16 14:50:46,false,,7.01,858,01:06:45,169,178,182,195,9:31,8:00,77,78,0.93,0.0,12106,No,00:00:07.4,8,01:06:40,01:06:45,707,752,Activities (1).csv
 Running,2026-04-20 14:07:21,false,,7.01,799,01:01:59,167,180,187,205,8:51,5:41,104,109,0.97,0.0,11546,No,00:00:02.6,8,01:01:51,01:01:59,707,749,Activities (1).csv
