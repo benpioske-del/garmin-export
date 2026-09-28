@@ -1,0 +1,15 @@
+# credentials - never commit
+.garmin_tokens/
+*_tokens.json
+*_token*.json
+*.env
+.env*
+
+# local-only artefacts
+garmin_sync.log
+__pycache__/
+*.pyc
+
+# raw activity files embed GPS position
+garmin_fit/
+*.fit

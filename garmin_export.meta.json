@@ -1,0 +1,12 @@
+{
+  "generated_utc": "2026-09-28T17:37:47+00:00",
+  "run_count": 36,
+  "earliest_run": "2026-04-14",
+  "latest_run": "2026-08-04",
+  "sources": [
+    "Activities (1).csv",
+    "Activities.csv"
+  ],
+  "newest_fit_file": "2026-09-26",
+  "note": "Derived from Garmin Connect CSV exports. Times are local wall clock; distances miles; pace min/mi. No GPS, no tokens."
+}
