@@ -76,19 +76,36 @@ tree will eventually undo a manual repair and report that it succeeded.
 
 ## Residual exposure
 
-**GitHub does not guarantee immediate removal from forks, clones, or caches.**
-Anyone who cloned or forked the repository before this rewrite still has the
-original objects locally, and raw URLs for the old commits may stay cached at
-GitHub's CDN for a period after the force-push. The rewrite makes the data
-unreachable through normal browsing; it cannot recall what was already
-downloaded.
+**GitHub retains unreachable objects for a period after a force-push.** The old
+commit is no longer reachable from `main` and no longer appears in the branch
+history, but `raw.githubusercontent.com` and the commits API still served it
+while this was being written. That is server-side retention, not a failed
+rewrite; there is no way to force it from the client. It resolves on GitHub's
+own schedule. If any of this needs to be gone sooner, deleting and recreating
+the repository is the reliable option, at the cost of the URL changing.
 
-A local mirror containing the original history was made before the rewrite, as a
-rollback safety net. It must be deleted once the rewrite is confirmed good.
+Anyone who cloned or forked the repository before the rewrite still has the
+original objects locally. The rewrite makes the data unreachable through normal
+browsing; it cannot recall what was already downloaded.
+
+The pre-rewrite local mirror taken as a rollback safety net has been deleted
+after the rewrite was verified.
 
 **This repository is public. That is the underlying risk.** Exact home
 coordinates in a public dataset are a durable disclosure. The pipeline can
 enforce "never publish coordinates"; it cannot make the data non-sensitive.
+
+## Verifying, and the CDN trap
+
+Check the result through the **GitHub contents API**, not `raw.githubusercontent.com`.
+The raw CDN served stale content for several of the checks above, which
+produced false positives for files that were already fixed. A cache-busting
+query parameter does not reliably defeat it.
+
+Note also that `docs/PRIVACY_INCIDENT.md` legitimately contains the coordinate
+values it documents removing, and a docstring may name the old fixtures. A grep
+for known values across the published tree will hit those on purpose. The
+meaningful checks are the published CSV, the audit doc, and the test fixtures.
 
 ## If this recurs
 
