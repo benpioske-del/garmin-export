@@ -1,5 +1,6 @@
 """Task 2: timestamp, provenance and timezone-status behaviour."""
 
+import csv
 import datetime
 import os
 
@@ -9,6 +10,22 @@ import garmin_fit_reader as r
 from conftest import REAL_FIT, requires_real_fit
 
 UTC = datetime.timezone.utc
+
+CANON = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "garmin_export.csv")
+
+
+@pytest.fixture(scope="module")
+def real_rows():
+    """Rows of the actually-published export, when it has been built.
+
+    Asserting on the real artifact catches wiring mistakes that a unit test on a
+    hand-made dict cannot.
+    """
+    if not os.path.exists(CANON):
+        pytest.skip("no published export yet; run export_publish.py")
+    with open(CANON, newline="", encoding="utf-8") as fh:
+        return list(csv.DictReader(fh))
 
 
 def test_naive_fit_start_is_treated_as_utc():
@@ -81,13 +98,56 @@ def test_no_published_column_does_not_look_like_a_coordinate():
 
 
 def test_provenance_survives_the_public_csv_header():
-    """Renaming _source_file must happen at write time, not lose the value."""
+    """Renaming _source_file must happen at write time, not lose the value.
+
+    Regression guard: fieldnames and row keys must be renamed together. Renaming
+    only the row keys makes DictWriter's extrasaction="ignore" drop the value and
+    emit a blank column.
+    """
     rows = [{"Date": "2026-07-26 01:10:15", "Date (UTC)": "2026-07-27T01:10:15Z",
              "Timezone Status": "assumed_utc", "Source": "Garmin FIT",
              "_source_file": "2026-07-26_23745136848.fit"}]
-    cols = list(rows[0])
+    internal = list(rows[0])
     header = {"_source_file": "Source File"}
-    out = {header.get(k, k): v for k, v in rows[0].items() if k in cols}
-    assert "Source File" in out
+    cols = [header.get(c, c) for c in internal]
+
+    out = {header.get(k, k): v for k, v in rows[0].items() if k in internal}
+    assert "Source File" in cols and "_source_file" not in cols
     assert out["Source File"] == "2026-07-26_23745136848.fit"
-    assert "_source_file" not in out
+
+
+def test_every_provenance_column_carries_a_value(real_rows):
+    """Blank provenance is worse than none: it looks like a device gave no data."""
+    for r in real_rows:
+        for col in ("Date (UTC)", "Timezone Status", "Source", "Source File"):
+            assert r.get(col, "").strip(), \
+                "%s blank for %s" % (col, r.get("Source File"))
+
+
+def test_published_header_uses_the_public_column_name(real_rows):
+    """The internal _source_file key must never reach the published header."""
+    assert "Source File" in real_rows[0]
+    assert "_source_file" not in real_rows[0]
+
+
+def test_no_two_rows_are_the_same_activity(real_rows):
+    """The corrected date must not have collapsed two genuinely different runs.
+
+    Dedupe keys on date + rounded distance, so two real activities sharing a
+    date and distance would silently lose one. The count is asserted because
+    dropping a phantom duplicate (57 -> 56) was a fix, but a real loss would
+    look identical in the log.
+    """
+    keys = [(r["Date"][:10], round(float(r["Distance"]), 1)) for r in real_rows]
+    assert len(keys) == len(set(keys)), "duplicate date+distance in the export"
+    assert len(real_rows) == 56, "unexpected activity count: %d" % len(real_rows)
+
+
+def test_corrected_run_is_dated_to_its_local_day(real_rows):
+    """The FIT 2026-07-27 01:10Z run is an evening run on 2026-07-26."""
+    hit = [r for r in real_rows
+           if r["Source File"] == "2026-07-26_23745136848.fit"]
+    assert len(hit) == 1, "expected exactly one row for the corrected run"
+    row = hit[0]
+    assert row["Date"].startswith("2026-07-26")
+    assert row["Date (UTC)"].startswith("2026-07-27T01:10:15")

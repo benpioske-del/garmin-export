@@ -306,9 +306,10 @@ def build_csv():
             if c not in cols:
                 cols.append(c)
     # Provenance columns last, in a fixed order, so the export's shape is stable.
+    # _source_file is the internal key; the published header is "Source File".
     if "_source_file" in cols:
         cols.remove("_source_file")
-    for c in ("Date (UTC)", "Timezone Status", "Source", "_source_file"):
+    for c in ("Date (UTC)", "Timezone Status", "Source", "Source File"):
         if c in cols:
             cols.remove(c)
         cols.append(c)
