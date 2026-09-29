@@ -1,5 +1,5 @@
 ﻿{
-  "_comment2": "Athlete parameters needed to reproduce the dashboard's cohort and population percentiles. These are stored in the dashboard UI, not derived from the activity log, so they are not in the CSV. Fill in what you know and re-publish; leave the rest null.",
+  "_comment": "Athlete parameters needed to reproduce the dashboard's cohort and population percentiles. These are stored in the dashboard UI, not derived from the activity log, so they are not in the CSV. Fill in what you know and re-publish; leave the rest null.",
   "age": null,
   "sex": null,
   "resting_hr": null,
@@ -14,5 +14,6 @@
   },
   "_warn": "While age and sex are null, do not present cohort or population percentiles as fact. Report them as unadjusted or omit them."
 }
+
 
 
