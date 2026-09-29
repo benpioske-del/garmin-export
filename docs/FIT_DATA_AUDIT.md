@@ -24,10 +24,18 @@ Both live alongside `garmin_fit_reader.py` and read
 | Position points found | 51,637 |
 | Points out of valid range | **0** |
 | Points at null island (0, 0) | **0** |
-| Latitude range | literal:withheld |
-| Longitude range | literal:withheld |
+| Coordinate spread | withheld, see note below |
 | Files with lap records | 56 |
 | Record messages | 51,653 |
+
+Note on the withheld coordinate spread: an earlier version of this table
+published the exact latitude and longitude range of the corpus. Those two numbers
+describe a bounding box roughly 11 km by 24 km, which in a public repository
+that also names the athlete's town is a location disclosure. The audit does not
+need them. Every point was checked against the valid latitude and longitude
+range and none fell outside it, which is the finding that matters; the
+coordinates themselves stay local. Re-run `fit_audit.py` locally if the actual
+bounds are needed.
 
 Device: `garmin`, type `activity`.
 
