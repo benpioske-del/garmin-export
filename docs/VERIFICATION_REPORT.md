@@ -59,8 +59,13 @@ pickaxe search, which had reported false positives from diff context:
 CLEAN: no blob in any history contains a real value
 ```
 
-Checked for: `44.759657`, `93.62763`, `44.9588`, `93.1618`, `44.7016`,
-`93.6554`, `Chaska`, `Minneapolis` — all zero occurrences across all 34 commits.
+Checked for: the four per-run coordinates from the removed scrub script, the two
+coordinates quoted in the scanner comment, the two published coordinate-range
+bounds, and both place names. All are absent from every blob in all 34 commits.
+
+The literal values are deliberately not reproduced here. Restating them in a
+report that is itself published would recreate the leak, which is exactly the
+mistake this section documents.
 
 Also deleted: `.git/filter-repo/fast-export.original`, a 417 KB plaintext dump of
 the pre-rewrite history that still contained the dashboard and coordinates, and
