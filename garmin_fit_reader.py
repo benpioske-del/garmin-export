@@ -5,13 +5,51 @@ start_position_lat/long, nec_lat/long and swc_lat/long; those are dropped here a
 the module asserts they never reach the output.
 """
 
+import datetime
 import glob
 import os
+import re
 
 import fitparse
 
 M_TO_MI = 1.0 / 1609.344
 M_TO_FT = 1.0 / 0.3048
+
+# Garmin names downloaded activities YYYY-MM-DD_<activity id>.fit, using the
+# device's local date. That filename is the only local-date signal we have,
+# because no FIT file carries a timezone offset.
+FILENAME_DATE = re.compile(r"^(\d{4}-\d{2}-\d{2})_")
+
+# Values for the Timezone Status column. See docs/PROVENANCE.md.
+TZ_ASSUMED_UTC = "assumed_utc; local date from filename"
+
+
+def split_start(start, path):
+    """Return (local_naive, utc_aware) for a FIT session start_time.
+
+    The FIT spec defines start_time as UTC, but fitparse returns a *naive*
+    datetime, so the value carries no offset marker of its own. Attaching UTC
+    makes the assumption explicit rather than implicit.
+
+    The athlete's own local date is taken from the filename when available. It
+    genuinely differs from the UTC date for evening runs that cross midnight
+    UTC, which is why the two are reported separately instead of one column
+    being silently labelled the other.
+    """
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=datetime.timezone.utc)
+    m = FILENAME_DATE.match(os.path.basename(path))
+    if not m:
+        return start.replace(tzinfo=None), start
+    try:
+        local_date = datetime.datetime.strptime(m.group(1), "%Y-%m-%d").date()
+    except ValueError:
+        return start.replace(tzinfo=None), start
+    local = datetime.datetime.combine(
+        local_date, start.astimezone(datetime.timezone.utc).timetz().replace(tzinfo=None)
+    )
+    return local, start
+
 
 # Fields that must never be exported. Guarded by assert_no_gps() below.
 FORBIDDEN = (
@@ -112,9 +150,14 @@ def read_fit(path):
     lo = round(min(elev) * M_TO_FT) if elev else ""
     hi = round(max(elev) * M_TO_FT) if elev else ""
 
+    local_start, start_utc = split_start(start, path)
+
     row = {
         "Activity Type": _sport_label(s.get("sport")),
-        "Date": start.strftime("%Y-%m-%d %H:%M:%S"),
+        "Date": local_start.strftime("%Y-%m-%d %H:%M:%S"),
+        "Date (UTC)": start_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "Timezone Status": TZ_ASSUMED_UTC,
+        "Source": "Garmin FIT",
         "Favorite": "false",
         # Title is intentionally blank. Garmin titles can name a city or route.
         "Title": "",

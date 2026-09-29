@@ -283,6 +283,9 @@ def build_csv():
                     # Garmin titles can name a city or route. Drop it: this is a
                     # public repo and a place name is a location identifier.
                     out["Title"] = ""
+                    out["Source"] = "Garmin CSV export"
+                    out["Timezone Status"] = "unknown; athlete-supplied date"
+                    out.setdefault("Date (UTC)", "")
                     out["_source_file"] = base
                     try:
                         dist = round(float(out.get("Distance") or 0), 1)
@@ -302,20 +305,27 @@ def build_csv():
         for c in r:
             if c not in cols:
                 cols.append(c)
+    # Provenance columns last, in a fixed order, so the export's shape is stable.
     if "_source_file" in cols:
         cols.remove("_source_file")
-    cols.append("_source_file")
+    for c in ("Date (UTC)", "Timezone Status", "Source", "_source_file"):
+        if c in cols:
+            cols.remove(c)
+        cols.append(c)
 
     def sk(r):
         d = r.get("Date", "")
         return (d[5:10], d[:10]) if len(d) >= 10 else ("", d)
 
     rows.sort(key=sk)
+    # _source_file is the internal key; publish it as a real provenance column.
+    header = {"_source_file": "Source File"}
     with open(os.path.join(REPO, CANON), "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore",
                            restval="", lineterminator="\n")
         w.writeheader()
-        w.writerows(rows)
+        for r in rows:
+            w.writerow({header.get(k, k): v for k, v in r.items() if k in cols})
 
     dates = sorted(r.get("Date", "")[:10] for r in rows if r.get("Date"))
     meta = {
