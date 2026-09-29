@@ -62,7 +62,7 @@ SECRET_PATTERNS = [
 # "5.0712, 5.0844" are indistinguishable from coordinates by shape alone.
 # Requiring a minus sign keeps those from blocking a legitimate brief, and the
 # labelled patterns below still catch an all-positive pair written as
-# "latitude: ***REMOVED***, longitude: literal:<redacted-coordinate>".
+# "latitude: literal:<redacted-coordinate>, longitude: literal:<redacted-coordinate>".
 GPS_PATTERNS = [
     (r"-?\d{1,2}\.\d{4,}\s*,\s*-\d{1,3}\.\d{4,}\b",
      "lat/lon coordinate pair (west)"),

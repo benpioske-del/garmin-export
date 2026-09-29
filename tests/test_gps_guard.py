@@ -12,7 +12,7 @@ import pytest
 import export_publish
 
 
-COORDS = '{"seq": 50, "lat": ***REMOVED***, "lon": ***REMOVED***, "tempF": 92.3}'
+COORDS = '{"seq": 50, "lat": 44.000000, "lon": literal:<redacted-coordinate>, "tempF": 92.3}'
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def test_bare_json_coordinates_are_refused(fake_repo, capsys):
 
 
 def test_latitude_longitude_keys_are_refused(fake_repo):
-    write(fake_repo, "leak.json", '{"latitude": ***REMOVED***, "longitude": ***REMOVED***}')
+    write(fake_repo, "leak.json", '{"latitude": literal:<redacted-coordinate>, "longitude": -literal:<redacted-coordinate>}')
     with pytest.raises(SystemExit):
         export_publish.guard_gps_content()
 

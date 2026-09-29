@@ -37,11 +37,11 @@ def test_secrets_are_caught(text, kind):
 
 
 @pytest.mark.parametrize("text,kind", [
-    ("The run started at ***REMOVED***, ***REMOVED*** downtown.", "lat/lon coordinate pair (west)"),
+    ("The run started at literal:<redacted-coordinate>, -literal:<redacted-coordinate> downtown.", "lat/lon coordinate pair (west)"),
     ("Track was at -33.8688, 151.2093.", "lat/lon coordinate pair (south)"),
     ("Add position_lat to the export.", "FIT GPS field name"),
-    ("latitude: ***REMOVED***", "latitude value"),
-    ("longitude = ***REMOVED***", "longitude value"),
+    ("latitude: literal:<redacted-coordinate>", "latitude value"),
+    ("longitude = -literal:<redacted-coordinate>", "longitude value"),
 ])
 def test_gps_is_caught(text, kind):
     hits = scan(text)
@@ -51,8 +51,8 @@ def test_gps_is_caught(text, kind):
 def test_labelled_positive_pair_is_still_caught():
     """The unlabelled rule needs a minus sign, so the labelled forms must
     cover the all-positive case."""
-    assert scan("latitude: ***REMOVED***, longitude: literal:<redacted-coordinate>")
-    assert scan("lat = ***REMOVED***")
+    assert scan("latitude: literal:<redacted-coordinate>, longitude: literal:<redacted-coordinate>")
+    assert scan("lat = literal:<redacted-coordinate>")
 
 
 def test_pace_splits_are_not_mistaken_for_coordinates():

@@ -24,8 +24,8 @@ Both live alongside `garmin_fit_reader.py` and read
 | Position points found | 51,637 |
 | Points out of valid range | **0** |
 | Points at null island (0, 0) | **0** |
-| Coordinate spread | withheld, see note below |
-| Coordinate spread | withheld, see note below |
+| Latitude range | literal:withheld |
+| Longitude range | literal:withheld |
 | Files with lap records | 56 |
 | Record messages | 51,653 |
 

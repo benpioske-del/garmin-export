@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 export_publish.py - normalise Garmin Connect CSV exports into one canonical
 file, then commit and push it to a GitHub repo and print the raw download URL.
@@ -458,6 +458,11 @@ def sync_with_remote(branch):
     the .FIT files, so on a rebase conflict it is safe to reset onto the remote
     and redo the export. Hand-edited files are backed up first so a conflict
     cannot eat the owner's edits to profile.json.
+
+    A divergent history is NOT auto-resolved. When the remote was rewritten on
+    purpose the two histories share no common ancestor, and the recovery path
+    below would discard the rewrite and republish what it removed. That
+    actually happened; see docs/PRIVACY_INCIDENT.md.
     """
     keep = {}
     for name in ("profile.json", "CREW_BRIEF.md"):
@@ -476,6 +481,18 @@ def sync_with_remote(branch):
         return
 
     print("remote moved: %s new commit(s) on origin/%s - folding them in" % (behind, branch))
+
+    # Unrelated histories mean the remote was rewritten on purpose, e.g. to
+    # purge leaked data. The conflict recovery below used to reset the local
+    # repo onto the old history and re-publish the removed commits, silently
+    # undoing the rewrite. Never resolve that automatically.
+    # See docs/PRIVACY_INCIDENT.md.
+    if run(["git", "merge-base", "HEAD", "origin/" + branch]).returncode != 0:
+        die("local and origin/%s have no common ancestor." % branch,
+            "The remote history was rewritten (e.g. to purge leaked data). "
+            "Resetting the local repo would resurrect the removed commits and "
+            "re-publish them. Review the divergence, then run: "
+            "git push --force-with-lease origin %s" % branch)
 
     if ahead in ("0", ""):
         # Nothing local to replay, so a plain fast-forward is enough. Without
