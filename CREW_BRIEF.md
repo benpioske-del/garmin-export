@@ -98,6 +98,27 @@ making any claim about current fitness.
 The publisher is at `C:\Users\benpi\Downloads\export_publish.py`, with FIT decoding in
 `garmin_fit_reader.py`. It commits only when the underlying data actually changes.
 
+### Raw URLs can lag a push by a few minutes
+
+GitHub serves `raw.githubusercontent.com` through a CDN. Immediately after a new commit
+lands, a fetch of the same URL can still return the **previous** version of a file for
+a short while. GitHub's own API endpoint is not cached this way:
+
+```
+https://api.github.com/repos/benpioske-del/garmin-export/contents/<file>?ref=main
+```
+
+Consequences for the crew:
+
+- Do not treat a repeated fetch as an error. The same data can arrive twice.
+- Do not assume a successful read proves the newest commit is visible.
+- Each fetch is internally consistent, so you will not get a half-written file, but you
+  may get a slightly old one. `publish_state.json` carries a `data_sha` and an `at`
+  timestamp: **if `data_sha` is unchanged, the data really is unchanged**, which is a
+  more reliable check than the file's modification time.
+- All files here are UTF-8 **without** a byte-order mark. If a parse fails on a leading
+  BOM, that is a stale or mangled cached copy, not the current file.
+
 ---
 
 ## Reproducing the owner's dashboard scoring
