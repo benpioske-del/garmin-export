@@ -13,7 +13,7 @@ being removed from the current tree. History was rewritten to remove them.
 | Per-run coordinates | `dashboard/index.html`, commits `ddc04b8` and `f713e13` | 12 latitude/longitude pairs, one per activity, with dates |
 | Athlete's town | `Title` column of `garmin_export.csv`, 6 commits | Named the home town on 36 activity rows |
 | Bounding box | `docs/FIT_DATA_AUDIT.md` | Latitude and longitude range of all 51,637 points: an 11 km × 24 km box around the home |
-| Realistic test fixtures | `tests/test_capture_supervisor.py`, `tests/test_gps_guard.py` | literal:the athlete's home area city centre and downtown literal:the home metro |
+| Realistic test fixtures | `tests/test_capture_supervisor.py`, `tests/test_gps_guard.py` | A city centre and a downtown block in the athlete's home area |
 
 The bounding box and the test fixtures were found only while auditing for this
 cleanup. The first two were known at the time of the initial containment; the
@@ -31,10 +31,12 @@ local-only.
 
 - `export_publish.py` has a content guard that refuses to publish any file
   containing a coordinate-shaped value, a FIT semicircle field, or a CSV
-  latitude/longitude column.
+  latitude/longitude column. It also matches unlabelled degree pairs, because
+  the two leaks recorded above were both unlabelled values quoted as examples.
 - `dashboard/` is gitignored.
-- Test fixtures use synthetic open-ocean coordinates (41.6001, -30.5001). They
-  trip the scanner by shape and mean nothing geographically.
+- Test fixtures use synthetic open-ocean coordinates (see
+  `tests/test_gps_guard.py`). They trip the scanner by shape and mean nothing
+  geographically.
 
 ## History rewrite
 

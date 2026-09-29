@@ -382,6 +382,14 @@ LOCAL_ONLY = ("dashboard/index.html",)
 GUARD_IMPL = ("export_publish.py", "capture_supervisor_brief.py",
               "tests/test_gps_guard.py", "tests/test_capture_supervisor.py")
 
+# The only coordinate pairs permitted to appear in this repository, and every
+# one of them is synthetic. They are listed explicitly because a fixture has to
+# contain a real-looking pair to prove the scanner still fires, and a comment
+# explaining the rule has to quote one. None of these is a real position: they
+# are generic examples chosen to have no geographic meaning. Real values are
+# never added here, which is the entire point.
+SYNTHETIC_PAIRS = ("41.6001, -30.5001", "12.3456, -67.8910", "23.4567, -81.2345")
+
 
 def guard_gps_content():
     """Refuse to stage any text file that embeds per-activity coordinates.
@@ -393,6 +401,13 @@ def guard_gps_content():
     A labelled coordinate is the signal. A bare decimal pair is not: training
     data is full of them (pace splits, lap times), and a false positive would
     block legitimate work.
+
+    The guard's own source and tests are exempt from the LABELLED patterns,
+    because they have to spell out the strings they search for. They are NOT
+    exempt from the bare degree-pair pattern, and that distinction is the point:
+    an exact position quoted as an example in a comment is still a leak, which
+    is how one survived a full rewrite. Test fixtures under tests/ use synthetic
+    open-ocean values, so the check is safe to run on them.
     """
     # Key/value forms, applied to code, data and markup.
     patterns = [
@@ -405,6 +420,16 @@ def guard_gps_content():
         # them), but a name paired with a value is an exact position.
         (r'["\']position_lat["\']\s*:\s*-?\d{5,}', "raw FIT semicircle latitude"),
         (r'["\']position_l[o]?ng["\']\s*:\s*-?\d{5,}', "raw FIT semicircle longitude"),
+        # Bare degree pair, either hemisphere. An unlabelled "12.3456,
+        # -67.8910" is an exact position, and that shape is what leaked twice:
+        # once in this repository's own scrub expressions and once as a comment
+        # example. Latitude is constrained to 0-90. A pair whose latitude is
+        # below 10 is not a plausible position in the region this data comes
+        # from, and such pairs are indistinguishable from split times such as
+        # "5.0712, 5.0844", so they are left alone to avoid blocking real work.
+        (r'(?<![\d.])(?:1\d|[2-8]\d|9[0]|[1-9]\d)\.\d{4,}\s*,'
+         r'\s*-?(?:1[0-7]\d|180|\d{1,2}(?:\.\d{4,})?)\.\d{4,}(?![\d.])',
+         "degree coordinate pair"),
     ]
     # Header-column form. Restricted to .csv because the same shape appears in
     # ordinary Python, e.g. "lat, lon = raw_lat * SCALE, raw_lon * SCALE".
@@ -421,8 +446,12 @@ def guard_gps_content():
             rel = os.path.relpath(os.path.join(dirpath, fn), REPO).replace("\\", "/")
             if not fn.endswith((".py", ".html", ".js", ".json", ".md", ".csv", ".txt")):
                 continue
-            if rel in LOCAL_ONLY or rel in GUARD_IMPL:
+            if rel in LOCAL_ONLY:
                 continue
+            # Guard implementation files skip the labelled patterns only; they are
+            # still checked for a bare degree pair, which has no false positives
+            # in this codebase because the test fixtures are synthetic.
+            is_guard_impl = rel in GUARD_IMPL
             p = os.path.join(dirpath, fn)
             try:
                 if os.path.getsize(p) > 8_000_000:
@@ -436,10 +465,25 @@ def guard_gps_content():
             # deliberately excluded. Only a numeric value paired with a location
             # key is a leak, so that is what is matched below.
             for pat, kind in patterns:
-                if re.search(pat, body):
-                    die("refusing to commit %s" % rel,
-                        "it contains a %s. This repository is public.\n"
-                        "Add it to LOCAL_ONLY and keep it local." % kind)
+                if is_guard_impl and kind != "degree coordinate pair":
+                    continue
+                if kind == "degree coordinate pair":
+                    # The allowlisted synthetic pairs are blanked ONLY in the
+                    # scanner's own files, which have to quote one to document
+                    # the rule and to prove the scanner fires. In any other
+                    # file the same value is a leak, so the exemption is scoped
+                    # rather than global.
+                    probe = body
+                    if is_guard_impl:
+                        for pair in SYNTHETIC_PAIRS:
+                            probe = probe.replace(pair, "0, -1")
+                    if not re.search(pat, probe):
+                        continue
+                elif not re.search(pat, body):
+                    continue
+                die("refusing to commit %s" % rel,
+                    "it contains a %s. This repository is public.\n"
+                    "Add it to LOCAL_ONLY and keep it local." % kind)
             if fn.endswith(".csv"):
                 for pat, kind in csv_patterns:
                     if re.search(pat, body):

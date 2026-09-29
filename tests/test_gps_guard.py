@@ -87,3 +87,53 @@ def test_published_csv_with_coordinates_would_be_refused(fake_repo):
     write(fake_repo, "garmin_export.csv", "Date,lat,lon\n2026-09-01,44.75,-93.62\n")
     with pytest.raises(SystemExit):
         export_publish.guard_gps_content()
+
+
+def test_unlabelled_degree_pair_is_refused(fake_repo):
+    """A bare lat/lon pair is a leak even with no key beside it.
+
+    Two real leaks were unlabelled values quoted as examples in a comment and
+    in a scrub script, so the guard must not rely on a label being present.
+    The values here are fabricated, from no one in particular.
+    """
+    write(fake_repo, "notes.md", "An example position: 12.3456, -67.8910")
+    with pytest.raises(SystemExit):
+        export_publish.guard_gps_content()
+
+
+def test_unlabelled_pair_in_a_comment_is_refused(fake_repo):
+    """Comments are not a loophole; this is how the second leak happened."""
+    write(fake_repo, "capture_helper.py",
+          "# see also 12.3456, -67.8910 for the shape\n")
+    with pytest.raises(SystemExit):
+        export_publish.guard_gps_content()
+
+
+def test_guard_impl_files_are_still_checked(fake_repo, monkeypatch):
+    """The scanner's own files must not be a blind spot.
+
+    GUARD_IMPL exempts them from the labelled patterns, which they have to spell
+    out. Exempting them from everything would let a real position hide in a
+    comment inside a scanner file.
+    """
+    monkeypatch.setattr(export_publish, "GUARD_IMPL", ("capture_supervisor_brief.py",))
+    # Empty the allowlist so the pair is NOT blanked, proving the file-scoped
+    # check still fires on a GUARD_IMPL file rather than trusting the exemption.
+    monkeypatch.setattr(export_publish, "SYNTHETIC_PAIRS", ())
+    write(fake_repo, "capture_supervisor_brief.py",
+          "# labelled pair is fine here: 12.3456, -67.8910\n")
+    with pytest.raises(SystemExit):
+        export_publish.guard_gps_content()
+
+
+def test_low_latitude_decimal_pairs_are_not_flagged(fake_repo):
+    """Guard against over-blocking: lap times are not coordinates."""
+    write(fake_repo, "notes.md", "laps 5.0712, 5.0844 and splits 4.9588, 4.6123")
+    export_publish.guard_gps_content()  # must not raise
+
+
+def test_real_repository_passes_its_own_guard(monkeypatch):
+    """The actual repo must be clean, not just the fixtures."""
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    monkeypatch.setattr(export_publish, "REPO", here)
+    export_publish.guard_gps_content()  # must not raise
