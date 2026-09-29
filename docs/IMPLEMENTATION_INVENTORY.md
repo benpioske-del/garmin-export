@@ -37,6 +37,7 @@ are greenfield, not modification, and are recorded as such under Blockers.
 | `garmin_sync.py` | Logs into Garmin Connect and downloads FIT files. 518 LOC. |
 | `garmin_server.py` | Localhost-only file server for the dashboard. 418 LOC. |
 | `capture_supervisor_brief.py` | Captures a supervisor brief and scans it for sensitive content. 194 LOC. |
+| `brief_bridge.py` | Receives a brief from the cloud flow over three transports and commits it. 1 file, see `docs/SUPERVISOR_BRIDGE.md`. |
 | `fit_audit.py` | Audits FIT parsing results. 104 LOC. |
 | `fit_gps_validate.py` | Validates whether FIT files carry usable GPS. 66 LOC. |
 | `paths.py` | Central path resolution. 39 LOC. |
@@ -116,7 +117,7 @@ the single-user local token.**
 | Purpose | Command | Status |
 |---|---|---|
 | Install | `pip install -e .` | Works |
-| Run tests | `python -m pytest` | **Works. 65 passed.** |
+| Run tests | `python -m pytest` | **Works. 90 passed, 1 skipped.** |
 | Publish | `python export_publish.py` | Works |
 | Check only | `python export_publish.py --check` | Works |
 | Audit FIT | `python fit_audit.py` | Works |
@@ -132,13 +133,13 @@ the single-user local token.**
 
 ## Tests
 
-65 tests across 7 files, all passing:
-
+90 tests across 8 files, all passing (1 skipped where symlinks are unavailable):
 | File | Covers |
 |---|---|
 | `tests/test_gps_guard.py` | Coordinate scanning, including the 2026-09-29 regression cases. |
 | `tests/test_capture_supervisor_brief.py` | Brief capture and its content scanner. |
 | `tests/test_history_safety.py` | Refuses to auto-reset a rewritten history. |
+| `tests/test_brief_bridge.py` | Bridge auth, traversal, size caps, content scan, idempotency, rollback. |
 | `tests/test_provenance.py` | UTC/local date reconstruction and timezone status. |
 | `tests/test_fit_audit.py` | FIT audit behaviour. |
 | `tests/test_paths_and_guards.py` | Path resolution and secret scanning. |

@@ -380,7 +380,8 @@ LOCAL_ONLY = ("dashboard/index.html",)
 # source and its own tests. This list is deliberately explicit rather than
 # pattern-based, so an exemption can never be granted by accident.
 GUARD_IMPL = ("export_publish.py", "capture_supervisor_brief.py",
-              "tests/test_gps_guard.py", "tests/test_capture_supervisor.py")
+              "tests/test_gps_guard.py", "tests/test_capture_supervisor.py",
+              "tests/test_brief_bridge.py")
 
 # The only coordinate pairs permitted to appear in this repository, and every
 # one of them is synthetic. They are listed explicitly because a fixture has to
