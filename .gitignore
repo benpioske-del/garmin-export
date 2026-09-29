@@ -13,3 +13,8 @@ __pycache__/
 # raw activity files embed GPS position
 garmin_fit/
 *.fit
+garmin_sleep.csv
+garmin_hr.csv
+garmin_last_sync.json
+.pytest_cache/
+.coach_dash_token

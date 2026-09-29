@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "garmin-export"
+version = "1.20.0"
+description = "Garmin Connect activity export, safety guards, and CrewAI task bridge"
+requires-python = ">=3.10"
+dependencies = [
+    "fitparse>=1.2.0",
+    "garminconnect>=0.3.13",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools]
+py-modules = ["export_publish", "garmin_fit_reader", "garmin_sync",
+              "capture_supervisor_brief", "fit_audit", "fit_gps_validate",
+              "garmin_server", "paths"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
+filterwarnings = [
+    # fitparse calls the deprecated datetime.utcfromtimestamp once per field.
+    # There are ~650k of them across the 56-file corpus, which buries real
+    # output. Harmless here: the value is only read for its UTC instant.
+    "ignore::DeprecationWarning:fitparse.processors",
+]
