@@ -18,3 +18,4 @@ garmin_hr.csv
 garmin_last_sync.json
 .pytest_cache/
 .coach_dash_token
+dashboard/

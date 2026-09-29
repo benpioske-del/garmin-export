@@ -82,6 +82,9 @@ __pycache__/
 # raw activity files embed GPS position
 garmin_fit/
 *.fit
+
+# the dashboard embeds an exact lat/lon per run - local only
+dashboard/
 """
 
 
@@ -115,8 +118,11 @@ def code_paths():
         if not os.path.isdir(d):
             continue
         for name in sorted(os.listdir(d)):
+            rel = "%s/%s" % (sub, name)
+            if rel in LOCAL_ONLY:
+                continue
             if name.endswith((".py", ".html", ".toml")):
-                out.append("%s/%s" % (sub, name))
+                out.append(rel)
     return out
 
 
@@ -348,6 +354,86 @@ def guard_secrets():
             if bad.rstrip("/") not in have:
                 print("  ! %s is not in .gitignore - refusing to continue" % bad)
                 sys.exit(1)
+    guard_gps_content()
+
+
+# Files we refuse to publish at all. The dashboard embeds an exact latitude and
+# longitude for individual runs, so it is a local-only artefact. It was committed
+# by accident once; that is what this list is here to prevent a second time.
+LOCAL_ONLY = ("dashboard/index.html",)
+
+# Files that necessarily contain the detection patterns themselves. The scanner
+# has to spell out the strings it looks for, so it would otherwise flag its own
+# source and its own tests. This list is deliberately explicit rather than
+# pattern-based, so an exemption can never be granted by accident.
+GUARD_IMPL = ("export_publish.py", "capture_supervisor_brief.py",
+              "tests/test_gps_guard.py", "tests/test_capture_supervisor.py")
+
+
+def guard_gps_content():
+    """Refuse to stage any text file that embeds per-activity coordinates.
+
+    The earlier guard only inspected file NAMES, so a file named index.html with
+    a dozen hardcoded lat/lon pairs sailed straight into a public repository.
+    Checking content is what actually protects the athlete.
+
+    A labelled coordinate is the signal. A bare decimal pair is not: training
+    data is full of them (pace splits, lap times), and a false positive would
+    block legitimate work.
+    """
+    # Key/value forms, applied to code, data and markup.
+    patterns = [
+        (r'"lat"\s*:\s*-?\d{1,3}\.\d{3,}', "JSON \"lat\" coordinate"),
+        (r'"lon[g]?"\s*:\s*-?\d{1,3}\.\d{3,}', "JSON \"lon\" coordinate"),
+        (r'"latitude"\s*:\s*-?\d{1,3}\.\d{3,}', "JSON \"latitude\" coordinate"),
+        (r'"longitude"\s*:\s*-?\d{1,3}\.\d{3,}', "JSON \"longitude\" coordinate"),
+        # Raw FIT stores semicircles as large integers, not degrees. A field
+        # name on its own is harmless (the reader must name them to reject
+        # them), but a name paired with a value is an exact position.
+        (r'["\']position_lat["\']\s*:\s*-?\d{5,}', "raw FIT semicircle latitude"),
+        (r'["\']position_l[o]?ng["\']\s*:\s*-?\d{5,}', "raw FIT semicircle longitude"),
+    ]
+    # Header-column form. Restricted to .csv because the same shape appears in
+    # ordinary Python, e.g. "lat, lon = raw_lat * SCALE, raw_lon * SCALE".
+    csv_patterns = [
+        (r'(?im)(?:^|,)\s*lat\b\s*(?:,|$)', "CSV \"lat\" column"),
+        (r'(?im)(?:^|,)\s*lon[g]?\b\s*(?:,|$)', "CSV \"lon\" column"),
+        (r'(?im)(?:^|,)\s*latitude\b\s*(?:,|$)', "CSV \"latitude\" column"),
+    ]
+    skip_dirs = (".git", "__pycache__", ".pytest_cache", "dashboard")
+    for dirpath, dirnames, filenames in os.walk(REPO):
+        dirnames[:] = [d for d in dirnames
+                       if d not in skip_dirs and not d.startswith(".")]
+        for fn in filenames:
+            rel = os.path.relpath(os.path.join(dirpath, fn), REPO).replace("\\", "/")
+            if not fn.endswith((".py", ".html", ".js", ".json", ".md", ".csv", ".txt")):
+                continue
+            if rel in LOCAL_ONLY or rel in GUARD_IMPL:
+                continue
+            p = os.path.join(dirpath, fn)
+            try:
+                if os.path.getsize(p) > 8_000_000:
+                    continue
+                with open(p, "rb") as fh:
+                    body = fh.read().decode("utf-8", "replace")
+            except OSError:
+                continue
+            # A bare field NAME is not a leak. garmin_fit_reader.py has to name
+            # position_lat to reject it, and CREW_BRIEF.md documents that GPS is
+            # deliberately excluded. Only a numeric value paired with a location
+            # key is a leak, so that is what is matched below.
+            for pat, kind in patterns:
+                if re.search(pat, body):
+                    die("refusing to commit %s" % rel,
+                        "it contains a %s. This repository is public.\n"
+                        "Add it to LOCAL_ONLY and keep it local." % kind)
+            if fn.endswith(".csv"):
+                for pat, kind in csv_patterns:
+                    if re.search(pat, body):
+                        die("refusing to commit %s" % rel,
+                            "it has a %s. This repository is public.\n"
+                            "Add it to LOCAL_ONLY and keep it local." % kind)
+
 
 
 def sync_with_remote(branch):
