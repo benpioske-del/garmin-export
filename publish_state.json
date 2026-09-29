@@ -1,10 +1,10 @@
 {
   "raw_url": "https://raw.githubusercontent.com/benpioske-del/garmin-export/main/garmin_export.csv",
   "branch": "main",
-  "at": "2026-09-29T04:31:29+00:00",
+  "at": "2026-09-29T04:32:30+00:00",
   "run_count": 56,
   "latest_run": "2026-09-26",
-  "data_sha": "a2988b077e43351e2e8f0ccf1dc4bf92752d6d6adaa631dd7fcfd9e36a17b361",
-  "code_sha": "c5cd0b1c2a00690b1d0d3b960119ea571dc8fb083811caf72c4fd01941410b02",
+  "data_sha": "47ca50e16425376858884e3434496388c567c23269555ac09513816b18c5e855",
+  "code_sha": "e5ef36ac5c11193be7b0a83d0f6aa5fd69e95ef5775e98c8537c388a89c25e73",
   "repo_visibility": "public - readable without a token"
 }

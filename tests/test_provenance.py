@@ -100,19 +100,21 @@ def test_no_published_column_does_not_look_like_a_coordinate():
 def test_provenance_survives_the_public_csv_header():
     """Renaming _source_file must happen at write time, not lose the value.
 
-    Regression guard: fieldnames and row keys must be renamed together. Renaming
-    only the row keys makes DictWriter's extrasaction="ignore" drop the value and
-    emit a blank column.
+    Regression guard for a real bug: fieldnames and row keys must be renamed
+    together, and the row filter must test the *published* name. Filtering on
+    the internal key drops every value and emits a blank column.
     """
-    rows = [{"Date": "2026-07-26 01:10:15", "Date (UTC)": "2026-07-27T01:10:15Z",
-             "Timezone Status": "assumed_utc", "Source": "Garmin FIT",
-             "_source_file": "2026-07-26_23745136848.fit"}]
-    internal = list(rows[0])
+    row = {"Date": "2026-07-26 01:10:15", "Date (UTC)": "2026-07-27T01:10:15Z",
+           "Timezone Status": "assumed_utc", "Source": "Garmin FIT",
+           "_source_file": "2026-07-26_23745136848.fit"}
+    internal = list(row)
     header = {"_source_file": "Source File"}
     cols = [header.get(c, c) for c in internal]
 
-    out = {header.get(k, k): v for k, v in rows[0].items() if k in internal}
     assert "Source File" in cols and "_source_file" not in cols
+
+    out = {header.get(k, k): v for k, v in row.items()
+           if header.get(k, k) in cols}
     assert out["Source File"] == "2026-07-26_23745136848.fit"
 
 

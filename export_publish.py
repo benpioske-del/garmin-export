@@ -320,13 +320,15 @@ def build_csv():
 
     rows.sort(key=sk)
     # _source_file is the internal key; publish it as a real provenance column.
+    # Filtering must test the *internal* key, which no longer appears in cols.
     header = {"_source_file": "Source File"}
     with open(os.path.join(REPO, CANON), "w", newline="", encoding="utf-8") as fh:
         w = csv.DictWriter(fh, fieldnames=cols, extrasaction="ignore",
                            restval="", lineterminator="\n")
         w.writeheader()
         for r in rows:
-            w.writerow({header.get(k, k): v for k, v in r.items() if k in cols})
+            w.writerow({header.get(k, k): v for k, v in r.items()
+                        if header.get(k, k) in cols})
 
     dates = sorted(r.get("Date", "")[:10] for r in rows if r.get("Date"))
     meta = {
