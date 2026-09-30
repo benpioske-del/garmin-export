@@ -21,7 +21,29 @@ history-safety check and the remote sync are reused rather than reimplemented.
 
 ## Transports
 
-All three share one commit path, so all three get identical validation.
+All four share one commit path, so all four get identical validation.
+
+### `capture` — run a flow command and commit what it prints
+
+For a flow whose runner can be invoked from this machine: a `crewai` CLI, a
+Studio CLI, or a wrapper script you write yourself.
+
+```cmd
+set CREWAI_FLOW_CMD=crewai run write_tasks_brief
+python brief_bridge.py capture
+```
+
+The command runs with the repository as its working directory and its **stdout**
+is treated exactly like a brief from any other transport. An unset
+`CREWAI_FLOW_CMD` is a normal state, not an error, so this is safe to call from a
+wrapper that does not always have a brief.
+
+There is deliberately no built-in CrewAI Studio HTTP client here. The Studio
+API's request and response shapes are not something this repository can verify,
+and a speculative client that looks functional is worse than an explicit seam:
+it would fail at the moment you most needed it to work. If the Studio API turns
+out to be the right transport, write the fetch in a wrapper that prints the
+brief and point `CREWAI_FLOW_CMD` at it.
 
 ### `post` — stdin
 
@@ -57,6 +79,103 @@ overridable with `GARMIN_BRIDGE_INBOX`. It is local-only and outside the repo.
 
 Pair it with a scheduled task to poll every few minutes and it becomes a
 push-free loop.
+
+## Running the whole thing: `Run CrewAI Supervisor.cmd`
+
+One command that captures the brief and publishes, in the right order:
+
+```
+Run CrewAI Supervisor.cmd            capture any brief, then publish
+Run CrewAI Supervisor.cmd --dry-run  validate everything, change nothing
+```
+
+It calls `supervisor_publish.py`, which runs `brief_bridge.py ingest` and then
+`export_publish.py`. The order matters: the publisher runs last and
+unconditionally, so `garmin_export.csv` is refreshed even on a run with no
+brief, and a rejected brief cannot leave the CSV stale. Both steps go through
+the same publisher, so there is one commit path and one set of guards.
+
+A run with **no** brief is normal and exits `0`. Most runs will not produce one,
+and treating that as an error would train you to ignore the output.
+
+## What the written brief looks like
+
+Each committed brief carries frontmatter and a generated timestamp:
+
+```
+---
+captured_utc: 2026-09-30T03:30:05+00:00
+source: inbox:brief.md
+verified_by_coach: no
+---
+
+# Supervisor Brief
+
+## Generated: 2026-09-30 03:30:05 (UTC)
+```
+
+`source` records which transport delivered it. The brief is treated as
+untrusted input throughout, and the header says so.
+
+The bridge also checks the brief's shape and reports what it found:
+
+```
+    ok: start marker present
+    ok: '## NEXT SUPERVISOR CHECK' section present
+```
+
+A missing marker is a **warning, not a refusal**. A flow is free to reword its
+headings, and a bridge that silently stops working because a heading was renamed
+is worse than one that says so. What this catches is the failure that matters:
+a transcript, an error page or a truncated response arriving where a brief was
+expected, which the coach agent would otherwise read as instructions.
+
+## Two scanners, and what happens when one objects
+
+Nothing reaches `main` without passing two independent checks:
+
+1. `capture_supervisor_brief.scan()` runs before anything is written. It knows
+   about credentials, email addresses, GPS field names and coordinate values.
+2. `export_publish.py`'s worktree guard runs at commit time and catches
+   coordinate shapes the first scanner does not model.
+
+They genuinely differ. A bare pair of two **positive** coordinates, written with
+four or more decimal places, is **not** caught by the pre-flight scanner, which
+only recognises west and south hemisphere pairs, but **is** caught by the
+publisher's degree-pair guard. Both routes end the same way.
+
+> This file once contained a realistic-looking example pair as an illustration
+> and the guard refused to commit it, which is the guard working as intended. The
+> shape is described in words instead, and the rule is: two positive numbers,
+> comma-separated, four or more decimal places each.
+
+When either refuses, the content is written to a **staging file outside the
+repository**:
+
+```
+%USERPROFILE%\Downloads\garmin_brief_rejected
+```
+
+It holds the rejected content plus the exact pattern that triggered it:
+
+```
+[!] refusing to commit: 4 unsafe or invalid item(s)
+    - GitHub token             ghp_ABCDEFGH...012345
+    - latitude value           lat=47.6062
+    - longitude value          lon=-122.3321
+
+Staged for manual review, outside the repository:
+  ...\garmin_brief_rejected\20260930T032412Z-inbox_leaky.md.rejected.md
+```
+
+Staging exists because the rejected content is the only evidence of what went
+wrong. It is deliberately *not* in the repo, and `stage_dir()` refuses to write
+there if `GARMIN_DATA_DIR` or `GARMIN_BRIDGE_STAGE` has been pointed at the
+repository, since staging a credential into git is the exact failure the scanner
+exists to prevent. Override with `GARMIN_BRIDGE_STAGE`.
+
+If the publisher blocks a commit after the file was written, the previous brief
+is restored, so the worktree never holds a brief that was rejected.
 
 ### `serve` — authenticated HTTP receiver
 

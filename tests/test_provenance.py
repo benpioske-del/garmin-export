@@ -139,10 +139,23 @@ def test_no_two_rows_are_the_same_activity(real_rows):
     date and distance would silently lose one. The count is asserted because
     dropping a phantom duplicate (57 -> 56) was a fix, but a real loss would
     look identical in the log.
+
+    The expected count comes from the FIT files on disk rather than a literal,
+    because the athlete adds runs. A hardcoded number turns every new activity
+    into a test failure, which trains you to ignore this check; deriving it keeps
+    the property that actually matters, which is that nothing was lost between
+    the FIT files and the published CSV.
     """
     keys = [(r["Date"][:10], round(float(r["Distance"]), 1)) for r in real_rows]
     assert len(keys) == len(set(keys)), "duplicate date+distance in the export"
-    assert len(real_rows) == 56, "unexpected activity count: %d" % len(real_rows)
+
+    expected = len(REAL_FIT)
+    assert len(real_rows) == expected, (
+        "published %d rows but %d FIT files on disk: %s"
+        % (len(real_rows), expected,
+           "an activity was lost or duplicated in the export"
+           if len(real_rows) < expected else
+           "the export has rows with no FIT file behind them"))
 
 
 def test_corrected_run_is_dated_to_its_local_day(real_rows):

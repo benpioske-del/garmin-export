@@ -45,6 +45,23 @@ without command output behind it.
 """
 
 
+@pytest.fixture(autouse=True)
+def isolated_staging(tmp_path, monkeypatch):
+    """Keep every rejection out of the athlete's real data directory.
+
+    Rejected briefs are staged under paths.data_dir(), which is ~/Downloads on
+    a normal machine. Without this the test suite quietly accumulates files in
+    the real inbox and staging folders, and a rejected brief can be left behind
+    for a run that never happened.
+
+    The directories are siblings of tmp_path, not children, because fake_repo
+    points REPO at tmp_path and staging refuses to sit inside the repository.
+    """
+    base = tmp_path.parent / (tmp_path.name + "_isolated")
+    monkeypatch.setenv("GARMIN_BRIDGE_STAGE", str(base / "staging"))
+    monkeypatch.setenv("GARMIN_BRIDGE_INBOX", str(base / "inbox"))
+
+
 @pytest.fixture
 def fake_repo(tmp_path, monkeypatch):
     """Point the bridge at a throwaway repo and never publish for real."""
@@ -336,3 +353,167 @@ def test_serve_refuses_to_start_without_a_token(fake_repo):
 def test_serve_refuses_a_non_loopback_bind(fake_repo):
     with pytest.raises(SystemExit):
         brief_bridge.serve(8790, TOKEN, "0.0.0.0", 1)
+
+
+# ------------------------------------------------------- rejected-brief staging
+
+def test_rejected_brief_is_staged_outside_the_repo(fake_repo, tmp_path, monkeypatch,
+                                                   capsys):
+    """A brief carrying a credential is written nowhere near git, but is kept.
+
+    The staging copy is the only evidence of what tripped the scanner, so it has
+    to survive; that is exactly why it must not be somewhere git can see.
+    """
+    # Staging must sit OUTSIDE fake_repo, which is what the real layout does.
+    stage = tmp_path.parent / (tmp_path.name + "_staging")
+    monkeypatch.setenv("GARMIN_BRIDGE_STAGE", str(stage))
+    leaky = BRIEF + "\nThe token is ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ012345\n"
+    assert brief_bridge.commit_brief(leaky, source="inbox:leaky.md") == 1
+
+    out = capsys.readouterr().out
+    assert "GitHub token" in out
+    assert "Staged for manual review" in out
+
+    staged = list(stage.glob("*.rejected.md"))
+    assert len(staged) == 1
+    body = staged[0].read_text(encoding="utf-8")
+    assert "ghp_ABCDEFGHI" in body          # the evidence is preserved
+    assert "GitHub token" in body           # and the reason is recorded
+    assert not (fake_repo / "SUPERVISOR_BRIEF.md").exists()
+
+
+def test_staging_refuses_a_directory_inside_the_repo(fake_repo, tmp_path,
+                                                     monkeypatch):
+    """GARMIN_DATA_DIR pointed at the repo must not stage a credential into git."""
+    monkeypatch.setenv("GARMIN_BRIDGE_STAGE", str(fake_repo / "staging"))
+    with pytest.raises(SystemExit):
+        brief_bridge.stage_dir()
+
+
+def test_staging_filename_survives_a_hostile_source(fake_repo, tmp_path,
+                                                    monkeypatch):
+    stage = tmp_path.parent / (tmp_path.name + "_stem")
+    monkeypatch.setenv("GARMIN_BRIDGE_STAGE", str(stage))
+    path = brief_bridge.stage_rejected(BRIEF, r"inbox:..\..\evil:C:\x", [],
+                                       "test")
+    assert path is not None
+    assert os.path.dirname(path) == str(stage)
+    assert ".." not in os.path.basename(path)
+
+
+def test_short_brief_is_staged_not_just_refused(fake_repo, tmp_path, monkeypatch):
+    stage = tmp_path.parent / (tmp_path.name + "_short")
+    monkeypatch.setenv("GARMIN_BRIDGE_STAGE", str(stage))
+    assert brief_bridge.commit_brief("too short", source="tiny") == 1
+    assert list(stage.glob("*.rejected.md"))
+
+
+def test_publish_failure_stages_and_restores(fake_repo, monkeypatch, capsys):
+    """A brief the publisher's guard refuses is staged and the old one restored."""
+    (fake_repo / "SUPERVISOR_BRIEF.md").write_text("PREVIOUS BRIEF", encoding="utf-8")
+    monkeypatch.setattr(
+        brief_bridge, "publish",
+        lambda target: (1, "refusing to commit SUPERVISOR_BRIEF.md\n"
+                          "it contains a degree coordinate pair. This repository is public."))
+    stage = fake_repo.parent / "stage2"
+    monkeypatch.setenv("GARMIN_BRIDGE_STAGE", str(stage))
+    assert brief_bridge.commit_brief(BRIEF, source="blocked") == 1
+    out = capsys.readouterr().out
+    assert "degree coordinate pair" in out
+    assert "restored the previous" in out
+    assert (fake_repo / "SUPERVISOR_BRIEF.md").read_text() == "PREVIOUS BRIEF"
+    assert list(stage.glob("*.rejected.md"))
+
+
+# ------------------------------------------------------------------- the header
+
+def test_written_brief_carries_a_generated_date(fake_repo):
+    assert brief_bridge.commit_brief(BRIEF, source="test") == 0
+    body = (fake_repo / "SUPERVISOR_BRIEF.md").read_text(encoding="utf-8")
+    today = brief_bridge.datetime.now(brief_bridge.timezone.utc).strftime("%Y-%m-%d")
+    assert "## Generated: %s" % today in body
+    assert "source: test" in body
+
+
+def test_identical_brief_is_not_committed_twice(fake_repo, capsys):
+    assert brief_bridge.commit_brief(BRIEF, source="test") == 0
+    assert brief_bridge.commit_brief(BRIEF, source="test") == 0
+    assert "already current" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------- shape reporting
+
+def test_shape_report_flags_a_missing_start_marker():
+    """The fixture has the end section but no start marker, so exactly one gap."""
+    warnings, confirmations = brief_bridge.shape_report(BRIEF)
+    assert confirmations == ["'## NEXT SUPERVISOR CHECK' section present"]
+    assert len(warnings) == 1
+    assert "UNVERIFIED LLM OUTPUT" in warnings[0]
+
+
+def test_shape_report_confirms_a_well_formed_brief():
+    text = brief_bridge.START_MARKER + "\n\nbody text\n\n" + brief_bridge.END_SECTION + "\n"
+    warnings, confirmations = brief_bridge.shape_report(text)
+    assert warnings == []
+    assert len(confirmations) == 2
+
+
+def test_shape_report_warns_on_a_transcript():
+    text = "Traceback (most recent call last):\n  File x\nRuntimeError: boom\n" * 40
+    warnings, confirmations = brief_bridge.shape_report(text)
+    assert confirmations == []
+    assert len(warnings) == 2
+
+
+def test_missing_markers_warn_but_still_publish(fake_repo, capsys):
+    """A renamed heading must not silently stop the bridge working."""
+    body = BRIEF.replace(brief_bridge.END_SECTION, "## NEXT CHECK")
+    assert brief_bridge.commit_brief(body, source="renamed") == 0
+    out = capsys.readouterr().out
+    assert "may be truncated" in out
+    assert (fake_repo / "SUPERVISOR_BRIEF.md").exists()
+
+
+# ------------------------------------------------------------ flow-command capture
+
+def test_capture_without_a_configured_command_is_not_an_error(monkeypatch, capsys):
+    monkeypatch.delenv("CREWAI_FLOW_CMD", raising=False)
+    assert brief_bridge.capture_flow() == 0
+    out = capsys.readouterr().out
+    assert "no flow command configured" in out
+    assert "CREWAI_FLOW_CMD" in out
+
+
+def test_capture_commits_the_brief_the_command_printed(fake_repo, monkeypatch):
+    import subprocess
+
+    class R:
+        returncode = 0
+        stdout = brief_bridge.START_MARKER + "\n" + BRIEF
+        stderr = ""
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: R())
+    assert brief_bridge.capture_flow(command="anything") == 0
+    body = (fake_repo / "SUPERVISOR_BRIEF.md").read_text(encoding="utf-8")
+    assert "source: flow-cmd" in body
+
+
+def test_capture_surfaces_stderr_when_there_is_no_stdout(fake_repo, monkeypatch):
+    import subprocess
+
+    class R:
+        returncode = 1
+        stdout = ""
+        stderr = "flow failed: bad credentials"
+
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: R())
+    with pytest.raises(SystemExit):
+        brief_bridge.capture_flow(command="anything")
+
+
+def test_capture_does_not_silently_swallow_a_missing_command(fake_repo, monkeypatch):
+    import subprocess
+    monkeypatch.setattr(subprocess, "run",
+                        lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError()))
+    with pytest.raises(SystemExit):
+        brief_bridge.capture_flow(command="no-such-binary-xyz")
