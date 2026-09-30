@@ -7,264 +7,307 @@ THIS IS UNVERIFIED LLM OUTPUT - review before acting.
 ---
 ## VERIFICATION (from previous brief)
 
-- `no-previous-tasks`: NOT APPLICABLE. The previous `SUPERVISOR_BRIEF.md` contained no actionable task definitions or stable task slugs.
-- `source-availability-check`: COMPLETED. `SUPERVISOR_BRIEF.md`, `docs/IMPLEMENTATION_INVENTORY.md`, and `docs/VERIFICATION_REPORT.md` were readable; `OPENCODE_INSTRUCTIONS.md` was unavailable from GitHub and absent from searched local project directories.
-- `foundation-verification`: COMPLETED IN LIVE DOCUMENTATION ONLY. The verification report records 152 passed tests and 1 skipped test, 56 imported activities, 56 raw SHA-256 references, 56 FIT files inspected, and 0 parse failures.
-- `partial-capability-review`: COMPLETED IN LIVE DOCUMENTATION ONLY. Health identity isolation, weather provider integration, live brief transport, profile completion, strength data, and activity confirmation remain incomplete or limited as documented below.
+- `reconcile-activity-count-and-provenance`: BLOCKED - The repository documents 56 FIT files and 56 canonical activities, but does not reconcile those records with the 55-row audit or historical 59-record source.
+- `profile-and-timezone-provenance`: IN PROGRESS - `profile.json` is empty, 56 timezone reviews remain open, and timestamp confidence and cross-midnight handling are incomplete.
+- `activity-confirmation-and-continuity`: IN PROGRESS - Eleven recent activities require confirmation and one activity gap is recorded, but the complete athlete-facing resolution and recomputation workflow is not evidenced.
+- `identity-consent-and-athlete-isolation`: BLOCKED - No authentication, REST API, UI, authorization system, or multi-athlete separation exists.
+- `strength-session-ingestion`: IN PROGRESS - The strength schema and service are tested, but no real strength sessions exist and `strength_load` is null.
+- `weather-provider-enrichment`: IN PROGRESS - Privacy gating exists, but there is no weather provider, coordinate resolution, observation persistence, or weather output integration.
+- `confirmed-training-load-and-coaching-loop`: IN PROGRESS - Load calculations and refusal behavior are tested, but the empty profile, unresolved reviews, missing strength data, and activity-count discrepancy prevent a trusted coaching loop.
+- `brief-transport-and-operational-delivery`: IN PROGRESS - The local bridge and tests exist, but cross-time idempotency, quality gates, dependency locking, and operational delivery remain incomplete.
+
+No previous task meets its complete acceptance criteria. The repository foundation includes 152 passing tests, canonical activity storage, FIT audit provenance, strength schema foundations, load calculations, safety boundaries, privacy guards, and a local brief bridge.
 
 ---
 ## SUPERVISOR DECISIONS
 
-The platform has a credible canonical-data, provenance, safety, and testing foundation. It is not yet ready for reliable personalised coaching at scale because several inputs and trust boundaries are incomplete.
+The immediate objective is data trust and safe athlete identity, not additional prediction features. The platform must not make authoritative personalized coaching decisions until source records, timestamp provenance, athlete identity, and confirmation status are explicit and testable.
 
-The first priority is to reconcile the reported 59 retained activities with the verified 56 imported activities. Training load, continuity, and coaching outputs must use one explainable canonical dataset. No performance or injury-related conclusion should be treated as authoritative until the three-record difference is identified and represented explicitly.
+The canonical activity count is unresolved. The repository contains evidence for 55 audit records, 56 FIT files and canonical activities, and a historical 59-record discrepancy. No record may be silently dropped, duplicated, or synthetically created. The implementation must produce a durable reconciliation artifact that identifies every divergence and defines which dataset is authoritative for coaching.
 
-Personalisation must be gated on a complete athlete profile. The empty `profile.json` prevents reliable local dates, timezone-aware continuity, location policy, and normal running-load operation. Original UTC timestamps must remain unchanged, while derived local timestamps must include provenance and confidence.
+The empty profile and unresolved timestamps make dates, load windows, weather policy, and recommendations provisional. The profile workflow must capture timezone, locale, units, goals, preferred activity identity, weather consent, and optional age or birth-year policy. Activities must expose `confirmed`, `inferred`, or `unknown` timestamp provenance and preserve the source and reason for every inference.
 
-The activity confirmation loop is a required product capability. The recommendation engine correctly refuses to proceed while 11 recent activities await confirmation, but the platform needs a review queue that distinguishes rest, illness, travel, missed recording, and missing source data without fabricating sessions.
+The existing refusal behavior is correct but incomplete. The confirmation workflow must allow an athlete or authorized actor to resolve activity dates, duplicates, invalid records, and continuity gaps. It must support `rest`, `illness`, `travel`, `missed_recording`, and `missing_source_data` without creating synthetic workouts. Every decision needs an actor, timestamp, reason, original value, revised status, and source provenance. Confirmed changes must trigger deterministic recomputation.
 
-Authentication and athlete-level isolation must be implemented before medical records, cloud coaching, or broad deployment. Consent and access logging alone are not sufficient. Every athlete-owned activity, strength session, health record, weather record, recommendation, and audit event must be attributable to an authenticated athlete.
+Authentication and athlete isolation are platform blockers. Consent is not authorization. Medical integration, cloud exposure, and multi-athlete operation must remain disabled until athlete identity, authorization, record ownership, protected import and export paths, consent revocation, and audit logging are implemented and tested.
 
-The strength domain is implemented but has no real data. A reliable strength-session capture path is needed before the system can calculate strength load, lifting fatigue, interference, progression, or strength-to-bodyweight measures.
+Heart-rate zone results are not trustworthy because 53 of 55 runs are classified as Zone 5. The platform must label HR data as untrusted and must not generate automated HR prescriptions until configuration and classification logic are validated. Pace, effort, terrain, and symptoms should remain the safer inputs.
 
-Weather enrichment should be implemented behind the existing consent and location gate after profile readiness. Weather must be stored with provider and retrieval provenance, and weather-adjusted predictions must remain disabled until enough matched data exists.
+The current low ACWR must be treated as a re-entry state after a sharp reduction, not as permission to immediately resume peak mileage. The coaching engine must consider acute load, chronic load, inactivity, confirmation confidence, gaps, strength load, symptoms, HR trust, and terrain rather than relying on ACWR alone.
 
-The existing 7/14/28-day load calculations and refusal-first recommendations should be connected into an end-to-end coaching state only after confirmation, profile, identity, and provenance requirements are satisfied. Incomplete evidence must produce `ready`, `provisional`, `confirmation_required`, or `insufficient_data` states rather than false precision.
+The strength foundation should be connected to real data through manual entry and structured import before broad device integration. Only confirmed strength sessions may contribute to combined load. The interface must distinguish no data, planned, draft, imported, and confirmed strength records.
 
-The brief bridge is not a live delivery system. Stable content identity and idempotency should be fixed before adding a cloud endpoint, tunnel, or scheduled ingest job. Dashboard work remains out of scope for this run because the existing dashboard is local-only and unversioned.
+Weather enrichment is deferred until identity, consent, and activity-time provenance are operational. When implemented, it should use a privacy-preserving provider integration, such as Open-Meteo, and store activity-context weather with provider and observation provenance without storing raw coordinates in weather observations.
 
-Advanced prediction and medical-record functionality are deferred. Release engineering gaps, including missing CI, linting, formatting, type checking, and dependency locking, should be addressed before broadening the deployment surface.
+The local brief bridge must be stabilized before cloud deployment. Stable identity must not depend on capture time. Quality gates, dependency reproducibility, repeatable verification, and backup and recovery documentation are required before operational exposure.
+
+The immediate execution order is:
+
+1. Reconcile activity and provenance records.
+2. Build identity and authorization foundations.
+3. Complete profile and timestamp provenance.
+4. Complete activity confirmation and continuity.
+5. Connect confirmed data to the coaching loop.
+6. Add real strength ingestion and combined load.
+7. Add consented weather enrichment.
+8. Stabilize operational delivery and quality gates.
 
 ---
 ## OPENCODE TASKS
 
-1. `reconcile-activity-count-and-provenance`
+### 1. reconcile-activity-count-and-provenance
 
-What to do:
-- Inspect the repository's FIT inventory, canonical activity tables or files, import services, audit scripts, and verification documentation.
-- Produce a source-to-canonical reconciliation report explaining why the coaching audit reports 59 activities while verified application import reports 56.
-- Compare source filenames, activity identifiers, hashes, timestamps, local dates, import status, duplicate status, and exclusion or pending status.
-- Identify each of the three records that account for the discrepancy, or document exactly which source evidence is missing.
-- Define one canonical activity count for application calculations.
-- Represent excluded, duplicate, pending, or unverified source records explicitly rather than silently dropping them.
-- Add a regression test that fails when the audit dataset and canonical application dataset diverge without an explainable status.
-- Update `docs/IMPLEMENTATION_INVENTORY.md` and `docs/VERIFICATION_REPORT.md` with the reconciliation result and the canonical counting rule.
+**What to do**
 
-Where:
-- Repository root.
-- Existing activity import, canonical record, audit, and verification modules.
-- Relevant data and documentation under `docs/`.
+Create a complete source-to-canonical reconciliation for all activity records. Identify every record in the FIT-file inventory, canonical `activities` table, 55-row audit dataset, and any historical 59-record audit source available in the repository. Classify every difference as one of:
 
-How to verify success:
-- Run the existing test suite and the new reconciliation tests.
-- The report names all records in the 59-versus-56 difference or records a specific evidence limitation.
-- A single documented canonical count is used by load and continuity calculations.
-- Re-running the import and audit produces no unexplained count difference.
-- Evidence includes the command output and final counts in `docs/VERIFICATION_REPORT.md`.
+- `duplicate`
+- `excluded_source_record`
+- `parse_or_import_difference`
+- `date_or_time_identity_difference`
+- `malformed_or_unreviewed`
+- `legitimate_additional_activity`
 
-Priority: HIGH
+Do not delete, duplicate, or synthesize an activity to force counts to match. Define and document the single authoritative dataset used by load calculations and coaching outputs. If the historical 59-record source is unavailable, record that fact as an explicit unresolved source limitation and include the exact paths and commands used to search for it.
 
-2. `profile-and-timezone-provenance`
+Add a durable reconciliation report and regression tests that detect future divergence between source inventory, audit records, and canonical records. Include source identifiers, canonical IDs, timestamps, dates, provenance references, classification, and resolution status for every divergence.
 
-What to do:
-- Inspect the existing profile model, `profile.json` handling, timestamp parsing, filename date parsing, location consent, weather gate, and recommendation prerequisites.
-- Implement an explicit profile-completion state covering timezone, locale, units, training goals, location consent, and the repository's existing age or birth-year policy if required by current interfaces.
-- Preserve every original UTC timestamp.
-- Store a derived local timestamp and local date with provenance values `confirmed`, `inferred`, or `unknown`.
-- Require review for cross-midnight activities and ambiguous filename-derived dates, including the activity displayed as 26 July at 01:10 with a UTC timestamp on 27 July.
-- Prevent weather enrichment and local-date-dependent coaching from claiming confirmed precision when profile or timestamp confidence is incomplete.
-- Keep the empty profile safe and non-personalised; do not invent athlete values.
-- Add migration or validation behavior that clearly reports incomplete required profile fields.
+**Where**
 
-Where:
-- Repository root.
-- Existing profile, timestamp, activity normalization, consent, and recommendation modules.
-- `profile.json` or its configured replacement.
-- Related tests and `docs/`.
+Work in the repository `benpioske-del/garmin-export` on the main branch. Inspect the activity import and audit code, database migrations, `docs/IMPLEMENTATION_INVENTORY.md`, `docs/VERIFICATION_REPORT.md`, existing data directories, and all activity-related tests. Add the report under `docs/` and place tests beside the existing activity and import tests.
 
-How to verify success:
-- Tests cover confirmed, inferred, unknown, and cross-midnight timestamp states.
-- An incomplete profile causes an explicit non-ready or confirmation-required state rather than silently using assumed values.
-- Original UTC values remain unchanged after processing.
-- A completed test profile produces deterministic local dates.
-- Weather location policy rejects or blocks requests when required profile and consent fields are absent.
-- Update `docs/VERIFICATION_REPORT.md` with profile validation and timezone test results.
+**How to verify success**
 
-Priority: HIGH
+- A committed reconciliation artifact accounts for every available record in every source.
+- The artifact explicitly explains the 55, 56, and 59 counts or documents which source is unavailable.
+- Every canonical activity has a source or an explicit reviewed exception.
+- No synthetic activity is created for a missing source record.
+- Re-running the reconciliation produces the same result without duplicate rows.
+- Regression tests fail if a source record is silently omitted or a canonical record loses provenance.
+- The normal test suite passes.
 
-3. `activity-confirmation-and-continuity`
+**Priority: HIGH**
 
-What to do:
-- Inspect the recommendation refusal path, activity confirmation fields, import status, missing-session handling, and recent activity views.
-- Implement a review queue for unconfirmed activities, suspicious gaps, duplicate candidates, and records with uncertain local dates.
-- Allow an authenticated athlete to classify a gap as `rest`, `illness`, `travel`, `missed_recording`, or `missing_source_data`.
-- Preserve the distinction between no activity occurring and no activity being recorded.
-- Do not create synthetic activities from gap classifications.
-- Recompute training load and recommendations only after relevant confirmation state changes.
-- Ensure the current 11 unconfirmed recent activities are visible and actionable through the review path.
-- Preserve refusal-first behavior when required confirmations remain unresolved.
+### 2. build-identity-consent-and-athlete-isolation
 
-Where:
-- Repository root.
-- Existing activity, recommendation, audit, and load calculation services.
-- Existing local API or command-line review interfaces.
-- Related tests and `docs/`.
+**What to do**
 
-How to verify success:
-- A test creates unconfirmed activities and a data gap, resolves each through the supported state transitions, and verifies the resulting load and recommendation state.
-- Unresolved confirmations return `confirmation_required`.
-- Gap classifications are stored with actor, timestamp, reason, and provenance.
-- No synthetic activity is created for a classified gap.
-- The review queue distinguishes missing data from confirmed rest.
-- Existing safety tests continue to pass.
+Implement a local-first athlete identity and authorization boundary before enabling medical data, cloud exposure, or multi-athlete operation. Add an immutable athlete identifier and ownership relationship to every athlete-owned record, including activities, activity reviews, continuity decisions, profiles, strength sessions, weather links, load outputs, recommendations, and sensitive import or export records.
 
-Priority: HIGH
+Implement authenticated local identity suitable for the current application architecture. Add authorization checks for reads, writes, imports, exports, review decisions, and sensitive data access. Implement consent grants and revocation enforcement for health and location data. Record auditable authorization decisions and sensitive access events. Preserve the existing health consent boundary, but do not treat it as authentication.
 
-4. `identity-consent-and-athlete-isolation`
+Keep medical-record integration disabled. Do not add a cloud endpoint as part of this task.
 
-What to do:
-- Inspect all data access paths for canonical activities, strength sessions, health records, weather data, recommendations, profiles, and audit logs.
-- Implement authenticated athlete identity and role boundaries using the repository's existing architecture and dependency conventions.
-- Add an athlete identifier to every athlete-owned record that lacks one, with an explicit migration strategy for existing local data.
-- Enforce athlete-level authorization on reads, writes, updates, imports, exports, recommendations, weather requests, consent changes, and audit events.
-- Make consent grants and revocations attributable to the authenticated athlete.
-- Preserve access logging and include actor, target athlete, resource, action, decision, and timestamp.
-- Do not add medical-record integration in this task. Keep it blocked until isolation and authorization are verified.
-- Ensure local single-athlete operation remains usable through an explicit local identity or development configuration that cannot bypass authorization in production mode.
+**Where**
 
-Where:
-- Repository root.
-- Existing health consent, access logging, profile, activity, strength, weather, recommendation, and brief transport modules.
-- Database schema and migrations.
-- Authentication and authorization tests.
-- `docs/`.
+Work in the repository database schema, migrations, services, import and export paths, health and weather consent code, and existing test suite. Inspect the current database and service architecture before choosing implementation details. Add a migration under the existing migration sequence and document the authorization model in `docs/`.
 
-How to verify success:
-- Cross-athlete read, write, update, import, export, consent, and recommendation tests are denied.
-- Authorized same-athlete operations succeed.
-- Every protected access produces an auditable decision.
-- Consent revocation prevents subsequent protected access where required.
-- Existing privacy and safety tests remain passing.
-- The verification report explicitly states that medical records remain blocked until this task is complete and reviewed.
+**How to verify success**
 
-Priority: HIGH
+- Every athlete-owned table has an athlete ownership field or an enforced ownership relationship.
+- Reads and writes reject unauthenticated or unauthorized access.
+- Tests prove that one athlete cannot read, modify, import for, or export another athlete's records.
+- Revoked health or location consent blocks the corresponding operation.
+- Sensitive access and authorization decisions are auditable.
+- Existing single-athlete data is migrated deterministically to one explicit local athlete identity.
+- Tests prove that medical integration and cloud exposure remain disabled.
+- The normal test suite passes with migration tests included.
 
-5. `strength-session-ingestion`
+**Priority: HIGH**
 
-What to do:
-- Inspect the existing strength schema, service, load calculation, terminology, and recommendation integration.
-- Implement a reliable strength-session input or import path for exercise, sets, repetitions, load, unit, RPE or RIR, rest, bodyweight where available, soreness, confirmation state, and session timestamp.
-- Add exercise identity and movement-pattern taxonomy using shared terminology.
-- Calculate estimated 1RM only for suitable source sets, and store the formula, inputs, and provenance.
-- Feed confirmed strength sessions into the existing 7/14/28-day load windows.
-- Store whether each session is athlete-confirmed, imported, or draft.
-- Keep strength-based recommendations provisional while no confirmed real sessions exist.
-- Do not infer strength-to-bodyweight ratios without valid bodyweight and strength inputs.
+### 3. complete-profile-and-timestamp-provenance
 
-Where:
-- Repository root.
-- Existing strength domain, training-load, terminology, recommendation, and migration modules.
-- Related tests and `docs/`.
+**What to do**
 
-How to verify success:
-- Tests cover valid sessions, drafts, imported sessions, athlete confirmation, invalid units, missing required set fields, and estimated 1RM provenance.
-- A confirmed strength session produces a non-null strength load in the correct windows.
-- An unconfirmed or draft session does not affect confirmed coaching load.
-- Movement-pattern terms match the shared terminology contract.
-- The verification report clearly states whether real athlete strength data is present after implementation.
+Implement profile completion and timestamp provenance workflows. The profile must support timezone, locale, units, training goals, preferred activity identity, location and weather consent, and an explicit optional age or birth-year policy. Validate required values and retain whether each value is user-confirmed, inferred, or unknown.
 
-Priority: HIGH
+Add explicit activity timestamp provenance states: `confirmed`, `inferred`, and `unknown`. Preserve UTC timestamp, derived local date, source filename date, timezone used, and the reason for any inference. Handle cross-midnight activities through a review state instead of silently changing their dates. Ensure incomplete profiles produce safe, explicit coaching states rather than invented values.
 
-6. `weather-provider-enrichment`
+Do not silently assume UTC for a completed profile. Existing assumptions may remain only as clearly labeled provisional provenance.
 
-What to do:
-- Inspect the existing weather gate, location consent, profile validation, activity timestamp handling, privacy guard, and data storage conventions.
-- Integrate a provider such as Open-Meteo behind the existing gate, using approved location and activity time only when profile and consent requirements are satisfied.
-- Store the raw provider response or a durable reference, provider name, query coordinates or grid reference, retrieval time, activity timestamp, schema version, and request status.
-- Store available temperature, relative humidity, dew point, wind speed, wind direction, precipitation, and conditions.
-- Distinguish observed, estimated, interpolated, unavailable, and consent-blocked weather.
-- Make the privacy guard conservative for bare single-coordinate cases and route ambiguous locations to manual review.
-- Add weather context to activity detail and trend outputs without applying automatic performance correction.
-- Keep weather-adjusted predictions disabled until a documented minimum matched-data threshold exists.
+**Where**
 
-Where:
-- Repository root.
-- Existing weather gate, profile, consent, privacy, activity enrichment, and reporting modules.
-- Configuration and dependency files.
-- Related tests and `docs/`.
+Work in `profile.json` handling, profile services and validation, activity import and date derivation code, activity review models, load calculation inputs, recommendation gates, and related tests. Update `docs/IMPLEMENTATION_INVENTORY.md` and add a provenance contract under `docs/`.
 
-How to verify success:
-- Tests cover missing profile, missing consent, blocked location, provider success, provider timeout, malformed response, unavailable weather, and repeat enrichment.
-- A permitted request stores provider and provenance fields.
-- A blocked request stores no unauthorized location or weather data and returns an explicit blocked state.
-- Repeated enrichment is idempotent for the same activity, provider, query, and schema version.
-- Weather is shown as explanatory context only; no weather-adjusted prediction is produced.
-- Update the verification report with provider configuration and test evidence without exposing secrets.
+**How to verify success**
 
-Priority: MEDIUM
+- A valid completed profile can be stored and reloaded with all required fields and consent states.
+- Invalid, incomplete, and revoked profile values are rejected or represented as explicit unknown states.
+- Every activity exposes one timestamp provenance state and the supporting source fields.
+- Cross-midnight fixtures enter review instead of being silently reassigned.
+- Local dates are deterministic for a confirmed timezone.
+- Load and recommendation outputs expose the effect of unresolved profile or timestamp data.
+- Tests cover confirmed, inferred, unknown, cross-midnight, and missing-timezone cases.
+- The normal test suite passes.
 
-7. `confirmed-training-load-and-coaching-loop`
+**Priority: HIGH**
 
-What to do:
-- Inspect canonical activity loading, strength load integration, 7/14/28-day windows, elevation load, long-run metrics, recommendation safety boundaries, profile prerequisites, and confirmation states.
-- Define and implement coaching states `ready`, `provisional`, `confirmation_required`, and `insufficient_data`.
-- Require canonical, confirmed data and a sufficiently complete profile before normal personalised recommendations.
-- Connect confirmed running and strength records into combined load outputs.
-- Expose rolling volume, long-run share, consecutive running days, elevation load, strength load, and recovery or confirmation confidence labels.
-- Preserve refusal-first behavior for missing identity, consent, profile, confirmation, provenance, or source data.
-- Encode the current conservative reset guidance as provisional coaching policy: approximately 6-8, 9-11, 12-14, and 14-16 running miles over four weeks only when recovery remains normal; long runs approximately 4, 5, 6, and 6-7 miles; most running easy; avoid stacking hills, quality running, long runs, and heavy lower-body lifting.
-- Do not present these ranges as medical advice or as a substitute for athlete confirmation.
+### 4. implement-activity-confirmation-and-continuity-queue
 
-Where:
-- Repository root.
-- Existing load, recommendation, activity confirmation, strength, profile, safety, and reporting modules.
-- Related tests and `docs/`.
+**What to do**
 
-How to verify success:
-- Tests cover each coaching state and all major blocking conditions.
-- Confirmed activity and strength fixtures produce deterministic 7/14/28-day outputs.
-- Pending confirmation prevents `ready`.
-- Missing profile or athlete identity prevents personalised output.
-- Incomplete weather does not block basic coaching when weather is not required, but cannot be represented as known.
-- The output includes confidence and provenance labels.
-- Existing 152-pass baseline remains passing, with any changed expectations documented.
+Turn existing review records into an actionable confirmation and continuity workflow. Support review actions for timezone or date correction, duplicate, invalid activity, and activity confirmation. Support gap classifications of `rest`, `illness`, `travel`, `missed_recording`, and `missing_source_data`.
 
-Priority: MEDIUM
+For every review decision, store the actor, decision timestamp, reason, original value, revised status, and source provenance. Preserve the history of changes rather than overwriting the original record. A continuity classification must not create a synthetic workout or alter source provenance. Add deterministic recomputation after a confirmation or correction, including load windows, trends, recommendations, and dashboard summaries.
 
-8. `brief-transport-and-operational-delivery`
+Keep recommendations in a refusal or confirmation-required state while required recent records remain unresolved.
 
-What to do:
-- Inspect the brief bridge, `commit_brief()`, transport schemas, delivery records, configuration, and operational documentation.
-- Define a stable brief identity based on source identity, athlete identity, content or canonical payload, and schema version.
-- Fix idempotency so repeated delivery does not depend on a regenerated `captured_utc` value. Preserve capture time as metadata, not as the sole identity input.
-- Add tests for repeated commits in the same second and across different seconds.
-- Do not configure a cloud endpoint, tunnel, or scheduled ingest until authentication, athlete isolation, confirmation, and provenance controls are verified.
-- Document the deferred operational deployment requirements.
-- Add CI, dependency locking, linting, formatting, and type-checking configuration only if compatible with the repository's current language and package tooling; otherwise document the exact blocker and a safe follow-up.
+**Where**
 
-Where:
-- Repository root.
-- Existing brief bridge implementation, transport schemas, configuration, build files, and operational documentation.
-- `docs/`.
+Work in the activity review and audit services, continuity or gap models, recommendation gates, load calculation services, dashboard/report output code, migrations, and tests. Use the existing 56 timezone reviews, 11 recent confirmations, and activity gap fixtures as regression cases where available.
 
-How to verify success:
-- Identical source content and identity produce one logical delivery regardless of commit time.
-- Changed content or source identity produces a new delivery.
-- Tests prove the timestamp no longer breaks idempotency.
-- No secrets, personal coordinates, or unauthenticated cloud endpoint are introduced.
-- Documentation states that live cloud delivery remains deferred until the required controls are complete.
-- Any added quality gates run successfully in a clean checkout.
+**How to verify success**
 
-Priority: LOW
+- The review queue lists all unresolved activity and continuity decisions with actionable allowed transitions.
+- All required classifications are accepted and persisted with complete audit metadata.
+- No continuity decision inserts a synthetic activity.
+- Confirming or correcting a record recomputes all affected outputs deterministically.
+- Repeating the same decision is idempotent.
+- Recommendations remain blocked when required confirmations are open and become eligible only when the documented gate is satisfied.
+- Tests cover every classification, authorization failure, audit field, recomputation, and no-synthetic-activity rule.
+- The normal test suite passes.
+
+**Priority: HIGH**
+
+### 5. harden-coaching-state-and-confirmed-load-loop
+
+**What to do**
+
+Complete the coaching contract around trusted data. Explicitly expose the states `ready`, `provisional`, `confirmation_required`, and `insufficient_data`, with a machine-readable reason and human-readable explanation for each state.
+
+Make 7-day, 14-day, and 28-day running and combined load calculations use only records whose inclusion status and provenance satisfy the documented rules. Add confirmed strength load when strength data is available. Treat a low ACWR after a recent sharp reduction as a re-entry state rather than automatically low risk. Include recent inactivity, confirmation confidence, activity gaps, strength load, symptoms, HR trust, and terrain in recommendation gating and output labels.
+
+Do not change refusal-first behavior into permissive behavior. Do not generate HR prescriptions while HR configuration is untrusted.
+
+**Where**
+
+Work in the load calculation, recommendation, trend, HR classification, and report output services, plus their schemas and tests. Update the coaching-state contract in `docs/`.
+
+**How to verify success**
+
+- Each coaching state can be produced through a documented fixture and includes a reason.
+- Confirmed running records produce deterministic 7/14/28-day loads.
+- Unconfirmed, unknown-date, excluded, or unresolved records are handled according to documented rules.
+- Confirmed strength records contribute to combined load; draft or planned records do not.
+- A sharp recent reduction produces a re-entry warning even when ACWR is low.
+- Untrusted HR data produces `hr_data_untrusted` and no automated HR prescription.
+- Recommendations remain refusal-first when data is insufficient or confirmation is required.
+- Tests cover all state transitions and existing 152-test behavior remains intact.
+
+**Priority: HIGH**
+
+### 6. validate-hr-zones-before-coaching
+
+**What to do**
+
+Audit and repair heart-rate zone interpretation without treating the existing 53-of-55 Zone 5 result as physiological truth. Identify whether zones are based on maximum HR, threshold HR, or heart-rate reserve, and preserve the source of the configured values. Add validation for impossible or suspicious distributions and expose an `hr_data_untrusted` state with affected metrics and required corrective action.
+
+Block automated HR-zone prescriptions and HR-based progression while configuration is unverified. Continue to expose average HR, maximum HR, pace, elevation, effort, and provenance for defensive review.
+
+**Where**
+
+Work in HR configuration, activity parsing, zone classification, coaching recommendation, and report output code. Add tests using fixtures that reproduce the current Zone 5 distribution and fixtures for valid max-HR, threshold-HR, and heart-rate-reserve configurations.
+
+**How to verify success**
+
+- The system identifies the current HR-zone configuration and its source.
+- Suspicious zone distributions are labeled untrusted instead of presented as confirmed physiology.
+- Automated HR prescriptions are blocked while HR settings are unverified.
+- Validated configurations produce deterministic zones with documented formulas.
+- Reports show the reason, affected metrics, and corrective action for untrusted HR data.
+- Tests cover invalid configuration, missing configuration, suspicious distribution, and validated configuration.
+- The normal test suite passes.
+
+**Priority: HIGH**
+
+### 7. add-confirmed-strength-session-ingestion
+
+**What to do**
+
+Implement a reliable manual entry and structured import path for real strength sessions using the existing strength schema and service. Support session date and timestamp provenance, exercises, movement-pattern taxonomy, sets, repetitions, load, bodyweight where available, RPE or repetitions in reserve, laterality, pain or limitation flags, and confirmed, imported, or draft state.
+
+Add estimated 1RM provenance and modification or deletion history. Ensure only confirmed sessions contribute to combined training load. Clearly distinguish no strength data, planned strength, draft strength, imported strength, and confirmed strength in reports and coaching output.
+
+Do not invent historical strength sessions. Do not infer strength progression from the absence of records.
+
+**Where**
+
+Work in `strength.py`, the `003_strength` migration or subsequent migrations, import and service layers, combined-load code, and strength tests. Add user-facing or CLI entry points consistent with the repository's current architecture. Update implementation documentation.
+
+**How to verify success**
+
+- A valid strength session can be manually created, imported, reviewed, confirmed, modified, and deleted with audit history.
+- Required fields and movement-pattern values are validated.
+- Estimated 1RM values identify their formula, inputs, and provenance.
+- Draft and planned sessions do not contribute to load.
+- Confirmed sessions contribute deterministically to 7/14/28-day combined load.
+- No-data output remains explicit until a session exists.
+- Tests cover field validation, state transitions, laterality, pain flags, provenance, idempotent import, and combined load.
+- The normal test suite passes.
+
+**Priority: MEDIUM**
+
+### 8. implement-consented-weather-provider-enrichment
+
+**What to do**
+
+After identity, consent, and timestamp provenance gates are available, add a privacy-preserving weather provider integration using Open-Meteo or the provider abstraction already present in the repository. Resolve weather for the activity context only when location consent exists and the activity time is sufficiently trusted.
+
+Persist temperature, relative humidity, dew point, wind speed and direction, precipitation, condition code, and apparent temperature or equivalent heat metric where the provider supplies them. Store retrieval timestamp, provider, model or observation provenance, and status values for `observed`, `estimated`, `interpolated`, `unavailable`, and `consent_blocked`.
+
+Do not store raw athlete coordinates in weather observation records. Make enrichment idempotent and expose weather context in activity and trend outputs only when data quality permits. Do not claim weather-adjusted performance from missing or insufficient data.
+
+**Where**
+
+Work in `weather.py`, weather migrations and models, consent and location policy code, activity enrichment services, report outputs, and privacy tests. Use provider mocking in tests and do not require live network access for the test suite.
+
+**How to verify success**
+
+- Enrichment is blocked without valid location consent or acceptable timestamp provenance.
+- Provider responses are persisted with complete provider and retrieval provenance.
+- Weather observations contain no raw coordinates.
+- Repeat enrichment produces one stable result rather than duplicate observations.
+- All required status values are represented and surfaced correctly.
+- Activity and trend outputs display weather context only when permitted and available.
+- Tests cover consent blocked, unavailable provider, observed or estimated data, repeat enrichment, and privacy rejection.
+- The normal test suite passes.
+
+**Priority: MEDIUM**
+
+### 9. stabilize-brief-transport-and-quality-gates
+
+**What to do**
+
+Fix brief transport idempotency so stable identity does not depend on regenerated `captured_utc`. A byte-identical brief posted in different seconds must resolve to the same identity and must not create duplicate records. Preserve capture time as metadata, not as the identity key.
+
+Add repository quality gates appropriate to the existing language and tooling: formatter, linter, type checker where applicable, test command, dependency lockfile, and CI configuration. Document repeatable import and verification commands and a local backup and recovery procedure. Do not deploy a cloud endpoint or expose athlete data operationally in this task.
+
+**Where**
+
+Work in `brief_bridge.py`, its tests, package and dependency files, CI configuration, and operational documentation under `docs/`.
+
+**How to verify success**
+
+- Cross-second idempotency tests pass using mocked timestamps.
+- Reposting byte-identical content does not create duplicate records.
+- Capture time remains available as metadata.
+- Quality checks run locally and in CI.
+- Dependencies are reproducible from a committed lockfile or the repository's standard equivalent.
+- Import, verification, backup, and recovery commands are documented and tested.
+- No cloud deployment or unauthenticated endpoint is introduced.
+- The normal test suite and all quality gates pass.
+
+**Priority: MEDIUM**
 
 ---
 ## NEXT SUPERVISOR CHECK
 
-On the next run, verify in this order:
+On the next run, verify that `reconcile-activity-count-and-provenance` has produced a committed record-level reconciliation and that the 55, 56, and 59 counts are either resolved or tied to explicit unavailable source evidence.
 
-1. `reconcile-activity-count-and-provenance` has identified the 59-versus-56 discrepancy and established a documented canonical count.
-2. `profile-and-timezone-provenance` has implemented explicit profile and timestamp confidence states without inventing athlete data.
-3. `activity-confirmation-and-continuity` has a working review path for the 11 pending activities and distinguishes missing records from confirmed rest.
-4. `identity-consent-and-athlete-isolation` has passing cross-athlete authorization tests before any medical or cloud capability is expanded.
-5. The full test suite still passes, and all verification documentation identifies remaining live-data limitations.
-6. No task has enabled weather-adjusted predictions, medical-record integration, or cloud brief delivery while the stated gates remain incomplete.
+Verify that `build-identity-consent-and-athlete-isolation` has established athlete ownership, authorization, consent revocation, and cross-athlete isolation tests without enabling medical integration or cloud exposure.
+
+Verify that `complete-profile-and-timestamp-provenance` and `implement-activity-confirmation-and-continuity-queue` have converted the empty profile, 56 timezone reviews, 11 recent confirmations, and activity gap into actionable, auditable workflows.
+
+Verify that the coaching engine exposes the four required states, remains refusal-first, uses only eligible confirmed data, and labels the low-ACWR re-entry condition and untrusted HR data correctly.
+
+Verify test results, migration status, documentation changes, and repository cleanliness. No task should be marked completed unless its acceptance criteria and regression evidence are present in the live repository.
