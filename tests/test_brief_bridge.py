@@ -196,6 +196,71 @@ def test_ingest_keeps_a_rejected_brief_for_inspection(fake_repo, tmp_path,
     assert bad.exists(), "a rejected brief stays put so it can be read"
 
 
+@pytest.mark.parametrize("name", ["brief.md", "brief.markdown", "brief.txt"])
+def test_ingest_accepts_the_extensions_notepad_actually_saves(
+        name, tmp_path, monkeypatch, fake_repo):
+    """Notepad saves .txt by default, and CrewAI Studio output is copied out.
+
+    Matching only .md meant a perfectly good drop was skipped without a word and
+    the run still reported success, which is indistinguishable from a broken
+    bridge. The athlete would conclude the automation was failing.
+    """
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    (inbox / name).write_text(BRIEF, encoding="utf-8")
+    monkeypatch.setattr(brief_bridge, "inbox_dir", lambda: str(inbox))
+    assert brief_bridge.ingest() == 0
+    assert (fake_repo / "SUPERVISOR_BRIEF.md").exists()
+    assert not (inbox / name).exists()
+
+
+def test_ingest_still_ignores_an_unrelated_extension(tmp_path, monkeypatch,
+                                                     fake_repo):
+    inbox = tmp_path / "inbox"
+    inbox.mkdir()
+    (inbox / "notes.pdf").write_text(BRIEF, encoding="utf-8")
+    monkeypatch.setattr(brief_bridge, "inbox_dir", lambda: str(inbox))
+    assert brief_bridge.ingest() == 0
+    assert not (fake_repo / "SUPERVISOR_BRIEF.md").exists()
+    assert (inbox / "notes.pdf").exists()
+
+
+def test_paste_publishes_a_brief_on_the_clipboard(fake_repo, monkeypatch):
+    # Real Studio output carries the marker. BRIEF does not, which is deliberate:
+    # it proves the marker check is what gates this transport.
+    marked = brief_bridge.START_MARKER + " - review before acting.\n\n" + BRIEF
+    monkeypatch.setattr(brief_bridge, "clipboard_text", lambda: marked)
+    assert brief_bridge.paste() == 0
+    assert (fake_repo / "SUPERVISOR_BRIEF.md").exists()
+
+
+def test_paste_refuses_a_clipboard_that_is_not_a_brief(fake_repo, monkeypatch,
+                                                        capsys):
+    """The clipboard holds whatever was last copied, which may be a password.
+
+    Without the marker check this transport would publish arbitrary clipboard
+    content into a file the coach agent reads as instructions.
+    """
+    monkeypatch.setattr(brief_bridge, "clipboard_text",
+                        lambda: "my wifi password is hunter2")
+    assert brief_bridge.paste() == 1
+    assert not (fake_repo / "SUPERVISOR_BRIEF.md").exists()
+    assert "does not look like" in capsys.readouterr().out
+
+
+def test_paste_with_an_empty_clipboard_is_not_a_failure(fake_repo, monkeypatch,
+                                                        capsys):
+    monkeypatch.setattr(brief_bridge, "clipboard_text", lambda: "")
+    assert brief_bridge.paste() == 0
+    assert not (fake_repo / "SUPERVISOR_BRIEF.md").exists()
+
+
+def test_paste_reports_an_unreadable_clipboard(fake_repo, monkeypatch, capsys):
+    monkeypatch.setattr(brief_bridge, "clipboard_text", lambda: None)
+    assert brief_bridge.paste() == 0
+    assert "could not be read" in capsys.readouterr().out
+
+
 def test_ingest_refuses_a_symlink(tmp_path, monkeypatch, fake_repo):
     """A symlink is not a drop; following it could read an arbitrary file."""
     inbox = tmp_path / "inbox"

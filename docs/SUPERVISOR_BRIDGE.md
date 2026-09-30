@@ -21,7 +21,36 @@ history-safety check and the remote sync are reused rather than reimplemented.
 
 ## Transports
 
-All four share one commit path, so all four get identical validation.
+All five share one commit path, so all five get identical validation.
+
+### `paste` — the Windows clipboard
+
+The one-step path, and the one to use while the flow runs in the cloud.
+
+1. Copy the `write_tasks_brief` output in the CrewAI Studio UI.
+2. Run `Run CrewAI Supervisor.cmd --paste`.
+
+```cmd
+python brief_bridge.py paste
+```
+
+This exists because every other route loses the brief somewhere between the
+Studio UI and the guard: a wrong filename, a `.txt` that matches nothing, a
+file that never got saved. Copying already happened, so the clipboard is the
+last place it survives intact.
+
+The clipboard is untrusted input like anything else here, so it has to prove it
+is a brief. The start marker is required. Without that check this transport
+would publish whatever was last copied into a file the coach agent reads as
+instructions — a copied password, a copied URL, a copied private message.
+
+```
+the clipboard does not look like a supervisor brief
+  expected a line beginning: THIS IS UNVERIFIED LLM OUTPUT
+  nothing was published, and the clipboard was left untouched
+```
+
+An empty clipboard is not a failure; it just means nothing was copied yet.
 
 ### `capture` — run a flow command and commit what it prints
 
@@ -69,6 +98,12 @@ python brief_bridge.py ingest
 The directory defaults to `%USERPROFILE%\Downloads\garmin_brief_inbox` and is
 overridable with `GARMIN_BRIDGE_INBOX`. It is local-only and outside the repo.
 
+It accepts `.md`, `.markdown` and `.txt`. The `.txt` case is not cosmetic:
+Notepad saves `.txt` by default, so the natural result of copying a brief out
+of the Studio UI and saving it is a file this bridge would otherwise have
+skipped silently, while still reporting a successful run. Prefer `paste`, which
+has no filename to get wrong.
+
 - An accepted brief is published and then **removed**, so a rerun is a no-op.
 - A **rejected** brief is **left in place**. It is the one worth reading: it is
   how a leaked credential or a coordinate gets found. Deleting it would destroy
@@ -88,16 +123,23 @@ the pipeline code is what belongs in the repository. It hardcodes the repo and
 interpreter paths and calls in:
 
 ```
-Run CrewAI Supervisor.cmd            capture any brief, then publish
-Run CrewAI Supervisor.cmd --dry-run  validate everything, change nothing
-Run CrewAI Supervisor.cmd --crew "..." run the local crew instead (older path)
+Run CrewAI Supervisor.cmd                      capture any brief, then publish
+Run CrewAI Supervisor.cmd --paste              publish the brief on the clipboard
+Run CrewAI Supervisor.cmd --dry-run            validate everything, change nothing
+Run CrewAI Supervisor.cmd --crew "..."         run the local crew instead
 ```
 
-It calls `supervisor_publish.py`, which runs `brief_bridge.py ingest` and then
-`export_publish.py`. The order matters: the publisher runs last and
-unconditionally, so `garmin_export.csv` is refreshed even on a run with no
-brief, and a rejected brief cannot leave the CSV stale. Both steps go through
-the same publisher, so there is one commit path and one set of guards.
+It calls `supervisor_publish.py`, which runs `brief_bridge.py ingest` (or
+`paste` with `--paste`) and then `export_publish.py`. The order matters: the
+publisher runs last and unconditionally, so `garmin_export.csv` is refreshed
+even on a run with no brief, and a rejected brief cannot leave the CSV stale.
+Both steps go through the same publisher, so there is one commit path and one
+set of guards.
+
+**The transport gap is still open.** Nothing carries the flow's output to this
+machine on its own. The brief will not appear until a human copies it, or a
+transport is configured. Until then this repo holds the last brief that was
+hand-delivered, which is why it looks stale.
 
 A run with **no** brief is normal and exits `0`. Most runs will not produce one,
 and treating that as an error would train you to ignore the output.

@@ -345,6 +345,60 @@ def commit_brief(text, source="stdin", name=None, dry_run=False):
     return 0
 
 
+# A brief saved from the CrewAI Studio UI is almost always a .txt, because that
+# is what Notepad defaults to. Accepting only .md meant a correct drop was
+# silently ignored and the run reported success, which reads as a broken bridge
+# rather than a naming mistake.
+BRIEF_SUFFIXES = (".md", ".markdown", ".txt")
+
+
+def paste(dry_run=False):
+    """Publish whatever brief is sitting on the Windows clipboard.
+
+    This is the one-step path: copy the write_tasks_brief output in the CrewAI
+    Studio UI, then run this. It saves inventing a filename, choosing an
+    extension and saving a file, which are three ways to lose a brief before it
+    ever reaches the guard.
+
+    The clipboard is untrusted input like any other transport, so it has to
+    prove it is a brief. Requiring the start marker is the difference between a
+    clipboard transport and a way to publish whatever was last copied.
+    """
+    text = clipboard_text()
+    if not text or not text.strip():
+        print("the clipboard is empty, or could not be read from it")
+        print("copy the brief in the CrewAI Studio UI, then run this again")
+        return 0  # nothing to do is a normal outcome, not a failure
+
+    if START_MARKER not in text:
+        print("the clipboard does not look like a supervisor brief")
+        print("  expected a line beginning: %s" % START_MARKER)
+        print("  nothing was published, and the clipboard was left untouched")
+        print("  if the brief really has no marker, drop it into the inbox")
+        print("  (%s) instead and run: python brief_bridge.py ingest"
+              % inbox_dir())
+        return 1
+
+    return commit_brief(text, source="clipboard", dry_run=dry_run)
+
+
+def clipboard_text():
+    """Read the Windows clipboard as text. None if it cannot be read."""
+    try:
+        r = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             "Get-Clipboard -Raw"],
+            capture_output=True, text=True, timeout=30, errors="replace")
+    except (OSError, subprocess.SubprocessError) as exc:
+        print("could not read the clipboard: %s" % exc)
+        return None
+    if r.returncode != 0:
+        print("could not read the clipboard: %s"
+              % (r.stderr or "").strip()[:200])
+        return None
+    return r.stdout
+
+
 def ingest(dry_run=False):
     """Drain the drop directory. One file per commit, oldest first."""
     d = inbox_dir()
@@ -353,7 +407,8 @@ def ingest(dry_run=False):
         print("create it, or point %s elsewhere" % INBOX_ENV)
         return 0
     try:
-        names = sorted(n for n in os.listdir(d) if n.endswith(".md"))
+        names = sorted(n for n in os.listdir(d)
+                       if n.lower().endswith(BRIEF_SUFFIXES))
     except OSError as exc:
         die("cannot read the inbox", str(exc))
     if not names:
@@ -622,6 +677,9 @@ def main():
     p.add_argument("--source", default="stdin")
     p.add_argument("--dry-run", action="store_true")
 
+    b = sub.add_parser("paste", help="commit the brief on the Windows clipboard")
+    b.add_argument("--dry-run", action="store_true")
+
     a = ap.parse_args()
     if a.cmd == "serve":
         return serve(a.port, a.token, a.host, a.idle_minutes, a.dry_run)
@@ -629,6 +687,8 @@ def main():
         return ingest(a.dry_run)
     if a.cmd == "capture":
         return capture_flow(a.dry_run, a.timeout, a.command)
+    if a.cmd == "paste":
+        return paste(a.dry_run)
     if sys.stdin.isatty():
         die("no brief on stdin",
             "pipe one in, e.g.  type file.md | python brief_bridge.py post")

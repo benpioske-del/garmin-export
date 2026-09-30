@@ -46,18 +46,27 @@ def main():
                     help="validate and show, but never write or push")
     ap.add_argument("--skip-capture", action="store_true",
                     help="publish the CSV without touching the brief inbox")
+    ap.add_argument("--paste", action="store_true",
+                    help="publish the brief on the clipboard instead of the inbox")
     ap.add_argument("--no-publish", action="store_true",
                     help="validate the brief but do not commit or push")
     a = ap.parse_args()
 
     dry = ["--dry-run"] if a.dry_run or a.no_publish else []
     brief_rc = 0
-    if not a.skip_capture:
+    if a.paste:
+        brief_rc = _run("capture brief from clipboard",
+                        [os.path.join(HERE, "brief_bridge.py"), "paste"] + dry)
+    elif not a.skip_capture:
         brief_rc = _run("capture brief", [os.path.join(HERE, "brief_bridge.py"),
                                           "ingest"] + dry)
-        if brief_rc != 0:
-            print("\nthe brief was rejected. See the staging path above; it is "
-                  "outside the repository and safe to read locally.")
+    if brief_rc != 0:
+        print("\nthe brief was rejected. See the staging path above; it is "
+              "outside the repository and safe to read locally.")
+    elif not a.paste and not a.skip_capture:
+        print("\nno brief was waiting in the inbox. If you just ran the flow, "
+              "re-run with --paste and copy the brief from the CrewAI Studio "
+              "UI first.")
     else:
         print("\n=== capture brief ===\nskipped (--skip-capture)")
 
