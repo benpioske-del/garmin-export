@@ -5,6 +5,7 @@
   "resting_hr": null,
   "weight_lb": null,
   "height_in": null,
+  "hr_max": 198,
   "units": {
     "_comment": "Locked to the Garmin device settings. Confirm before trusting any derived figure.",
     "distance": "miles",
@@ -19,7 +20,8 @@
     "sex": "Expected 'M' or 'F'. Selects the age-adjustment table and the sex-specific world 5K reference (about 12.8 min for M, 14.8 min for F).",
     "resting_hr": "Used for Banister TRIMP training load and recovery-debt maths, scaled against the season's highest recorded max HR.",
     "weight_lb": "Used for weight trends and the fuel/hydration guide.",
-    "height_in": "Optional. Context for weight and fuel calculations."
+    "height_in": "Optional. Context for weight and fuel calculations.",
+    "hr_max": "Set by the athlete to 198 on 2026-09-29. NOT estimated from age: the usual age formulas predict about 186-188 at age 32, and the recorded peaks are higher (195 twice, 194 twice, 192 twice across Apr-Aug 2026), so the athlete's own data contradicts the formulas. 198 is a deliberate choice over the observed 195 peak, on the judgement that a higher ceiling is achievable. Practical effect: the load method buckets intensity, so every value from 195 to 203 yields an identical 7-day load. The exact number inside that band does not change current results. Setting above a true max slightly understates intensity; that is the conservative direction here."
   },
   "_warn": "While age and sex are null, do not present cohort or population percentiles as fact. Report them as unadjusted, or omit them and say why. An AI that silently assumes a default age produces confident nonsense."
 }
