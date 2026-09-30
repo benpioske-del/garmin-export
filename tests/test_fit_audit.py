@@ -1,8 +1,16 @@
-"""Tests for fit_audit: GPS presence, validity, and failure handling.
+"""Tests for fit_audit: GPS presence, validity, reproducibility, failure handling.
 
-Supervisor brief Task 4 requires coverage of a file with GPS, one without GPS,
-and malformed input. Of the three, only "with GPS" is available as a real
-fixture, so the other two are synthesised.
+Supervisor brief Task 3 requires coverage of a file with GPS, one without GPS,
+and malformed input, plus file hashes and parser versions. Of the three file
+shapes, only "with GPS" is available as a real fixture, so the other two are
+synthesised.
+
+The previous version of this file asserted that the athlete's coordinates fall
+inside a particular region. That assertion both hardcoded the location into a
+tracked test file and depended on the audit reporting coordinates at all. The
+audit no longer reports coordinates, so the test is inverted: it now asserts
+that no coordinate value appears anywhere in the output. See
+docs/PRIVACY_INCIDENT.md.
 """
 
 import os
@@ -23,7 +31,7 @@ def to_semicircles(deg):
 
 @pytest.fixture(scope="module")
 def real_report():
-    """Parse the whole corpus once. Inspecting 56 files is slow, and four
+    """Parse the whole corpus once. Inspecting 56 files is slow, and several
     separate tests each re-reading them dominated the run time."""
     return fit_audit.report()
 
@@ -39,7 +47,7 @@ def test_real_files_parse_without_failure(real_report):
 def test_real_files_have_gps_and_valid_coordinates(real_report):
     _, results, _ = real_report
     assert all(r["has_gps"] for r in results), "expected GPS in every file"
-    assert sum(r["points"] for r in results) > 0
+    assert sum(r["position_points"] for r in results) > 0
     assert sum(r["out_of_range"] for r in results) == 0
     assert sum(r["null_island"] for r in results) == 0
 
@@ -49,16 +57,32 @@ def test_real_files_have_laps_and_no_timezone(real_report):
     _, results, _ = real_report
     assert all(r["laps"] > 0 for r in results)
     # No FIT file exposes a time zone, which is why the export has to record an
-    # explicit unknown timezone status rather than deriving one.
+    # explicit assumed-UTC status rather than deriving one.
     assert sum(r["tz_fields"] for r in results) == 0
 
 
 @requires_real_fit
-def test_coordinates_land_in_the_expected_region(real_report):
+def test_every_real_file_has_a_hash_and_usable_timestamp(real_report):
     _, results, _ = real_report
-    lats = [r["lat_min"] for r in results if r["lat_min"] is not None]
-    lats += [r["lat_max"] for r in results if r["lat_max"] is not None]
-    assert 44.0 < min(lats) and max(lats) < 45.5
+    for r in results:
+        assert r["sha256"] and len(r["sha256"]) == 64
+        assert r["byte_size"] > 0
+        assert r["has_timestamp"] is True
+        assert r["start_utc"].endswith("Z")
+
+
+@requires_real_fit
+def test_audit_output_contains_no_coordinates(real_report):
+    """Regression guard: the audit must reduce positions to counts."""
+    text, results, _ = real_report
+    blob = text + repr(results)
+    # Any decoded degree value would show up as a bare decimal in this range.
+    for suspect in ("lat_min", "lat_max", "lon_min", "lon_max", "semicircle"):
+        assert suspect not in blob
+    for row in results:
+        for key, value in row.items():
+            assert "lat" not in key.lower() and "lon" not in key.lower(), key
+            assert not isinstance(value, float) or value >= 0, key
 
 
 # --- a file without GPS ----------------------------------------------------
@@ -75,11 +99,11 @@ def test_file_without_gps_is_detected_not_assumed(monkeypatch, tmp_path):
                         lambda _p: FakeFitFile())
     out = fit_audit.inspect_file(str(p))
     assert out["has_gps"] is False
-    assert out["points"] == 0
-    assert out["lat_min"] is None and out["lon_max"] is None
+    assert out["position_points"] == 0
+    assert out["readable"] is True
 
 
-def test_file_with_gps_converts_semicircles(monkeypatch, tmp_path):
+def test_file_with_gps_is_counted_without_decoding(monkeypatch, tmp_path):
     p = tmp_path / "gps.fit"
     p.write_bytes(b"stub")
     rec = FakeMessage([
@@ -90,11 +114,12 @@ def test_file_with_gps_converts_semicircles(monkeypatch, tmp_path):
                         lambda _p: FakeFitFile(records=[rec]))
     out = fit_audit.inspect_file(str(p))
     assert out["has_gps"] is True
-    assert out["points"] == 1
-    assert out["lat_min"] == pytest.approx(44.95, abs=0.01)
-    assert out["lon_max"] == pytest.approx(-93.16, abs=0.01)
+    assert out["position_points"] == 1
     assert out["out_of_range"] == 0
     assert out["null_island"] == 0
+    # The decoded degrees exist nowhere in the result.
+    assert "44.95" not in repr(out)
+    assert "-93.16" not in repr(out)
 
 
 def test_partial_gps_pair_is_not_counted(monkeypatch, tmp_path):
@@ -105,7 +130,7 @@ def test_partial_gps_pair_is_not_counted(monkeypatch, tmp_path):
     monkeypatch.setattr(fit_audit.fitparse, "FitFile",
                         lambda _p: FakeFitFile(records=[rec]))
     out = fit_audit.inspect_file(str(p))
-    assert out["points"] == 0
+    assert out["position_points"] == 0
     assert out["has_gps"] is False
 
 
@@ -117,6 +142,53 @@ def test_null_island_is_flagged(monkeypatch, tmp_path):
                         lambda _p: FakeFitFile(records=[rec]))
     out = fit_audit.inspect_file(str(p))
     assert out["null_island"] == 1
+
+
+def test_missing_session_fields_are_reported(monkeypatch, tmp_path):
+    """A field the reader needs but the file lacks must show up, not go blank."""
+    p = tmp_path / "thin.fit"
+    p.write_bytes(b"stub")
+    monkeypatch.setattr(fit_audit.fitparse, "FitFile",
+                        lambda _p: FakeFitFile(
+                            sessions=[FakeMessage([("sport", "running")])]))
+    out = fit_audit.inspect_file(str(p))
+    assert "avg_heart_rate" in out["fields_missing"]
+    assert any("missing session fields" in w for w in out["warnings"])
+
+
+# --- hashes and versions ---------------------------------------------------
+
+def test_hash_is_recorded_and_stable(monkeypatch, tmp_path):
+    p = tmp_path / "h.fit"
+    p.write_bytes(b"deterministic bytes")
+    monkeypatch.setattr(fit_audit.fitparse, "FitFile", lambda _p: FakeFitFile())
+    first = fit_audit.inspect_file(str(p))
+    second = fit_audit.inspect_file(str(p))
+    assert first["sha256"] == second["sha256"]
+    assert first["byte_size"] == 19
+
+
+def test_parser_version_is_reported():
+    versions = fit_audit.parser_versions()
+    assert versions.get("fitparse")
+
+
+def test_report_states_the_parser_version(monkeypatch, tmp_path):
+    p = tmp_path / "v.fit"
+    p.write_bytes(b"stub")
+    monkeypatch.setattr(fit_audit.fitparse, "FitFile", lambda _p: FakeFitFile())
+    text, _, _ = fit_audit.report(str(tmp_path))
+    assert "fitparse=" in text
+
+
+def test_rollup_counts_are_consistent(monkeypatch, tmp_path):
+    p = tmp_path / "r.fit"
+    p.write_bytes(b"stub")
+    monkeypatch.setattr(fit_audit.fitparse, "FitFile", lambda _p: FakeFitFile())
+    _, results, failures = fit_audit.report(str(tmp_path))
+    roll = fit_audit.rollup(results, failures)
+    assert roll["files_inspected"] == 1
+    assert roll["files_with_gps"] + roll["files_without_gps"] == len(results)
 
 
 # --- malformed input -------------------------------------------------------

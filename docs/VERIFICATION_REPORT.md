@@ -1,191 +1,194 @@
-# Verification Report
+# Verification report
 
-**Date:** 2026-09-29
-**Repository:** `benpioske-del/garmin-export`
-**Verified revision:** `b3722432f4a985017410baa6384cdda24dc43306` (34 commits)
-**Environment:** Windows, Python 3.13.15, git 2.53.0.windows.4
+Supervisor brief Task 10. Everything below was run in the working tree on
+2026-09-29. Commands and results are reproduced as observed.
 
-This report records only what was executed and observed. Nothing is marked
-complete on the basis of code inspection alone.
+## Environment
 
-## 1. Two live privacy leaks found and fixed
+| | |
+| --- | --- |
+| Python | 3.13.15 |
+| Git | 2.53.0.windows.4 |
+| Platform | Windows, win32 |
+| Repo | `benpioske-del/garmin-export`, branch `main` |
 
-The most significant finding of this run. Both files were **tracked and publicly
-served on `main`**, and both were missed by an earlier verification sweep.
-
-| File | Leak | Public status before fix |
-|---|---|---|
-| `tools/privacy_replacements.txt` | Four real coordinates | HTTP 200, 944 bytes, live |
-| `capture_supervisor_brief.py` | Two real coordinates quoted as pattern examples | HTTP 200, live |
-
-`tools/privacy_replacements.txt` was a `git filter-repo` scrub script that
-contained the exact values it existed to remove. It had been reintroduced into
-tracked files and published.
-
-### Root cause of the guard gap
-
-`guard_gps_content()` in `export_publish.py` only matched **labelled**
-coordinates (`"latitude": 44.9`). Both leaks were *unlabelled* values. Worse,
-`GUARD_IMPL` fully exempted the scanner's own source and tests, so a real
-coordinate quoted in a comment inside a scanner file was never checked at all.
-
-### Fixes applied
-
-1. Deleted `tools/privacy_replacements.txt` from the worktree and from history.
-2. Replaced the real coordinates in `capture_supervisor_brief.py` with fabricated
-   values, with a comment stating that real positions must never be quoted.
-3. Removed the town name from `docs/PRIVACY_INCIDENT.md`.
-4. Added an **unlabelled degree-pair** pattern, bounded to plausible latitude so
-   that lap times such as `5.0712, 5.0844` are not blocked.
-5. Narrowed the `GUARD_IMPL` exemption: those files are still exempt from the
-   labelled patterns, which they must spell out, but are **no longer exempt from
-   the degree-pair check**. Synthetic values are allowlisted by explicit value in
-   `SYNTHETIC_PAIRS`, and the allowlist applies only to those files.
-6. Added 5 regression tests, including `test_real_repository_passes_its_own_guard`
-   which runs the guard against the real repository.
-
-A first attempt at the new rule produced a false positive on the lap-time example
-`5.0712, 5.0844`; that was fixed by bounding the latitude component, and the
-over-blocking case is now covered by `test_low_latitude_decimal_pairs_are_not_flagged`.
-
-### History rewrite
-
-Three `git filter-repo` passes, then a force-push (`6c3bd91...a2bbd3d (forced update)`).
-
-Verification scanned **every blob in every commit** rather than trusting a
-pickaxe search, which had reported false positives from diff context:
+## Test suite
 
 ```
-CLEAN: no blob in any history contains a real value
+$ python -m pytest
+152 passed, 1 skipped in 58.92s
 ```
 
-Checked for: the four per-run coordinates from the removed scrub script, the two
-coordinates quoted in the scanner comment, the two published coordinate-range
-bounds, and both place names. All are absent from every blob in all 34 commits.
+| File | Tests |
+| --- | --- |
+| `tests/test_training_data.py` | 56 |
+| `tests/test_brief_bridge.py` | 26 |
+| `tests/test_capture_supervisor.py` | 16 |
+| `tests/test_fit_audit.py` | 16 |
+| `tests/test_provenance.py` | 15 |
+| `tests/test_gps_guard.py` | 13 |
+| `tests/test_paths_and_guards.py` | 9 |
+| `tests/test_history_safety.py` | 2 |
+| **Total** | **153** (152 pass, 1 skip) |
 
-The literal values are deliberately not reproduced here. Restating them in a
-report that is itself published would recreate the leak, which is exactly the
-mistake this section documents.
+The skip is the Windows symlink case in the brief-bridge suite; the code path is
+covered on platforms that permit symlinks.
 
-Also deleted: `.git/filter-repo/fast-export.original`, a 417 KB plaintext dump of
-the pre-rewrite history that still contained the dashboard and coordinates, and
-the temporary scrub expression files.
+Up from 90 passed / 1 skipped before this round. The 62 new tests cover the data
+layer, the canonical activity model, strength, load, recommendations, health
+consent, and the rewritten FIT audit.
 
-## 2. Test suite
+## FIT data audit
+
+```
+$ python fit_audit.py
+FIT data audit
+parser: fitparse=1.2.0 reader=1.0.0
+
+files inspected           : 56
+parse failures            : 0
+files readable            : 56
+files with GPS            : 56
+files without GPS         : 0
+files with usable timestamp: 56
+files without timestamp   : 0
+session messages          : 56
+lap messages              : 499
+record messages           : 51653
+position points (counted) : 51637
+files missing fields      : 0
+
+warnings:
+   none
+```
+
+Full report and schema documentation: [`FIT_AUDIT.md`](FIT_AUDIT.md).
+
+## Data layer
+
+```
+$ python trainingdb.py migrate
+applied 001 001_core_activity
+applied 002 002_provenance_audit
+applied 003 003_strength
+applied 004 004_load_and_health_access
+applied 005 005_health
+applied 006 006_weather
+
+$ python trainingdb.py
+applied: [1, 2, 3, 4, 5, 6]
+pending: none
+```
+
+Re-running is a no-op. Editing an applied migration raises
+`RuntimeError: migration NNN changed after it was applied` — covered by
+`test_edited_migration_is_a_hard_error`.
+
+## Import against the real corpus
+
+```
+$ python activities.py import
+{"inserted": 56, "updated": 0, "unchanged": 0, "unreadable": 0}
+```
+
+Second import of the identical files:
+
+```
+{"inserted": 0, "updated": 0, "unchanged": 56, "unreadable": 0}
+```
+
+**Idempotency verified on the real data**: no rows updated, and no new audit
+rows written on the second pass.
+
+```
+$ python activities.py summary
+{"activities": 56, "open_reviews": 57}
+```
+
+- 56 activities
+- 56 open `timezone_uncertain` reviews (one per activity, expected)
+- 1 open `activity_gap`: `no activity 2026-06-26..2026-07-05 (8 days)`
+- 0 duplicates detected
+- 56 SHA-256 raw references stored
+
+## Training load and recommendation
+
+Against the real corpus as of 2026-09-26, with `hr_max=185` supplied by the
+caller:
+
+```
+7-day window: run_load 1174.9, strength_load null, combined_load 1174.9,
+              run_confidence medium
+recommend(): confirmation_required
+             "11 recent activities are awaiting confirmation"
+```
+
+Two things worth stating plainly:
+
+- `strength_load` is `null`, not `0`. No strength sessions exist yet, and an
+  absent component is not a zero component.
+- The recommendation is a **refusal**, and it is the correct one: 11 activities
+  in the window still carry unresolved timezone reviews, so
+  `recommend.recommend()` declines to issue a control state. This is the
+  designed behaviour, not a failure.
+
+## Publisher and privacy guard
+
+```
+$ python export_publish.py
+```
+
+Runs the position-data guard over every candidate file, refuses to commit if
+position data is present, then commits and pushes. The guard blocks labelled
+coordinate fields, degree pairs, FIT semicircle field names, and CSV coordinate
+columns.
+
+**Known limitation, unchanged:** the guard cannot reject a bare single
+coordinate, because a decimal such as `44.95` is indistinguishable from
+legitimate training data. Manual review remains necessary. This is recorded in
+the inventory rather than papered over.
+
+## Privacy checks
+
+- Raw FIT files are gitignored; the local `trainloop.db` is gitignored.
+- `weather_observations` has no `lat`/`lon`/`latitude`/`longitude` column —
+  asserted against `PRAGMA table_info` by
+  `test_weather_schema_stores_no_coordinates`.
+- `test_audit_output_contains_no_coordinates` walks the entire FIT audit result
+  and fails if any key or value resembles a position.
+- The audit no longer reports a latitude/longitude range. The previous test
+  suite asserted the athlete's coordinates fell inside a specific region; that
+  test both hardcoded a location into a tracked file and depended on the leak.
+  It has been inverted into a regression guard.
+- Current `main` is clean through the authoritative GitHub API.
+
+**Unresolved:** GitHub still retains unreachable historical commits by SHA.
+Deleting and recreating the repository is the only guaranteed purge. This has
+not been done, as it would break the public URL and all existing automation.
+
+## Not verified
+
+Stated rather than implied:
+
+| Item | Status |
+| --- | --- |
+| Linter / formatter / type checker | None configured. Nothing was run. |
+| CI | None. No workflow exists, so nothing runs on push. |
+| `python -m build` | Not run. `build` is not a declared dependency and no lockfile pins the environment. |
+| Dependency pinning | `pyproject.toml` only. No lockfile, so a future resolve may drift. |
+| `python -m pip install .` | Not re-run this round. |
+| Multi-athlete isolation | Does not exist. The database is local and single-subject. |
+| Weather provider | None. The gate returns `unavailable` past consent and location. |
+| Strength data | Schema and service verified by tests; no real strength sessions recorded yet. |
+| `profile.json` | All fields null. Blocks confirmed timezones, running load, and weather location. |
+
+## Reproducing this report
 
 ```
 python -m pytest
-65 passed in 77.07s (0:01:17)   exit 0
+python fit_audit.py
+python trainingdb.py migrate
+python trainingdb.py
+python activities.py import
+python activities.py summary
 ```
-
-Up from 60 tests; 5 new regression tests for the guard gap.
-
-## 3. Public repository state
-
-| Check | Result |
-|---|---|
-| Public `main` tip | `a2bbd3d…` via API, matching local |
-| `tools/privacy_replacements.txt` | Removed from `main` |
-| `capture_supervisor_brief.py` | Clean on `main` |
-| `export_publish.py`, `tests/test_gps_guard.py`, `docs/PRIVACY_INCIDENT.md` | Clean |
-| `garmin_export.csv`, `docs/FIT_DATA_AUDIT.md` | Clean, no coordinates |
-
-## 4. Publisher
-
-```
-python export_publish.py
-runs        : 56  (2026-04-14 -> 2026-09-26)
-committed   : garmin export: 56 runs, latest 2026-09-26
-pushed      : origin/main
-exit 0
-```
-
-Working tree clean after publish. Local `main` and `origin/main` verified in sync.
-
-## 5. Scheduled tasks
-
-`Garmin Export Publish` and `Garmin Export Publish PM` both `Ready`, pointing at
-`C:\Users\benpi\Downloads\garmin_publish_task.bat`.
-
-An earlier AM run reported `2147946720` (`0x800710E0`, "request refused"). This
-was **not a fault**: the task is configured `MultipleInstances: IgnoreNew` and was
-skipped because a manual run held the lock. Re-run manually, it returns `0` and
-publishes correctly.
-
-## 6. Static analysis, build, and CI
-
-| Check | Command | Result |
-|---|---|---|
-| Lint | — | **Cannot run.** Not configured in the repository. |
-| Format | — | **Cannot run.** No formatter configured. |
-| Type check | — | **Cannot run.** No type checker configured. |
-| Build | `python -m build` | Configured via setuptools; no lockfile, never run in CI. |
-| Migrations | — | **Not applicable.** No database exists. |
-| CI | — | **None.** No `.github/workflows`. |
-| Dependency audit | — | **Not configured.** |
-
-These are recorded as unavailable rather than passed. Task 12's full suite is
-therefore limited to pytest plus the publisher and the privacy checks above.
-
-## 7. Representative workflows
-
-| Workflow | Evidence | Status |
-|---|---|---|
-| Running activity import | 56 rows, 2026-04-14 to 2026-09-26 | **Verified** |
-| Duplicate re-import | CSV duplicate collapsed; publisher is idempotent ("data unchanged") | **Verified** |
-| Timestamp discrepancy review | Documented in `docs/PROVENANCE.md`; **still unresolved by design** | **Open** |
-| Data-completeness confirmation | No implementation exists | **Not built** |
-| Strength session creation | No implementation exists | **Not built** |
-| Consent grant/revocation | No implementation exists | **Not built** |
-| Running/strength load calculation | No implementation exists | **Not built** |
-| Recommendation generation | No implementation exists | **Not built** |
-| Blocked weather enrichment | No implementation exists | **Not built** |
-| Mocked weather enrichment | No implementation exists | **Not built** |
-
-## 8. Security and privacy checks
-
-- No `.env`, credential file, or raw FIT file is tracked.
-- `C:\Users\benpi\Downloads\garmin_fit\` (56 GPS-bearing files) is outside the
-  repository and untracked.
-- `dashboard/` is gitignored; it embeds exact per-run GPS and is local-only.
-- `profile.json` is tracked but every athlete value is `null`.
-- The publication guard now catches unlabelled degree pairs and checks its own
-  source files, closing the gap that allowed both leaks.
-
-## 9. Open risks
-
-1. **GitHub retains the old leaking commit.** `6c3bd91` is no longer on `main`,
-   but the API still returns it and the raw URL still serves the file. Unreachable
-   objects are retained server-side. Only deleting and recreating the repository
-   guarantees removal; that changes the URL and requires updating the CrewAI
-   polling configuration.
-2. **The 26 July timestamp discrepancy remains unresolved**, deliberately. It is
-   recorded rather than silently corrected, pending athlete confirmation.
-3. **The dashboard is unversioned.** Its Task 11 labelling fixes exist only in a
-   gitignored local file and would be lost if that file were lost. Making it
-   durable requires splitting code from embedded GPS data.
-4. **No lint, format, type-check, or CI exists**, so the guard that caught these
-   leaks is enforced only by one developer running pytest locally.
-
-## 10. Task status against the supplied brief
-
-| Task | Status |
-|---|---|
-| 1. Repository inventory | **Complete.** `docs/IMPLEMENTATION_INVENTORY.md` |
-| 2. Canonical records and provenance | **Partially present.** CSV-level provenance, timezone status, and source-file identity exist. No database, so no migration, no API, and no schema layer. |
-| 3. Completeness and confirmation | **Not built.** No implementation. |
-| 4. FIT audit and provenance | **Substantially complete.** `docs/FIT_DATA_AUDIT.md`; GPS deliberately excluded, so lap/session GPS provenance is not retained by policy. |
-| 5. Strength structures | **Not built.** No schema, no importer, no UI. |
-| 6. Consent-gated recovery | **Not built.** No auth, no consent model. |
-| 7. Versioned load calculations | **Not built.** |
-| 8. Training-control states | **Not built.** |
-| 9. Provisional labelling | **Partially complete.** `docs/METRIC_LABELING.md`; dashboard edits local-only. |
-| 10. Weather enrichment boundary | **Not built.** Weather remains **blocked**: no usable location or consent state. |
-| 11. Weather analysis | **Not built.** Correctly has no output without matched observations. |
-| 12. Verification suite | **This report.** Limited to what the repository can run. |
-
-**Weather remains blocked.** There is no usable GPS/location state and no consent
-model, so no weather provider is called and no weather record is created.
-
-**The 26 July timestamp remains unresolved**, as a confirmation-required item
-rather than a silent correction.

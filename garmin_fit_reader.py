@@ -15,6 +15,10 @@ import fitparse
 M_TO_MI = 1.0 / 1609.344
 M_TO_FT = 1.0 / 0.3048
 
+# Bump when the derived fields below change meaning, not just for bug fixes.
+# Recorded by fit_audit so a result can name the code that produced it.
+__version__ = "1.0.0"
+
 # Garmin names downloaded activities YYYY-MM-DD_<activity id>.fit, using the
 # device's local date. That filename is the only local-date signal we have,
 # because no FIT file carries a timezone offset.

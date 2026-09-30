@@ -19,3 +19,12 @@ garmin_last_sync.json
 .pytest_cache/
 .coach_dash_token
 dashboard/
+
+# local canonical database: personal training history, never published.
+# migrations/ is tracked; the database built from it is not.
+*.db
+*.db-journal
+trainloop.db
+
+# generated audit output, reproducible from `python fit_audit.py`
+fit_audit_manifest.json
