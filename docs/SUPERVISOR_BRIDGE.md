@@ -82,11 +82,15 @@ push-free loop.
 
 ## Running the whole thing: `Run CrewAI Supervisor.cmd`
 
-One command that captures the brief and publishes, in the right order:
+The launcher lives in `%USERPROFILE%\Downloads` alongside `Coach Dashboard.cmd`
+and `Refresh Garmin Data.cmd`, because that is where the local launchers live and
+the pipeline code is what belongs in the repository. It hardcodes the repo and
+interpreter paths and calls in:
 
 ```
 Run CrewAI Supervisor.cmd            capture any brief, then publish
 Run CrewAI Supervisor.cmd --dry-run  validate everything, change nothing
+Run CrewAI Supervisor.cmd --crew "..." run the local crew instead (older path)
 ```
 
 It calls `supervisor_publish.py`, which runs `brief_bridge.py ingest` and then

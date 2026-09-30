@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """One command that refreshes the published CSV and the supervisor brief.
 
-This is what `Run CrewAI Supervisor.cmd` calls. It exists because the two
-publish paths have to agree on order and on what counts as success, and
-encoding that in a batch file makes it impossible to test.
+This is what `Run CrewAI Supervisor.cmd` calls. The launcher itself lives in
+%USERPROFILE%\Downloads with the other local launchers; only the pipeline code
+belongs in the repository. It exists because the two publish paths have to
+agree on order and on what counts as success, and encoding that in a batch file
+makes it impossible to test.
 
     1. drain the brief inbox      (brief if the flow left one)
     2. publish                    (CSV always, brief if it was captured)
