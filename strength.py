@@ -214,10 +214,14 @@ def suggest_progression(conn, exercise_name, equipment=None, athlete_kg=None):
                 "reason": "no recorded sets for %s" % exercise_name,
                 "confidence": terms.UNVERIFIED}
 
-    sets = [s for s in session_sets(conn, row["session_id"]) if not s["is_warmup"]]
+    # Restrict to the requested exercise. A session holds several exercises,
+    # and comparing a squat's rep count against a deadlift's is meaningless:
+    # 5-rep work and 8-rep work are different progressions, not a shortfall.
+    sets = [s for s in session_sets(conn, row["session_id"])
+            if not s["is_warmup"] and s["exercise"] == exercise_name]
     if not sets:
         return {"decision": "no_history", "load_kg": None,
-                "reason": "last session had only warmup sets",
+                "reason": "last session had no working sets for %s" % exercise_name,
                 "confidence": terms.UNVERIFIED}
 
     bodyweight = all(s["load_kg"] is None for s in sets)
@@ -250,7 +254,13 @@ def suggest_progression(conn, exercise_name, equipment=None, athlete_kg=None):
                 "reason": "bodyweight: all working sets completed cleanly",
                 "confidence": terms.MEDIUM}
 
+    # A session that mixes loaded and unweighted sets for one exercise is not
+    # something the increment logic can reason about; hold rather than guess.
     last = sets[-1]["load_kg"]
+    if last is None:
+        return {"decision": "hold", "load_kg": None,
+                "reason": "mixed loaded and bodyweight sets: no single load to increment",
+                "confidence": terms.LOW}
     step = LOAD_INCREMENT_KG
     if athlete_kg and last / athlete_kg < 0.5:
         step = 0.5                      # lighter lift, smaller jump

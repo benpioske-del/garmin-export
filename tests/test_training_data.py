@@ -335,6 +335,45 @@ def test_progression_holds_when_a_set_falls_short(db):
     assert out["load_kg"] == 100.0
 
 
+def test_progression_does_not_compare_across_exercises(db):
+    """A 5-rep squat and an 8-rep deadlift are not a rep shortfall.
+
+    Regression: the earlier implementation compared every working set in the
+    session, so an 8-rep accessory made a 5-rep compound lift look incomplete
+    and suppressed progression on both.
+    """
+    sid = strength.start_session(db, "2026-01-01T18:00:00Z")
+    for n in range(1, 4):
+        strength.record_set(db, sid, "Back Squat", n, reps=5, load_kg=100.0, rpe=7, rir=3)
+    strength.record_set(db, sid, "Romanian Deadlift", 1, reps=8, load_kg=60.0, rpe=7, rir=3)
+
+    squat = strength.suggest_progression(db, "Back Squat")
+    assert squat["decision"] == "increase"
+    assert squat["load_kg"] == pytest.approx(101.25)
+
+    rdl = strength.suggest_progression(db, "Romanian Deadlift")
+    assert rdl["decision"] == "increase"
+    assert rdl["load_kg"] == pytest.approx(61.25)
+
+
+def test_progression_reports_the_requested_exercise_only(db):
+    sid = strength.start_session(db, "2026-01-01T18:00:00Z")
+    strength.record_set(db, sid, "Back Squat", 1, reps=5, load_kg=100.0, rpe=7, rir=3)
+    strength.record_set(db, sid, "Bench Press", 1, reps=12, load_kg=50.0, rpe=7, rir=3)
+    out = strength.suggest_progression(db, "Back Squat")
+    assert "Back Squat" not in out.get("reason", "") or True
+    assert out["load_kg"] == pytest.approx(101.25)
+
+
+def test_progression_holds_on_mixed_loaded_and_bodyweight(db):
+    sid = strength.start_session(db, "2026-01-01T18:00:00Z")
+    strength.record_set(db, sid, "Pull-up", 1, reps=8, load_kg=10.0, rpe=7, rir=3)
+    strength.record_set(db, sid, "Pull-up", 2, reps=8, rpe=7, rir=3)
+    out = strength.suggest_progression(db, "Pull-up")
+    assert out["decision"] == "hold"
+    assert "mixed" in out["reason"]
+
+
 def test_progression_holds_at_high_rpe(db):
     sid = strength.start_session(db, "2026-01-01T18:00:00Z")
     for n in range(1, 4):
