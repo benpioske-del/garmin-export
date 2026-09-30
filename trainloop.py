@@ -285,8 +285,10 @@ def cmd_status(args):
     print("hr_max                : %s" % (hr_max if hr_max else "NOT SET"))
     print()
 
-    def plural(n, word):
-        return "%d %s%s" % (n, word, "" if n == 1 else "s")
+    def plural(n, word, plural_form=None):
+        if n == 1:
+            return "1 %s" % word
+        return "%d %s" % (n, plural_form or word + "s")
 
     gaps = []
     if db_count == 0 and fit_files:
@@ -294,10 +296,12 @@ def cmd_status(args):
                     "python trainloop.py bootstrap" % plural(len(fit_files), "FIT file"))
     if db_count and db_count != len(fit_files):
         gaps.append("database has %s but %s are on disk"
-                    % (plural(db_count, "activity"), plural(len(fit_files), "FIT file")))
+                    % (plural(db_count, "activity", "activities"),
+                       plural(len(fit_files), "FIT file")))
     if csv_rows and db_count and csv_rows != db_count:
         gaps.append("published CSV has %s, database has %s"
-                    % (plural(csv_rows, "row"), plural(db_count, "activity")))
+                    % (plural(csv_rows, "row"),
+                       plural(db_count, "activity", "activities")))
     if hr_max is None:
         gaps.append("hr_max not set -> running load and recommendations are "
                     "unavailable by design (see docs/TRAINING_LOAD_METHODOLOGY.md)")
