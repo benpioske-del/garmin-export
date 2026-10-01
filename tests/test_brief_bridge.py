@@ -8,6 +8,7 @@ failure cases matter more than the happy path, because a mistake here publishes
 someone's location.
 """
 
+import datetime
 import io
 import json
 import os
@@ -68,6 +69,29 @@ def fake_repo(tmp_path, monkeypatch):
     monkeypatch.setattr(brief_bridge, "REPO", str(tmp_path))
     monkeypatch.setattr(brief_bridge, "publish", lambda target: (0, "ok"))
     return tmp_path
+
+
+@pytest.fixture
+def frozen_clock(monkeypatch):
+    """A clock the test advances by hand, returned as an `advance` callable.
+
+    The idempotency defect this file guards against was invisible to a test that
+    published twice inside the same second, so a clock that can be moved across a
+    second boundary is the whole point.
+    """
+    real = datetime.datetime
+    state = {"now": real(2026, 9, 30, 12, 0, 0, tzinfo=datetime.timezone.utc)}
+
+    class Frozen(real):
+        @classmethod
+        def now(cls, tz=None):
+            return state["now"] if tz is None else state["now"].astimezone(tz)
+
+    def advance(**kw):
+        state["now"] = state["now"] + datetime.timedelta(**kw)
+
+    monkeypatch.setattr(brief_bridge, "datetime", Frozen)
+    return advance
 
 
 def serve_once(handler_cls=Handler):
@@ -504,6 +528,71 @@ def test_identical_brief_is_not_committed_twice(fake_repo, capsys):
     assert brief_bridge.commit_brief(BRIEF, source="test") == 0
     assert brief_bridge.commit_brief(BRIEF, source="test") == 0
     assert "already current" in capsys.readouterr().out
+
+
+# --------------------------------------------------------------- stable identity
+
+def test_identical_brief_is_not_committed_twice_across_seconds(fake_repo, capsys,
+                                                               frozen_clock):
+    """Identity must not depend on the capture time.
+
+    Both commits in the test above land inside the same second, which is the only
+    reason it passed: the header carried the current time, so a real repeat run
+    never matched and republished a brief byte for byte.
+    """
+    assert brief_bridge.commit_brief(BRIEF, source="test") == 0
+    frozen_clock(seconds=90)
+    assert brief_bridge.commit_brief(BRIEF, source="test") == 0
+    assert "already current" in capsys.readouterr().out
+
+
+def test_an_unchanged_brief_keeps_its_original_capture_time(fake_repo, frozen_clock):
+    """Capture time is metadata about the first arrival, not a rewound clock."""
+    assert brief_bridge.commit_brief(BRIEF, source="test") == 0
+    dest = fake_repo / "SUPERVISOR_BRIEF.md"
+    first = dest.read_text(encoding="utf-8")
+
+    frozen_clock(seconds=90)
+    assert brief_bridge.commit_brief(BRIEF, source="test") == 0
+
+    assert dest.read_text(encoding="utf-8") == first
+    assert "captured_utc: 2026-09-30T12:00:00+00:00" in first
+
+
+def test_a_changed_brief_is_written_and_gets_a_new_identity(fake_repo, frozen_clock):
+    dest = fake_repo / "SUPERVISOR_BRIEF.md"
+    assert brief_bridge.commit_brief(BRIEF, source="test") == 0
+    before = brief_bridge.read_brief_id(str(dest))
+
+    frozen_clock(seconds=90)
+    assert brief_bridge.commit_brief(
+        BRIEF + "\n\n## Task 9\nSomething new.\n", source="test") == 0
+
+    assert brief_bridge.read_brief_id(str(dest)) != before
+    assert "Something new." in dest.read_text(encoding="utf-8")
+
+
+def test_brief_id_is_the_content_digest_and_not_a_timestamp():
+    assert brief_bridge.brief_digest(BRIEF) == brief_bridge.brief_digest(BRIEF)
+    assert brief_bridge.brief_digest(BRIEF) != brief_bridge.brief_digest(BRIEF + "x")
+
+
+def test_brief_id_survives_transport_whitespace_differences():
+    """A transport that strips or converts newlines is still the same brief."""
+    assert brief_bridge.brief_digest(BRIEF) == brief_bridge.brief_digest(BRIEF + "\n\n\n")
+    assert brief_bridge.brief_digest(BRIEF) == brief_bridge.brief_digest(
+        BRIEF.replace("\n", "\r\n"))
+
+
+def test_a_flow_committed_brief_is_recognised_without_a_brief_id_line(fake_repo):
+    """The cloud flow pushes straight to main, so there is no header to read."""
+    dest = fake_repo / "SUPERVISOR_BRIEF.md"
+    dest.write_text(BRIEF, encoding="utf-8")
+    assert brief_bridge.read_brief_id(str(dest)) == brief_bridge.brief_digest(BRIEF)
+
+
+def test_a_missing_brief_file_has_no_identity(fake_repo):
+    assert brief_bridge.read_brief_id(str(fake_repo / "SUPERVISOR_BRIEF.md")) is None
 
 
 # --------------------------------------------------------------- shape reporting
