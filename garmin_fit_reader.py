@@ -17,7 +17,43 @@ M_TO_FT = 1.0 / 0.3048
 
 # Bump when the derived fields below change meaning, not just for bug fixes.
 # Recorded by fit_audit so a result can name the code that produced it.
-__version__ = "1.0.0"
+__version__ = "1.1.0"
+
+# Elevation is the one field in a FIT file that is never measured, only derived.
+# These files carry no barometer_pressure samples, so altitude comes from GPS at
+# roughly 6-second intervals carrying several feet of positional noise. Summing
+# every upward step therefore counts that noise as climbing: on a real 5-mile
+# run the raw sum was 596 ft while ~300 ft of it was noise.
+#
+# `total_ascent` stays the device's own figure because it is the most defensible
+# number available and inventing a different one would be worse. The smoothed
+# recomputation is carried beside it so the uncertainty is visible instead of
+# silent. Neither is a measurement, and neither should drive a load decision.
+ELEV_SMOOTH_SAMPLES = 5
+
+
+def _smooth(values, window):
+    """Centred moving average with ragged edges clamped, not shortened."""
+    if window < 2 or len(values) < 2:
+        return list(values)
+    half = window // 2
+    out = []
+    for i in range(len(values)):
+        lo = max(0, i - half)
+        hi = min(len(values), i + half + 1)
+        out.append(sum(values[lo:hi]) / (hi - lo))
+    return out
+
+
+def _ascent_ft(alt_m):
+    """Total climb in feet from a metre altitude series, or None.
+
+    Sums only positive steps. A smoothed series is supplied by the caller; this
+    function does not smooth so a caller can compare both and expose the spread.
+    """
+    if len(alt_m) < 2:
+        return None
+    return sum(max(0.0, alt_m[i] - alt_m[i - 1]) for i in range(1, len(alt_m))) * M_TO_FT
 
 # Garmin names downloaded activities YYYY-MM-DD_<activity id>.fit, using the
 # device's local date. That filename is the only local-date signal we have,
@@ -144,15 +180,28 @@ def read_fit(path):
         if lt and (not best_lap or t < hms_sec(best_lap)):
             best_lap = lt
 
+    # One altitude sample per record. Previously this appended both
+    # enhanced_altitude and altitude when a record carried both, interleaving two
+    # series into a single list; they happen to be identical on current firmware
+    # so min/max were unaffected, but on firmware where they diverge it would
+    # have produced a min and max from different series. enhanced_altitude is
+    # preferred because it is the device's corrected altitude.
     elev = []
     for rec in fit.get_messages("record"):
-        for f in rec:
-            if f.name == "enhanced_altitude" and f.value is not None:
-                elev.append(f.value)
-            elif f.name == "altitude" and f.value is not None:
-                elev.append(f.value)
+        d = {f.name: f.value for f in rec}
+        alt = d.get("enhanced_altitude")
+        if alt is None:
+            alt = d.get("altitude")
+        if alt is not None:
+            elev.append(alt)
     lo = round(min(elev) * M_TO_FT) if elev else ""
     hi = round(max(elev) * M_TO_FT) if elev else ""
+    # Recomputed climb, carried so the GPS-noise band around the device figure is
+    # visible. Not a replacement: see the note above ELEV_SMOOTH_SAMPLES.
+    elev_smooth = _smooth(elev, ELEV_SMOOTH_SAMPLES)
+    smooth_ascent = _ascent_ft(elev_smooth)
+    raw_ascent = _ascent_ft(elev)
+    elev_range = (max(elev) - min(elev)) * M_TO_FT if elev else 0.0
 
     local_start, start_utc = split_start(start, path)
 
@@ -188,6 +237,13 @@ def read_fit(path):
         "Elapsed Time": hms(elapsed_s),
         "Min Elevation": lo,
         "Max Elevation": hi,
+        # Underscore-prefixed: diagnostics, not part of the published CSV schema.
+        # They expose the GPS-noise band around Total Ascent and let a consumer
+        # sanity-check an implausible ratio without re-parsing the FIT file.
+        "_elev_range_ft": round(elev_range),
+        "_ascent_smoothed_ft": round(smooth_ascent) if smooth_ascent is not None else "",
+        "_ascent_raw_ft": round(raw_ascent) if raw_ascent is not None else "",
+        "_ascent_samples": len(elev),
         "_source_file": os.path.basename(path),
     }
     return assert_no_gps(row)
