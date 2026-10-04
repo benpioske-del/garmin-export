@@ -300,9 +300,16 @@ def build_csv():
         die("no usable rows found in the activity sources")
 
     # Union of every column seen, FIT columns first then any CSV-only columns.
+    # Underscore-prefixed keys are internal diagnostics, never part of the
+    # published schema. _source_file is the single exception: it is renamed and
+    # published deliberately below as "Source File". The elevation diagnostics
+    # the reader attaches (_ascent_smoothed_ft and friends) stay in-process so
+    # this export's header does not change shape under existing consumers.
     cols = []
     for r in rows:
         for c in r:
+            if c.startswith("_") and c != "_source_file":
+                continue
             if c not in cols:
                 cols.append(c)
     # Provenance columns last, in a fixed order, so the export's shape is stable.

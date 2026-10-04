@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 207 passed, 1 skipped (Windows symlink case) |
+| Tests | 231 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -71,8 +71,8 @@ Docs: [`DATA_QUALITY.md`](DATA_QUALITY.md),
 
 | Component | Path | Notes |
 | --- | --- | --- |
-| FIT reader | `garmin_fit_reader.py` | `__version__ = 1.0.0`; asserts no GPS field escapes |
-| CSV export | `garmin_export.csv` | 57 activities, 29 columns |
+| FIT reader | `garmin_fit_reader.py` | `__version__ = 1.1.0`; asserts no GPS field escapes; attaches internal elevation diagnostics (`_ascent_smoothed_ft`, `_elev_range_ft`) that are excluded from the published CSV |
+| CSV export | `garmin_export.csv` | 58 activities, 29 columns |
 | Publisher | `export_publish.py` | guard, remote sync, history-safety enforcement |
 | Sync | `garmin_sync.py` | OAuth, local only |
 | Trigger server | `garmin_server.py` | localhost static + trigger routes; **not** an API |
@@ -89,7 +89,7 @@ an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 207 passed, 1 skipped. |
+| `python -m pytest` | Works. 231 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -99,6 +99,8 @@ an out-of-date copy of this document.
 | CI | **None** — no workflow, no pre-commit |
 | Dependency lockfile | **None** (`pyproject.toml` only) |
 | `python -m build` | Not verified; the `build` package is not a declared dependency |
+| Database vs export parity | **Verified 2026-10-04.** FIT directory, `garmin_export.csv` and `trainloop.db` all hold 58. Note `load` computes only; `bootstrap` is what imports. |
+| `garmin_export.csv` provenance | Rebuilt in-process with `export_publish.build_csv()` on 2026-10-03, not committed. It picks up `2026-10-01` from the FIT directory. |
 
 Style is followed by convention rather than enforced by a tool. The 19 Python
 modules use the existing naming and formatting, but nothing would catch a
@@ -106,20 +108,25 @@ regression in it.
 
 ## Data state
 
-- 57 FIT files, all parse, all with GPS and a usable timestamp
-- 57 activities imported, 0 unreadable
-- 505 laps, 52,213 records, 52,197 position points
-- Re-import of identical files: 57 `unchanged`, 0 audit rows written
+- 58 FIT files on disk, all parse, all with GPS and a usable timestamp
+- 58 rows in `garmin_export.csv`
+- 58 activities imported into `trainloop.db`, newest `2026-10-01`
+- 523 laps, 54,652 records, 54,636 position points
+- Re-import of identical files: 58 `unchanged`, 0 audit rows written
 - **1 open date gap**: 2026-06-26 to 2026-07-05
-- **57 open `timezone_uncertain` reviews**, expected until an offset is confirmed
+- **58 open `timezone_uncertain` reviews**, expected until an offset is confirmed
+- **1 open `activity_gap` review** for the 2026-06-26 to 2026-07-05 gap
 - 1 activity where the local date and UTC date differ
-  (`garmin:23745136848`, local 2026-07-26T01:10:15, UTC 2026-07-27T01:10:15Z)
+    (`garmin:23745136848`, local 2026-07-26T01:10:15, UTC 2026-07-27T01:10:15Z)
 - 0 strength sessions. `strength_load` is `null` while this is true, which is
   not the same as zero.
 
-These three sources agree at **57** each. An earlier brief asserted a
-55/56/59 discrepancy; that premise was checked against the live corpus and is
-not supported — there is nothing to reconcile.
+All three sources now agree at **58**: FIT directory, CSV, and database. An
+earlier brief asserted a 55/56/59 discrepancy; that premise was checked against
+the live corpus and is not supported — there was nothing to reconcile. The
+database was one run behind until `trainloop bootstrap` was re-run on
+2026-10-04; it is the import step that closes this, not `load`, which only
+computes.
 
 ## Privacy posture
 
@@ -140,7 +147,7 @@ not supported — there is nothing to reconcile.
    `resting_hr`, `weight_lb` and `height_in` are still `null`. The missing
    values block confirmed local dates, cohort percentiles and the weather
    location policy. The athlete's UTC offset is the single highest-value
-   missing field, because 57 reviews are waiting on it.
+   missing field, because 58 reviews are waiting on it.
 2. No authentication and no multi-athlete separation. The health boundary is
    single-subject and described that way, not dressed up as a permission system.
 3. ~~The transport is not live.~~ **Resolved.** The CrewAI flow pushes
@@ -163,7 +170,7 @@ The supervisor reads this file and `VERIFICATION_REPORT.md` as its evidence
 base, so a stale number here becomes a wrong instruction in the next brief.
 Two things were corrected on 2026-10-01 after a run acted on them:
 
-- The **152-test** count was stale; it is 207.
+- The **152-test** count was stale; it is 231.
 - **`profile.json` was described as empty**; it carries `hr_max` and field
   notes, and only the remaining fields are `null`.
 

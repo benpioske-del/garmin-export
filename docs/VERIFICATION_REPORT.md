@@ -16,21 +16,27 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-207 passed, 1 skipped in 100.63s
+231 passed, 1 skipped in 89.07s
 ```
 
 | File | Tests |
 | --- | --- |
-| `tests/test_brief_bridge.py` | 56 |
 | `tests/test_training_data.py` | 59 |
+| `tests/test_brief_bridge.py` | 56 |
 | `tests/test_trainloop_cli.py` | 22 |
+| `tests/test_fit_reader_elevation.py` | 21 |
+| `tests/test_provenance.py` | 18 |
 | `tests/test_capture_supervisor.py` | 16 |
 | `tests/test_fit_audit.py` | 16 |
-| `tests/test_provenance.py` | 15 |
 | `tests/test_gps_guard.py` | 13 |
 | `tests/test_paths_and_guards.py` | 9 |
 | `tests/test_history_safety.py` | 2 |
-| **Total** | **208** (207 pass, 1 skip) |
+| **Total** | **232** (231 pass, 1 skip) |
+
+`tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
+reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
+leak guard, which caught the diagnostics being published as columns before this
+report was written.
 
 The skip is the Windows symlink case in the brief-bridge suite; the code path is
 covered on platforms that permit symlinks.
@@ -46,19 +52,19 @@ is new.
 ```
 $ python fit_audit.py
 FIT data audit
-parser: fitparse=1.2.0 reader=1.0.0
+parser: fitparse=1.2.0 reader=1.1.0
 
-files inspected           : 57
+files inspected           : 58
 parse failures            : 0
-files readable            : 57
-files with GPS            : 57
+files readable            : 58
+files with GPS            : 58
 files without GPS         : 0
-files with usable timestamp: 57
+files with usable timestamp: 58
 files without timestamp   : 0
-session messages          : 57
-lap messages              : 505
-record messages           : 52213
-position points (counted) : 52197
+session messages          : 58
+lap messages              : 523
+record messages           : 54652
+position points (counted) : 54636
 files missing fields      : 0
 
 warnings:
@@ -89,13 +95,13 @@ Re-running is a no-op. Editing an applied migration raises
 
 ## Import against the real corpus
 
-On a fresh database with the current corpus of 57 files, the first import
-inserts all 57. Re-running against a database that already holds them reports
+On a fresh database with the current corpus of 58 files, the first import
+inserts all 58. Re-running against a database that already holds them reports
 every file `unchanged`:
 
 ```
 $ python activities.py import
-{"inserted": 0, "updated": 0, "unchanged": 57, "unreadable": 0}
+{"inserted": 0, "updated": 0, "unchanged": 58, "unreadable": 0}
 ```
 
 **Idempotency verified on the real data**: no rows updated, and no new audit
@@ -103,19 +109,24 @@ rows written on the second pass.
 
 ```
 $ python activities.py summary
-{"activities": 57, "open_reviews": 58}
+{"activities": 58, "open_reviews": 59}
 ```
 
-- 57 activities
-- 57 open `timezone_uncertain` reviews (one per activity, expected)
+- 58 activities
+- 58 open `timezone_uncertain` reviews (one per activity, expected)
 - 1 open `activity_gap`: `no activity 2026-06-26..2026-07-05 (8 days)`
 - 0 duplicates detected
-- 57 SHA-256 raw references stored
+- 58 SHA-256 raw references stored
 
 The FIT-file inventory, the canonical table and the published CSV all agree at
-**57**. An earlier brief described a 55/56/59 discrepancy; that premise was
+**58**. An earlier brief described a 55/56/59 discrepancy; that premise was
 checked against the live corpus and is unsupported, so there is no
 reconciliation to perform.
+
+Note for anyone re-running this: `trainloop.py load` only *computes* load. The
+command that imports new FIT files is `trainloop.py bootstrap`. Until bootstrap
+was re-run on 2026-10-04 the database held 57 while the FIT directory and CSV
+held 58, so every load figure silently excluded the most recent run.
 
 ## Training load and recommendation
 
@@ -125,10 +136,21 @@ the load is bucketed by intensity band, so the exact number inside 195-203 does
 not change it):
 
 ```
-7-day window: run_load 1174.9, strength_load null, combined_load 1174.9,
-              run_confidence medium
-recommend(): confirmation_required
-             "11 recent activities are awaiting confirmation"
+$ python trainloop.py load
+7d    run 780.8   strength n/a  combined 780.8   run_conf medium
+14d   run 1798.1  strength n/a  combined 1798.1  run_conf medium
+28d   run 3364.4  strength n/a  combined 3364.4  run_conf medium
+
+$ python trainloop.py recommend
+state: confirmation_required
+reasons:
+  - 11 recent activities are awaiting confirmation
+evidence:
+  run_load_28d         3364.4
+  runs_28d             11
+  runs_7d              2
+  strength_28d         0
+  strength_load_28d    None
 ```
 
 Two things worth stating plainly:
@@ -139,6 +161,10 @@ Two things worth stating plainly:
   in the window still carry unresolved timezone reviews, so
   `recommend.recommend()` declines to issue a control state. This is the
   designed behaviour, not a failure.
+
+The 7-day figure moved from 180.7 to 780.8 when `2026-10-01` was finally
+imported. That is the practical cost of the database being a run behind: the
+load looked like a light week when the corpus said otherwise.
 
 ## Publisher and privacy guard
 
@@ -190,7 +216,8 @@ Stated rather than implied:
 | Strength data | Schema and service verified by tests; no real strength sessions recorded yet. |
 | `profile.json` | Partially populated. `hr_max=198`; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` null. The missing UTC offset blocks confirmed local dates and weather location. |
 | Brief bridge idempotency | **Now verified.** `3054d6a` gave the file a content-derived `brief_id`; `captured_utc` is metadata only. Tests advance a frozen clock 90s to prove an unchanged brief is a no-op. |
-| Athlete UTC offset | Not supplied by the athlete. This is what 57 open `timezone_uncertain` reviews are waiting on. |
+| Athlete UTC offset | Not supplied by the athlete. This is what 58 open `timezone_uncertain` reviews are waiting on. |
+| Elevation accuracy | **Derived, not measured.** These FIT files carry no `barometer_pressure`, so altitude is GPS-derived and noisy. The device figure and a smoothed recomputation differ by up to ~25% on real runs. See [ELEVATION.md](ELEVATION.md). |
 
 ## Withdrawn claims
 
@@ -203,7 +230,7 @@ Recorded so they are not reintroduced by a later brief:
   `2.53.0.windows.4`. The claim could not be traced to any code, fixture or
   command output, and was withdrawn rather than investigated as a real finding.
 - **"55 audit records and a historical 59-record source."** Both counts are
-  unsupported. The live corpus is 57 across every source.
+  unsupported. The live corpus is 58 across every source.
 
 ## Reproducing this report
 

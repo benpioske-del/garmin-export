@@ -132,6 +132,39 @@ def test_published_header_uses_the_public_column_name(real_rows):
     assert "_source_file" not in real_rows[0]
 
 
+def test_internal_diagnostics_never_reach_the_published_csv(real_rows):
+    """The reader attaches underscore-prefixed elevation diagnostics.
+
+    export_publish builds its header from the union of every row key, so an
+    internal key that is not explicitly excluded becomes a public column and
+    changes the shape of the export for every downstream consumer. Only
+    _source_file is published, and only under its public name.
+    """
+    leaked = [c for r in real_rows for c in r if c.startswith("_")]
+    assert not leaked, "internal keys leaked into the export: %s" % sorted(set(leaked))
+
+
+def test_the_elevation_diagnostics_are_actually_present_in_the_reader():
+    """If the reader stopped attaching them, the guard above would pass for the
+    wrong reason. Assert they exist and that they are underscore-prefixed."""
+    row = r.read_fit(REAL_FIT[0])
+    for k in ("_elev_range_ft", "_ascent_smoothed_ft", "_ascent_raw_ft",
+              "_ascent_samples"):
+        assert k in row, "reader no longer emits %s" % k
+
+
+def test_published_ascent_is_unchanged_by_the_diagnostics(real_rows):
+    """The diagnostics are additive. The published figure must still be the
+    device's own whole number of feet, not a smoothed or recomputed one.
+
+    Values arrive as strings because these rows come back out of the CSV.
+    """
+    for r in real_rows:
+        v = r.get("Total Ascent", "").strip()
+        if v:
+            assert v.isdigit(), "Total Ascent is not a whole number: %r" % v
+
+
 def test_no_two_rows_are_the_same_activity(real_rows):
     """The corrected date must not have collapsed two genuinely different runs.
 

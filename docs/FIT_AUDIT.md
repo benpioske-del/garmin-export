@@ -8,8 +8,8 @@ python fit_audit.py --json out.json      # machine-readable manifest
 ```
 
 - **Parser:** `fitparse` 1.2.0
-- **Reader:** `garmin_fit_reader` 1.0.0
-- **Source:** `C:\Users\benpi\Downloads\garmin_fit\*.fit` (56 files, local only)
+- **Reader:** `garmin_fit_reader` 1.1.0
+- **Source:** `C:\Users\benpi\Downloads\garmin_fit\*.fit` (58 files, local only)
 - **Run:** 2026-09-29
 
 Results are reproducible: every file is hashed with SHA-256 and the parser
