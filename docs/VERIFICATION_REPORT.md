@@ -16,12 +16,13 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-327 passed, 1 skipped in 129.87s
+348 passed, 1 skipped in 133.20s
 ```
 
 | File | Tests |
 | --- | --- |
 | `tests/test_dashboard_contract.py` | 36 |
+| `tests/test_recommend_snapshots.py` | 21 |
 | `tests/test_training_data.py` | 59 |
 | `tests/test_brief_bridge.py` | 56 |
 | `tests/test_dashboard_api.py` | 38 |
@@ -34,7 +35,7 @@ $ python -m pytest
 | `tests/test_gps_guard.py` | 13 |
 | `tests/test_paths_and_guards.py` | 9 |
 | `tests/test_history_safety.py` | 2 |
-| **Total** | **328** (327 pass, 1 skip) |
+| **Total** | **349** (348 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV

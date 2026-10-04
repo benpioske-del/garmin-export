@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 327 passed, 1 skipped (Windows symlink case) |
+| Tests | 348 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -89,7 +89,7 @@ an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 327 passed, 1 skipped. |
+| `python -m pytest` | Works. 348 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -127,6 +127,42 @@ the live corpus and is not supported — there was nothing to reconcile. The
 database was one run behind until `trainloop bootstrap` was re-run on
 2026-10-04; it is the import step that closes this, not `load`, which only
 computes.
+
+## Coaching rationale fixtures
+
+`tests/recommend_snapshots.py` pins the output of every reachable coaching
+branch to a golden JSON file under `tests/fixtures/recommend/`, built from the
+scenarios in `tests/recommend_scenarios.py`. Re-record with
+`REGENERATE_SNAPSHOTS=1`, then read the diff.
+
+Determinism is pinned two ways: `as_of` is a fixed instant, so the 7-day window
+does not slide with the calendar, and `hr_max` is supplied rather than inferred.
+Every scenario builds its database at an explicit path via
+`trainingdb.connect(path=...)`; the environment variable is never set.
+
+Reachability is established by sweeping 3600 database shapes rather than by
+reading the source, because `STATE_DELOAD` *is* present in `recommend.py` inside
+a branch nothing can reach.
+
+Writing these found four defects, documented in
+[COACHING_POLICY_AUDIT.md](COACHING_POLICY_AUDIT.md):
+
+- `deload` is unreachable. The acute:chronic ratio is a 7-day sum over a 28-day
+  sum, and the acute window is a subset of the chronic one, so the ratio is
+  bounded by 1.0 while `HIGH_ACWR` is 1.5. The policy cannot recommend reducing
+  load.
+- The 1.3-1.5 caution band is dead for the same reason.
+- `recover` is in `CONTROL_STATES` and returned by `available_states()`, but no
+  branch produces it.
+- A missing `hr_max` is reported as "only 0 runs in 28 days" rather than as a
+  missing input, because runs without a computable load are dropped before being
+  counted as days.
+
+None are fixed here: each changes what the athlete is told, so they are policy
+decisions rather than bugs to patch. Each is asserted in the suite, so a change
+in either direction has to be acknowledged.
+
+21 tests, plus 9 golden files.
 
 ## Dashboard data-source contract
 
@@ -242,7 +278,7 @@ The supervisor reads this file and `VERIFICATION_REPORT.md` as its evidence
 base, so a stale number here becomes a wrong instruction in the next brief.
 Two things were corrected on 2026-10-01 after a run acted on them:
 
-- The **152-test** count was stale; it is 327.
+- The **152-test** count was stale; it is 348.
 - **`profile.json` was described as empty**; it carries `hr_max` and field
   notes, and only the remaining fields are `null`.
 
