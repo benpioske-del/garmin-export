@@ -16,14 +16,16 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-231 passed, 1 skipped in 89.07s
+291 passed, 1 skipped in 107.80s
 ```
 
 | File | Tests |
 | --- | --- |
 | `tests/test_training_data.py` | 59 |
 | `tests/test_brief_bridge.py` | 56 |
+| `tests/test_dashboard_api.py` | 38 |
 | `tests/test_trainloop_cli.py` | 22 |
+| `tests/test_dashboard_api_http.py` | 22 |
 | `tests/test_fit_reader_elevation.py` | 21 |
 | `tests/test_provenance.py` | 18 |
 | `tests/test_capture_supervisor.py` | 16 |
@@ -31,7 +33,7 @@ $ python -m pytest
 | `tests/test_gps_guard.py` | 13 |
 | `tests/test_paths_and_guards.py` | 9 |
 | `tests/test_history_safety.py` | 2 |
-| **Total** | **232** (231 pass, 1 skip) |
+| **Total** | **292** (291 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -229,6 +231,16 @@ Recorded so they are not reintroduced by a later brief:
   and `53`/`55` appear in these documents only inside the Git version string
   `2.53.0.windows.4`. The claim could not be traced to any code, fixture or
   command output, and was withdrawn rather than investigated as a real finding.
+- **"The standing verification state is 57 FIT files, 57 activities, 58 open
+  reviews, 207 passed / 1 skipped."** Asserted as authoritative by the
+  `connect-dashboard-to-data-layer` brief of 2026-10-04, which also instructed
+  that the correct figures (58 / 58 / 59 / 231) "are not adopted" and must not be
+  restated. The brief was working from a pre-`b2201c7` snapshot of these
+  documents. Every one of those numbers was verified wrong on the live corpus
+  before any code was written, and the brief's own instruction -- "do not
+  hard-code counts as a substitute for querying the data layer" -- is what
+  prevents the error from reaching the UI. The API queries every count; none is
+  written down. See [SUPERVISOR_BRIEF_ERRORS.md](SUPERVISOR_BRIEF_ERRORS.md).
 - **"55 audit records and a historical 59-record source."** Both counts are
   unsupported. The live corpus is 58 across every source.
 

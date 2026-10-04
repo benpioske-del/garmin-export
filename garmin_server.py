@@ -20,6 +20,7 @@ Usage:
 """
 
 import argparse
+import datetime
 import io
 import json
 import os
@@ -81,11 +82,218 @@ IDLE_TIMEOUT = 1200
 
 TOKEN = ""
 PORT = 0
+
+# ---------------------------------------------------------------------------
+# JSON API over the existing data layer.
+#
+# These routes are the dashboard's only authoritative source for activities,
+# load and coaching. They read the migration-backed database and call
+# loadcalc/recommend directly; nothing is recomputed here, so the browser and
+# the CLI can never disagree about a number.
+#
+# Two rules shape the code below:
+#
+#   1. Counts, versions and states are QUERIED, never written down. A hardcoded
+#      count goes stale the moment a run is imported, and a stale count in a
+#      coaching surface is worse than no number at all.
+#   2. null, unavailable and refused are preserved as themselves. None of them
+#      is zero, and none of them is a normal result.
+#
+# Each builder is a pure function of (conn, hr_max) returning a JSON-safe dict,
+# so the tests exercise real logic without binding a socket.
+# ---------------------------------------------------------------------------
+
+API_PREFIX = "/api/"
+
+
+def _rows(conn, sql, args=()):
+    """Fetch rows as dicts. Row factory is set per-connection in trainingdb."""
+    return [dict(r) for r in conn.execute(sql, args).fetchall()]
+
+
+def _open_reviews(conn, activity_id):
+    return _rows(
+        conn,
+        "SELECT reason, detail, opened_utc FROM review_items "
+        "WHERE activity_id = ? AND state = 'open' ORDER BY reason",
+        (activity_id,),
+    )
+
+
+def _review_summary(conn):
+    """Open review counts by reason, queried. Includes activity_gap rows, whose
+    activity_id is null because no activity exists for the gap."""
+    by_reason = {r["reason"]: r["c"] for r in _rows(
+        conn,
+        "SELECT reason, COUNT(*) c FROM review_items WHERE state = 'open' "
+        "GROUP BY reason ORDER BY reason",
+    )}
+    total = sum(by_reason.values())
+    return {
+        "open_reviews": total,
+        "by_reason": by_reason,
+        "timezone_uncertain": by_reason.get("timezone_uncertain", 0),
+        "activity_gap": by_reason.get("activity_gap", 0),
+    }
+
+
+def _source_files(conn):
+    """activity_id -> raw FIT filename, so the dashboard can keep its existing
+    raw FIT detail view reachable without a second lookup convention."""
+    return {r["activity_id"]: r["source_file"] for r in _rows(
+        conn,
+        "SELECT activity_id, source_file FROM activity_raw_refs",
+    )}
+
+
+def api_activities(conn):
+    """GET /api/activities - canonical activities with review state preserved."""
+    src = _source_files(conn)
+    out = []
+    for r in _rows(conn, "SELECT * FROM activities ORDER BY start_utc DESC"):
+        aid = r["activity_id"]
+        reviews = _open_reviews(conn, aid)
+        out.append({
+            # Stable identity. Never the array index, never the FIT filename.
+            "activity_id": aid,
+            "source_activity_id": r["source_activity_id"],
+            "source_file": src.get(aid),
+            "sport": r["sport"],
+            "start_utc": r["start_utc"],
+            "start_local": r["start_local"],
+            # start_local is a filename-derived guess until the offset is
+            # confirmed. Say so rather than presenting it as local time.
+            "timezone_source": r["timezone_source"],
+            "distance_mi": r["distance_mi"],
+            "moving_time_s": r["moving_time_s"],
+            "elapsed_time_s": r["elapsed_time_s"],
+            "avg_hr": r["avg_hr"],
+            "max_hr": r["max_hr"],
+            "total_ascent_ft": r["total_ascent_ft"],
+            "total_descent_ft": r["total_descent_ft"],
+            "value_state": r["value_state"],
+            "confidence": r["confidence"],
+            "confirmation": r["confirmation"],
+            "review_state": r["review_state"],
+            "reviews": reviews,
+            "has_open_review": bool(reviews) or r["review_state"] == "open",
+        })
+    summary = _review_summary(conn)
+    return {
+        "activities": out,
+        "count": len(out),
+        "review_summary": summary,
+        # Provenance of the snapshot itself, so a stale panel is detectable.
+        "data_version": {
+            "last_activity_update_utc": conn.execute(
+                "SELECT MAX(last_updated_utc) v FROM activities"
+            ).fetchone()["v"],
+            "activities_table": "activities",
+            "source": "trainloop.db",
+        },
+    }
+
+
+def _window_payload(w, days, as_of_utc):
+    """One load window. start/end are the actual bounds, so the number is
+    interpretable without re-deriving the window server-side.
+
+    window_bounds returns datetimes; they are converted here so the payload is
+    JSON-native rather than relying on a default=str fallback at send time.
+    """
+    start, end = loadcalc.window_bounds(as_of_utc, days)
+    start = start.isoformat() if hasattr(start, "isoformat") else str(start)
+    end = end.isoformat() if hasattr(end, "isoformat") else str(end)
+    return {
+        "days": days,
+        "value": w["run_load"],
+        "combined_load": w["combined_load"],
+        "start": start,
+        "end": end,
+        "run_confidence": w["run_confidence"],
+        "strength_confidence": w["strength_confidence"],
+        "runs_included": len(w["run_days"]),
+        "strength_sessions_included": len(w["strength_days"]),
+        # Why a component is missing, verbatim from loadcalc. Empty means the
+        # component was simply absent, not that it was withheld.
+        "unavailable": w["unavailable"],
+        "included_activity_ids": w["included_run_ids"],
+    }
+
+
+def api_load(conn, hr_max, as_of=None):
+    """GET /api/load - 7/14/28-day load straight from loadcalc."""
+    result = loadcalc.compute(conn, as_of=as_of, hr_max=hr_max)
+    windows = {}
+    for key in ("7", "14", "28"):
+        w = result["windows"][key]
+        windows["%sd" % key] = _window_payload(w, w["days"], result["as_of_utc"])
+
+    hr_note = None
+    if hr_max is None:
+        # loadcalc still returns numbers without a max by falling back, so the
+        # dashboard must be able to say the input was never supplied.
+        hr_note = ("hr_max not supplied; run load falls back to the "
+                   "loadcalc unverified path")
+
+    return {
+        "algorithm": result["version"],
+        "as_of_utc": result["as_of_utc"],
+        "windows": windows,
+        # null here means "no confirmed strength sessions exist". It must never
+        # be rendered as 0, which would read as "you trained and did nothing".
+        "strength_load": result["windows"]["28"]["strength_load"],
+        "strength_state": result["windows"]["28"]["strength_confidence"],
+        "assumptions": result["assumptions"],
+        "hr_max_supplied": hr_max,
+        "hr_max_note": hr_note,
+    }
+
+
+def api_coaching(conn, hr_max, as_of=None):
+    """GET /api/coaching - refusal-first result straight from recommend."""
+    result = recommend.recommend(conn, as_of=as_of, hr_max=hr_max)
+    state = result["state"]
+    advisory = result.get("advisory", True)
+    return {
+        "state": state,
+        # A refusal is not a weak recommendation. The dashboard keys its
+        # rendering off this flag, so a refusal can never be styled as advice.
+        "refused": not advisory,
+        "advisory": advisory,
+        "blocking_conditions": list(result.get("reasons", [])),
+        "rationale": list(result.get("reasons", [])),
+        "limitation": result.get("limitation"),
+        "evidence": result.get("evidence", {}),
+        "disclaimers": result.get("disclaimers", []),
+        "available_states": recommend.available_states(),
+        "review_summary": _review_summary(conn),
+        "version": loadcalc.LOAD_VERSION,
+    }
+
+
+API_ROUTES = {
+    "/api/activities": lambda conn, hr, at: api_activities(conn),
+    "/api/load": lambda conn, hr, at: api_load(conn, hr, as_of=at),
+    "/api/coaching": lambda conn, hr, at: api_coaching(conn, hr, as_of=at),
+}
+
+TOKEN = ""
+PORT = 0
 last_request: float = time.time()
 SYNC_SCRIPT = os.path.join(ROOT, "garmin_sync.py")
 _sync_lock = threading.Lock()
 MEGACMD = ""
 MEGACMD_REMOTE = "/CoachDashboard"
+
+# Imported for the JSON API. These are the canonical implementations; the
+# server must not grow a second parser, a second load formula or a second
+# coaching rule, or the dashboard and the CLI would drift apart.
+import activities          # noqa: E402
+import loadcalc            # noqa: E402
+import recommend           # noqa: E402
+import trainingdb          # noqa: E402
+import trainloop           # noqa: E402
 
 
 def _run_sync():
@@ -236,6 +444,72 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             pass
 
+    def _send_json(self, code, payload):
+        """Send a JSON body with the same hardening as _send.
+
+        Errors go through here too, so an API failure is always parseable JSON
+        rather than a traceback or an HTML error page.
+        """
+        try:
+            body = json.dumps(payload, default=str).encode("utf-8")
+        except (TypeError, ValueError):
+            body = json.dumps(
+                {"error": "unserializable response"}).encode("utf-8")
+            code = 500
+        return self._send(code, body, "application/json; charset=utf-8")
+
+    def _api(self, path, query):
+        """Dispatch one /api/ route.
+
+        Opens the database per request and closes it in a finally, so a browser
+        hitting refresh in a loop cannot leak handles.
+        """
+        route = API_ROUTES.get(path)
+        if route is None:
+            return self._send_json(404, {
+                "error": "unknown endpoint",
+                "path": path,
+                "available": sorted(API_ROUTES),
+            })
+        # Reject unknown query parameters rather than ignoring a typo, which
+        # would otherwise look like a filter that silently did nothing.
+        for key in query:
+            if key not in ("as_of",):
+                return self._send_json(400, {
+                    "error": "unsupported query parameter",
+                    "parameter": key,
+                    "supported": ["as_of"],
+                })
+        as_of = query.get("as_of")
+        if as_of is not None:
+            try:
+                datetime.datetime.strptime(as_of, "%Y-%m-%dT%H:%M:%SZ")
+            except ValueError:
+                return self._send_json(400, {
+                    "error": "as_of must be UTC ISO-8601, e.g. "
+                             "2026-10-04T00:00:00Z",
+                    "as_of": as_of,
+                })
+
+        conn = None
+        try:
+            conn = trainingdb.connect()
+            hr_max = trainloop._hr_max()
+            payload = route(conn, hr_max, as_of)
+        except Exception as exc:
+            # Log locally, return nothing identifying. A traceback or a
+            # filesystem path in a browser is an information leak.
+            sys.stderr.write("api %s failed: %s: %s\n"
+                             % (path, type(exc).__name__, exc))
+            return self._send_json(500, {
+                "error": "internal error",
+                "endpoint": path,
+            })
+        finally:
+            if conn is not None:
+                conn.close()
+        return self._send_json(200, payload)
+
     def _send_zip(self, payload, filename):
         try:
             self.send_response(200)
@@ -286,6 +560,14 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/cloud-check":
             return self._send(200, json.dumps({"megacmd": _find_megacmd() is not None}).encode("utf-8"),
                               "application/json; charset=utf-8")
+        if path.startswith(API_PREFIX):
+            # Behind the token check above, same as every other data route.
+            # Same-origin only; no CORS headers are ever sent.
+            # parse_qs yields lists; take the first value so a duplicated
+            # parameter cannot smuggle a second value past the checks below.
+            raw = urllib.parse.parse_qs(parts.query)
+            query = {k: v[0] for k, v in raw.items() if v}
+            return self._api(path, query)
         if path.startswith("/fit/"):
             name = path[len("/fit/"):].replace("/", "")
             if name not in fit_names():

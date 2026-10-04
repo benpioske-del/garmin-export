@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 231 passed, 1 skipped (Windows symlink case) |
+| Tests | 291 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -75,7 +75,7 @@ Docs: [`DATA_QUALITY.md`](DATA_QUALITY.md),
 | CSV export | `garmin_export.csv` | 58 activities, 29 columns |
 | Publisher | `export_publish.py` | guard, remote sync, history-safety enforcement |
 | Sync | `garmin_sync.py` | OAuth, local only |
-| Trigger server | `garmin_server.py` | localhost static + trigger routes; **not** an API |
+| Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching` |
 | Audit | `fit_audit.py` | rewritten: hashes, parser versions, counts only |
 | Brief bridge | `brief_bridge.py` | `post` / `ingest` / `paste` / `serve` / `capture` |
 | Profile | `profile.json` | `hr_max` set to 198; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` still `null` |
@@ -89,7 +89,7 @@ an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 231 passed, 1 skipped. |
+| `python -m pytest` | Works. 291 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -102,7 +102,7 @@ an out-of-date copy of this document.
 | Database vs export parity | **Verified 2026-10-04.** FIT directory, `garmin_export.csv` and `trainloop.db` all hold 58. Note `load` computes only; `bootstrap` is what imports. |
 | `garmin_export.csv` provenance | Rebuilt in-process with `export_publish.build_csv()` on 2026-10-03, not committed. It picks up `2026-10-01` from the FIT directory. |
 
-Style is followed by convention rather than enforced by a tool. The 19 Python
+Style is followed by convention rather than enforced by a tool. The 20 Python
 modules use the existing naming and formatting, but nothing would catch a
 regression in it.
 
@@ -127,6 +127,49 @@ the live corpus and is not supported — there was nothing to reconcile. The
 database was one run behind until `trainloop bootstrap` was re-run on
 2026-10-04; it is the import step that closes this, not `load`, which only
 computes.
+
+## Dashboard JSON API
+
+Added for supervisor brief `connect-dashboard-to-data-layer`. Three read-only
+same-origin GET routes, served by the existing locked-down `garmin_server.py`:
+
+| Route | Source of truth | Notes |
+| --- | --- | --- |
+| `GET /api/activities` | `activities` + `review_items` + `activity_raw_refs` | canonical rows, open reviews preserved, `source_file` resolved from the raw-ref table rather than reconstructed |
+| `GET /api/load` | `loadcalc.compute()` | 7/14/28 windows with real bounds; `algorithm` is `loadcalc.LOAD_VERSION` |
+| `GET /api/coaching` | `recommend.recommend()` | refusal-first; `refused` is derived from `advisory`, not re-decided |
+
+Design constraints, all test-enforced:
+
+- **Nothing is recomputed.** The routes call the same functions the CLI calls, so
+  the dashboard and `trainloop.py` cannot disagree about a number.
+- **No count, version or threshold is written down.** Everything is queried. A
+  brief asserting a wrong figure cannot make the API wrong.
+- **`null` is not `0`.** `strength_load` stays `null` because no confirmed
+  strength sessions exist; every window value is `null` on an empty database.
+- **A refusal is not advice.** `refused` is true whenever `recommend` returns a
+  non-advisory state, and the dashboard renders it as a refusal.
+- **No stale fallback.** If the API fails the panel says so instead of falling
+  back to the inline arrays still present elsewhere in the dashboard.
+- **No traceback or path in a response.** 5xx returns
+  `{"error": "internal error"}`; detail goes to stderr only.
+
+Behind the existing `X-Dash-Token` gate and the `Host` header check. No CORS
+headers are sent. Unknown query parameters are a 400 rather than being ignored,
+because a silently ignored typo looks like a filter that did nothing. `as_of`
+accepts UTC ISO-8601 and is validated.
+
+The pre-existing `fit-list`, `fit/<name>`, `ping`, `sync` and cloud routes are
+unchanged, covered by regression tests in `tests/test_dashboard_api_http.py`.
+
+Tests: `tests/test_dashboard_api.py` (38) and `tests/test_dashboard_api_http.py`
+(22). `smoke_dashboard_api.py` runs the same paths against the live database and
+is deliberately not part of pytest.
+
+`dashboard/index.html` is untracked and gitignored because it contains
+hand-entered athlete data, so the panel markup is not in version control. It is
+appended as a self-contained IIFE that reads its own token from the URL and
+exposes `window.refreshApiPanel()`.
 
 ## Privacy posture
 
@@ -170,7 +213,7 @@ The supervisor reads this file and `VERIFICATION_REPORT.md` as its evidence
 base, so a stale number here becomes a wrong instruction in the next brief.
 Two things were corrected on 2026-10-01 after a run acted on them:
 
-- The **152-test** count was stale; it is 231.
+- The **152-test** count was stale; it is 291.
 - **`profile.json` was described as empty**; it carries `hr_max` and field
   notes, and only the remaining fields are `null`.
 
