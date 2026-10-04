@@ -1,0 +1,145 @@
+{
+  "covers": [
+    "unavailable",
+    "refused"
+  ],
+  "description": "History is sufficient but no max heart rate is supplied. Running load is unavailable rather than zero. KNOWN DEFECT: the refusal currently reports 'only 0 runs in 28 days', because runs with no computable load are dropped before they are counted as days. The true cause is the missing hr_max and the rationale does not say so.",
+  "expected_state": "data_insufficient",
+  "fixed_as_of": "2026-10-04T12:00:00Z",
+  "hr_max": null,
+  "recommend": {
+    "advisory": false,
+    "disclaimers": [
+      "Workload ratio, a monitoring signal only. Not an injury probability, risk score or diagnosis.",
+      "Not medical advice.",
+      "Stop and seek a qualified clinician for pain that persists, altered gait, chest pain, or any medical concern. Nothing here is a diagnosis."
+    ],
+    "evidence": {
+      "run_load_28d": null,
+      "run_unavailable": [
+        {
+          "activity_id": "run-009",
+          "reason": "no hr_max supplied"
+        },
+        {
+          "activity_id": "run-008",
+          "reason": "no hr_max supplied"
+        },
+        {
+          "activity_id": "run-007",
+          "reason": "no hr_max supplied"
+        },
+        {
+          "activity_id": "run-006",
+          "reason": "no hr_max supplied"
+        },
+        {
+          "activity_id": "run-005",
+          "reason": "no hr_max supplied"
+        },
+        {
+          "activity_id": "run-004",
+          "reason": "no hr_max supplied"
+        },
+        {
+          "activity_id": "run-003",
+          "reason": "no hr_max supplied"
+        },
+        {
+          "activity_id": "run-002",
+          "reason": "no hr_max supplied"
+        },
+        {
+          "activity_id": "run-001",
+          "reason": "no hr_max supplied"
+        },
+        {
+          "activity_id": "run-000",
+          "reason": "no hr_max supplied"
+        }
+      ],
+      "runs_28d": 0,
+      "runs_7d": 0,
+      "strength_28d": 0,
+      "strength_load_28d": null,
+      "strength_unavailable": []
+    },
+    "limitation": "Not enough recorded history to judge load.",
+    "reasons": [
+      "only 0 runs in 28 days, need 8"
+    ],
+    "state": "data_insufficient"
+  },
+  "scenario": "run-load-unavailable-no-hr-max",
+  "unavailable": {
+    "run": [
+      {
+        "activity_id": "run-009",
+        "reason": "no hr_max supplied"
+      },
+      {
+        "activity_id": "run-008",
+        "reason": "no hr_max supplied"
+      },
+      {
+        "activity_id": "run-007",
+        "reason": "no hr_max supplied"
+      },
+      {
+        "activity_id": "run-006",
+        "reason": "no hr_max supplied"
+      },
+      {
+        "activity_id": "run-005",
+        "reason": "no hr_max supplied"
+      },
+      {
+        "activity_id": "run-004",
+        "reason": "no hr_max supplied"
+      },
+      {
+        "activity_id": "run-003",
+        "reason": "no hr_max supplied"
+      },
+      {
+        "activity_id": "run-002",
+        "reason": "no hr_max supplied"
+      },
+      {
+        "activity_id": "run-001",
+        "reason": "no hr_max supplied"
+      },
+      {
+        "activity_id": "run-000",
+        "reason": "no hr_max supplied"
+      }
+    ],
+    "strength": []
+  },
+  "windows": {
+    "14": {
+      "combined_load": null,
+      "run_confidence": "unverified",
+      "run_days": 0,
+      "run_load": null,
+      "strength_days": 0,
+      "strength_load": null
+    },
+    "28": {
+      "combined_load": null,
+      "run_confidence": "unverified",
+      "run_days": 0,
+      "run_load": null,
+      "strength_days": 0,
+      "strength_load": null
+    },
+    "7": {
+      "combined_load": null,
+      "run_confidence": "unverified",
+      "run_days": 0,
+      "run_load": null,
+      "strength_days": 0,
+      "strength_load": null
+    }
+  }
+}

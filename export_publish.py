@@ -102,16 +102,69 @@ def die(msg, hint=None):
     sys.exit(1)
 
 
+# The modules the publisher is allowed to publish. Explicit, not inferred: the
+# publisher runs unattended from scheduled tasks, so a stray scratch script in
+# the repo root must never be pushed to the public repo without a human adding
+# it here on purpose.
+PUBLISHED_MODULES = frozenset([
+    "activities.py",
+    "brief_bridge.py",
+    "capture_supervisor_brief.py",
+    "dashboard_contract.py",
+    "export_publish.py",
+    "fit_audit.py",
+    "fit_gps_validate.py",
+    "garmin_fit_reader.py",
+    "garmin_server.py",
+    "garmin_sync.py",
+    "health.py",
+    "loadcalc.py",
+    "paths.py",
+    "recommend.py",
+    "smoke_dashboard_api.py",
+    "strength.py",
+    "supervisor_publish.py",
+    "terms.py",
+    "trainingdb.py",
+    "trainloop.py",
+    "weather.py",
+])
+
+
+def is_scratch_script(name):
+    """Throwaway scripts are local scratch and are never published."""
+    return name.startswith("_") or name.endswith((".tmp", ".bak", ".orig"))
+
+
+def unpublished_scripts():
+    """Root-level .py files that exist but are deliberately not published.
+
+    Returned so the publisher can report them rather than ignore them: a new
+    module that was forgotten here should be visible, and scratch debris should
+    be left out of the public repo instead of published by accident.
+    """
+    out = []
+    for name in sorted(os.listdir(REPO)):
+        if not name.endswith(".py") or not os.path.isfile(os.path.join(REPO, name)):
+            continue
+        if is_scratch_script(name) or name in PUBLISHED_MODULES:
+            continue
+        out.append(name)
+    return out
+
+
 def code_paths():
     """Version-controlled pipeline code, as repo-relative paths.
 
     The scripts used to live in Downloads with no version control, which meant
     a cleared Downloads folder would destroy the pipeline. They are in the repo
     now, so the publisher stages and fingerprints them.
+
+    Only PUBLISHED_MODULES is staged at the root; see that constant for why.
     """
     out = ["pyproject.toml"]
-    for name in sorted(os.listdir(REPO)):
-        if name.endswith(".py") and os.path.isfile(os.path.join(REPO, name)):
+    for name in sorted(PUBLISHED_MODULES):
+        if os.path.isfile(os.path.join(REPO, name)):
             out.append(name)
     for sub in ("tests", "dashboard"):
         d = os.path.join(REPO, sub)
@@ -123,6 +176,14 @@ def code_paths():
                 continue
             if name.endswith((".py", ".html", ".toml")):
                 out.append(rel)
+    fixture_root = os.path.join(REPO, "tests", "fixtures")
+    if os.path.isdir(fixture_root):
+        for base, _dirs, names in os.walk(fixture_root):
+            for name in sorted(names):
+                if not name.endswith(".json"):
+                    continue
+                full = os.path.join(base, name)
+                out.append(os.path.relpath(full, REPO).replace("\\", "/"))
     return out
 
 
@@ -621,6 +682,21 @@ def raw_url(remote, branch):
         m.group(1), m.group(2), branch, CANON)
 
 
+def build_commit_message(run_count, latest_run, staged, export_only):
+    """Commit message that describes what is actually in the commit.
+
+    The scheduled task fires unattended, so a code change must not land under a
+    bare "export" message; the history has to say the commit is more than a
+    data refresh.
+    """
+    msg = "garmin export: %d runs, latest %s" % (run_count, latest_run)
+    pipeline = sorted(p for p in staged if p not in export_only)
+    if pipeline:
+        msg += "\n\nalso publishes %d pipeline file(s):\n%s" % (
+            len(pipeline), "\n".join("  " + p for p in pipeline))
+    return msg
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="report only, change nothing")
@@ -635,6 +711,12 @@ def main():
 
     remote = need_repo()
     print("origin      : %s" % remote)
+
+    stray = unpublished_scripts()
+    if stray:
+        print("\nnot published (not in PUBLISHED_MODULES, add it there if it is real):")
+        for name in stray:
+            print("  %s" % name)
 
     ig = os.path.join(REPO, ".gitignore")
     if not os.path.exists(ig):
@@ -774,7 +856,10 @@ def main():
         print("raw url     : %s" % url)
         return 0
 
-    msg = "garmin export: %d runs, latest %s" % (meta["run_count"], meta["latest_run"])
+    export_only = {CANON, META, "publish_state.json"}
+    staged = [ln.strip() for ln in run(["diff", "--cached", "--name-only"]).stdout.splitlines()
+              if ln.strip()]
+    msg = build_commit_message(meta["run_count"], meta["latest_run"], staged, export_only)
     r = run(["git", "commit", "-m", msg])
     if r.returncode != 0:
         die("git commit failed", r.stderr.strip())

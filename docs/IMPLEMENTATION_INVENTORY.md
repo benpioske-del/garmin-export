@@ -1,4 +1,4 @@
-# Implementation inventory
+﻿# Implementation inventory
 
 Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 
@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 348 passed, 1 skipped (Windows symlink case) |
+| Tests | 367 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -22,12 +22,12 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | 5 | Training load, 7/14/28-day windows | Implemented |
 | 6 | Recommendations and safety boundaries | Implemented |
 | 7 | Shared terminology | Implemented |
-| 8 | Health data with consent boundary | Partial — boundary implemented, no auth |
-| 9 | Weather enrichment gate | Partial — gate implemented, no provider |
+| 8 | Health data with consent boundary | Partial â€” boundary implemented, no auth |
+| 9 | Weather enrichment gate | Partial â€” gate implemented, no provider |
 | 10 | Verification documentation | Implemented |
 | 11 | Dashboard | Pre-existing, local-only, unversioned |
 | 12 | Brief transport | Implemented, live; cross-second idempotency fixed in `3054d6a` |
-| 13 | Quality gates and CI | **Not started** — supervisor brief Task 7 |
+| 13 | Quality gates and CI | **Not started** â€” supervisor brief Task 7 |
 
 ## Data layer
 
@@ -39,11 +39,11 @@ established as the minimum that satisfies the requirement.
 | Component | Path | Notes |
 | --- | --- | --- |
 | Connection + migration runner | `trainingdb.py` | stdlib `sqlite3`, no new dependency |
-| Migrations | `migrations/001`–`006` | numbered SQL, applied in order, checksum-guarded |
+| Migrations | `migrations/001`â€“`006` | numbered SQL, applied in order, checksum-guarded |
 | Database file | `trainloop.db` | **gitignored**, local only |
 | Terminology | `terms.py` | shared by every module below |
 | Activities | `activities.py` | canonical records, provenance, review, audit |
-| Strength | `strength.py` | sessions → exercises → sets |
+| Strength | `strength.py` | sessions â†’ exercises â†’ sets |
 | Load | `loadcalc.py` | versioned `load-1.0.0`, windows 7/14/28 |
 | Recommendations | `recommend.py` | six control states, refusal-first |
 | Health | `health.py` | consent-gated, access-logged |
@@ -89,14 +89,14 @@ an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 348 passed, 1 skipped. |
+| `python -m pytest` | Works. 367 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
 | Linter | **None configured** |
 | Formatter | **None configured** |
 | Type checker | **None configured, no annotations** |
-| CI | **None** — no workflow, no pre-commit |
+| CI | **None** â€” no workflow, no pre-commit |
 | Dependency lockfile | **None** (`pyproject.toml` only) |
 | `python -m build` | Not verified; the `build` package is not a declared dependency |
 | Database vs export parity | **Verified 2026-10-04.** FIT directory, `garmin_export.csv` and `trainloop.db` all hold 58. Note `load` computes only; `bootstrap` is what imports. |
@@ -123,7 +123,7 @@ regression in it.
 
 All three sources now agree at **58**: FIT directory, CSV, and database. An
 earlier brief asserted a 55/56/59 discrepancy; that premise was checked against
-the live corpus and is not supported — there was nothing to reconcile. The
+the live corpus and is not supported â€” there was nothing to reconcile. The
 database was one run behind until `trainloop bootstrap` was re-run on
 2026-10-04; it is the import step that closes this, not `load`, which only
 computes.
@@ -278,14 +278,14 @@ The supervisor reads this file and `VERIFICATION_REPORT.md` as its evidence
 base, so a stale number here becomes a wrong instruction in the next brief.
 Two things were corrected on 2026-10-01 after a run acted on them:
 
-- The **152-test** count was stale; it is 348.
+- The **152-test** count was stale; it is 367.
 - **`profile.json` was described as empty**; it carries `hr_max` and field
   notes, and only the remaining fields are `null`.
 
 One claim could not be sourced at all and was withdrawn rather than carried
 forward: an earlier brief stated that 53 of 55 runs fall in HR Zone 5. There is
-no HR zone classification anywhere in this repository — every occurrence of
-"zone" in the source is `timezone_source` — and `53` and `55` appear in these
+no HR zone classification anywhere in this repository â€” every occurrence of
+"zone" in the source is `timezone_source` â€” and `53` and `55` appear in these
 docs only inside the Git version string `2.53.0.windows.4`. Any future brief
 asserting zone distribution should be treated as unfounded until code for it
 exists.

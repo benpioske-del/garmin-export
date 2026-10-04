@@ -1,4 +1,4 @@
-# Verification report
+﻿# Verification report
 
 Supervisor brief Task 10. Everything below was run in the working tree on
 2026-10-01. Commands and results are reproduced as observed.
@@ -16,13 +16,13 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-348 passed, 1 skipped in 133.20s
+367 passed, 1 skipped (368 collected)
 ```
 
 | File | Tests |
 | --- | --- |
 | `tests/test_dashboard_contract.py` | 36 |
-| `tests/test_recommend_snapshots.py` | 21 |
+| `tests/test_recommend_snapshots.py` | 23 |
 | `tests/test_training_data.py` | 59 |
 | `tests/test_brief_bridge.py` | 56 |
 | `tests/test_dashboard_api.py` | 38 |
@@ -35,7 +35,8 @@ $ python -m pytest
 | `tests/test_gps_guard.py` | 13 |
 | `tests/test_paths_and_guards.py` | 9 |
 | `tests/test_history_safety.py` | 2 |
-| **Total** | **349** (348 pass, 1 skip) |
+| `tests/test_publish_scope.py` | 17 |
+| **Total** | **368** (367 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -94,7 +95,7 @@ pending: none
 ```
 
 Re-running is a no-op. Editing an applied migration raises
-`RuntimeError: migration NNN changed after it was applied` — covered by
+`RuntimeError: migration NNN changed after it was applied` â€” covered by
 `test_edited_migration_is_a_hard_error`.
 
 ## Import against the real corpus
@@ -189,7 +190,7 @@ the inventory rather than papered over.
 ## Privacy checks
 
 - Raw FIT files are gitignored; the local `trainloop.db` is gitignored.
-- `weather_observations` has no `lat`/`lon`/`latitude`/`longitude` column —
+- `weather_observations` has no `lat`/`lon`/`latitude`/`longitude` column â€”
   asserted against `PRAGMA table_info` by
   `test_weather_schema_stores_no_coordinates`.
 - `test_audit_output_contains_no_coordinates` walks the entire FIT audit result

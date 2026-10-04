@@ -1,0 +1,63 @@
+{
+  "covers": [
+    "available"
+  ],
+  "description": "Load spread thinly across the window. A low ratio is not on its own a reason to add volume, so this maintains.",
+  "expected_state": "maintain",
+  "fixed_as_of": "2026-10-04T12:00:00Z",
+  "hr_max": 198,
+  "recommend": {
+    "advisory": true,
+    "disclaimers": [
+      "Workload ratio, a monitoring signal only. Not an injury probability, risk score or diagnosis.",
+      "Not medical advice.",
+      "Stop and seek a qualified clinician for pain that persists, altered gait, chest pain, or any medical concern. Nothing here is a diagnosis."
+    ],
+    "evidence": {
+      "acwr": 0.4,
+      "run_load_28d": 1500.0,
+      "run_unavailable": [],
+      "runs_28d": 10,
+      "runs_7d": 4,
+      "strength_28d": 0,
+      "strength_load_28d": null,
+      "strength_unavailable": []
+    },
+    "limitation": "A low ratio is not on its own a reason to add volume.",
+    "reasons": [
+      "acute:chronic 0.40 is below 0.8"
+    ],
+    "state": "maintain"
+  },
+  "scenario": "maintain-low-ratio",
+  "unavailable": {
+    "run": [],
+    "strength": []
+  },
+  "windows": {
+    "14": {
+      "combined_load": 1050.0,
+      "run_confidence": "medium",
+      "run_days": 7,
+      "run_load": 1050.0,
+      "strength_days": 0,
+      "strength_load": null
+    },
+    "28": {
+      "combined_load": 1500.0,
+      "run_confidence": "medium",
+      "run_days": 10,
+      "run_load": 1500.0,
+      "strength_days": 0,
+      "strength_load": null
+    },
+    "7": {
+      "combined_load": 600.0,
+      "run_confidence": "medium",
+      "run_days": 4,
+      "run_load": 600.0,
+      "strength_days": 0,
+      "strength_load": null
+    }
+  }
+}

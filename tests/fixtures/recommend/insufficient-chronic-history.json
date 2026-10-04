@@ -1,0 +1,63 @@
+{
+  "covers": [
+    "missing",
+    "refused"
+  ],
+  "description": "Six runs in 28 days against a floor of eight. The chronic window is not established, so no build is authorised.",
+  "expected_state": "data_insufficient",
+  "fixed_as_of": "2026-10-04T12:00:00Z",
+  "hr_max": 198,
+  "recommend": {
+    "advisory": false,
+    "disclaimers": [
+      "Workload ratio, a monitoring signal only. Not an injury probability, risk score or diagnosis.",
+      "Not medical advice.",
+      "Stop and seek a qualified clinician for pain that persists, altered gait, chest pain, or any medical concern. Nothing here is a diagnosis."
+    ],
+    "evidence": {
+      "run_load_28d": 900.0,
+      "run_unavailable": [],
+      "runs_28d": 6,
+      "runs_7d": 2,
+      "strength_28d": 0,
+      "strength_load_28d": null,
+      "strength_unavailable": []
+    },
+    "limitation": "Not enough recorded history to judge load.",
+    "reasons": [
+      "only 6 runs in 28 days, need 8"
+    ],
+    "state": "data_insufficient"
+  },
+  "scenario": "insufficient-chronic-history",
+  "unavailable": {
+    "run": [],
+    "strength": []
+  },
+  "windows": {
+    "14": {
+      "combined_load": 600.0,
+      "run_confidence": "medium",
+      "run_days": 4,
+      "run_load": 600.0,
+      "strength_days": 0,
+      "strength_load": null
+    },
+    "28": {
+      "combined_load": 900.0,
+      "run_confidence": "medium",
+      "run_days": 6,
+      "run_load": 900.0,
+      "strength_days": 0,
+      "strength_load": null
+    },
+    "7": {
+      "combined_load": 300.0,
+      "run_confidence": "medium",
+      "run_days": 2,
+      "run_load": 300.0,
+      "strength_days": 0,
+      "strength_load": null
+    }
+  }
+}

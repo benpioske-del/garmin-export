@@ -1,0 +1,63 @@
+{
+  "covers": [
+    "null-not-zero",
+    "refused"
+  ],
+  "description": "Only four counted days, so the chronic floor rejects the window before a ratio is ever considered. Retained to pin the null-not-zero distinction: with no established chronic window the ratio stays null rather than defaulting to 1.0.",
+  "expected_state": "data_insufficient",
+  "fixed_as_of": "2026-10-04T12:00:00Z",
+  "hr_max": 198,
+  "recommend": {
+    "advisory": false,
+    "disclaimers": [
+      "Workload ratio, a monitoring signal only. Not an injury probability, risk score or diagnosis.",
+      "Not medical advice.",
+      "Stop and seek a qualified clinician for pain that persists, altered gait, chest pain, or any medical concern. Nothing here is a diagnosis."
+    ],
+    "evidence": {
+      "run_load_28d": 600.0,
+      "run_unavailable": [],
+      "runs_28d": 4,
+      "runs_7d": 4,
+      "strength_28d": 0,
+      "strength_load_28d": null,
+      "strength_unavailable": []
+    },
+    "limitation": "Not enough recorded history to judge load.",
+    "reasons": [
+      "only 4 runs in 28 days, need 8"
+    ],
+    "state": "data_insufficient"
+  },
+  "scenario": "zero-chronic-load-is-not-a-ratio",
+  "unavailable": {
+    "run": [],
+    "strength": []
+  },
+  "windows": {
+    "14": {
+      "combined_load": 600.0,
+      "run_confidence": "medium",
+      "run_days": 4,
+      "run_load": 600.0,
+      "strength_days": 0,
+      "strength_load": null
+    },
+    "28": {
+      "combined_load": 600.0,
+      "run_confidence": "medium",
+      "run_days": 4,
+      "run_load": 600.0,
+      "strength_days": 0,
+      "strength_load": null
+    },
+    "7": {
+      "combined_load": 600.0,
+      "run_confidence": "medium",
+      "run_days": 4,
+      "run_load": 600.0,
+      "strength_days": 0,
+      "strength_load": null
+    }
+  }
+}
