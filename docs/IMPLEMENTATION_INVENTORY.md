@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 291 passed, 1 skipped (Windows symlink case) |
+| Tests | 327 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -89,7 +89,7 @@ an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 291 passed, 1 skipped. |
+| `python -m pytest` | Works. 327 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -102,7 +102,7 @@ an out-of-date copy of this document.
 | Database vs export parity | **Verified 2026-10-04.** FIT directory, `garmin_export.csv` and `trainloop.db` all hold 58. Note `load` computes only; `bootstrap` is what imports. |
 | `garmin_export.csv` provenance | Rebuilt in-process with `export_publish.build_csv()` on 2026-10-03, not committed. It picks up `2026-10-01` from the FIT directory. |
 
-Style is followed by convention rather than enforced by a tool. The 20 Python
+Style is followed by convention rather than enforced by a tool. The 21 Python
 modules use the existing naming and formatting, but nothing would catch a
 regression in it.
 
@@ -127,6 +127,35 @@ the live corpus and is not supported — there was nothing to reconcile. The
 database was one run behind until `trainloop bootstrap` was re-run on
 2026-10-04; it is the import step that closes this, not `load`, which only
 computes.
+
+## Dashboard data-source contract
+
+`dashboard_contract.py` audits the private dashboard and writes
+`docs/DASHBOARD_AUDIT.md`, which is committed. It exists because the dashboard
+is gitignored: the brief process could not read it, so it described a file it
+had never seen, guessed its contents twice, and re-issued
+`connect-dashboard-to-data-layer` after that work was finished and merged.
+
+The dashboard declares its own sources in a `window.DASHBOARD_SOURCES` block.
+The contract checks that declaration against the document and fails on drift:
+
+- every column-0 declaration is classified as private-journal, static table or
+  scratch, so inline data cannot be added without saying what it is
+- the canonical panel must fetch all three API routes, each with its own
+  rejection handler, and must have a failure renderer that writes visible text
+- the canonical panel may not read any private-journal declaration. This is the
+  check that stops the two datasets being conflated.
+- legacy features *may* still read the journal. Deleting it is not the fix: it
+  holds narrative notes, splits, hydration, injury flags, weight and
+  coordinates that exist in no FIT file.
+
+Verified by mutation, not assertion. Ten realistic regressions are applied to
+the real document in `tests/test_dashboard_contract.py` and every one must fail
+the audit. Two of them were originally missed -- a keyword match for
+"Unavailable" survived deleting the failure handler, and a forward scan for
+`.then(` let one route claim another's handler. Both checks are now structural.
+
+36 tests.
 
 ## Dashboard JSON API
 
@@ -213,7 +242,7 @@ The supervisor reads this file and `VERIFICATION_REPORT.md` as its evidence
 base, so a stale number here becomes a wrong instruction in the next brief.
 Two things were corrected on 2026-10-01 after a run acted on them:
 
-- The **152-test** count was stale; it is 291.
+- The **152-test** count was stale; it is 327.
 - **`profile.json` was described as empty**; it carries `hr_max` and field
   notes, and only the remaining fields are `null`.
 

@@ -73,8 +73,78 @@ database or from the module that owns them. A brief can be wrong about what the
 numbers are; it cannot make the code wrong, because the code never heard the
 number.
 
+## 2026-10-04 (second run): the dashboard loop
+
+This run is worth recording separately, because it is not a stale-number
+problem and no amount of care about figures would have fixed it.
+
+Commit `f390334` landed **on top of** `776a918`, which had already completed
+`connect-dashboard-to-data-layer`. The brief then re-issued that same task as
+TOP PRIORITY and asserted:
+
+> `dashboard/index.html` is served by `garmin_server.py` but remains
+> disconnected from the tested data layer; it has zero references to
+> `garmin_export.csv`, `trainloop.db`, or the new services.
+
+All three API routes existed, were tested, and the dashboard was fetching them.
+
+**The cause: the brief process cannot read the dashboard at all.**
+
+```
+$ git ls-files dashboard/            # -> nothing
+$ git check-ignore -v dashboard/index.html
+.gitignore:21:dashboard/   dashboard/index.html
+$ git cat-file -p HEAD:dashboard/index.html
+fatal: path 'dashboard/index.html' exists on disk, but not in 'HEAD'
+```
+
+`dashboard/index.html` is gitignored because it holds a 52-entry running
+journal, a body-weight series, and coordinates. That was the right call for the
+data. The consequence was not considered: the file holds *all* of the
+dashboard's logic too, so every brief's description of the dashboard has been
+invention. It reported "approximately 54 inline JavaScript arrays" in one run
+and 133 in another. It guessed a file size and a panel structure it had never
+seen.
+
+A brief cannot be satisfied by work it is unable to inspect, so it re-issues the
+task every run, and the loop would continue indefinitely.
+
+**The fix is to give it something it can read.**
+`docs/DASHBOARD_AUDIT.md` is now generated from the real file by
+`dashboard_contract.py` and committed. It reports the actual declarations,
+classifies each one as canonical-API / private-journal / static / scratch, and
+states whether the canonical panel is genuinely API-only. The dashboard declares
+its own sources in a `window.DASHBOARD_SOURCES` block; the audit checks that
+declaration against the file and fails on drift.
+
+The audit is verified by mutation rather than by assertion: ten realistic
+regressions are applied to the real document in
+`tests/test_dashboard_contract.py::TestRealDashboardMutations`, and every one
+must fail the audit. Two of those mutations were originally *not* caught, which
+is the reason the checks are structural:
+
+- A check for the word "Unavailable" passed even with the failure handler
+  deleted, because `catch` appears throughout the panel. It now requires each
+  fetch to carry a rejection handler, counted from the `.then` arguments.
+- Scanning forward for any `.then(` let `/api/coaching` claim
+  `/api/load`'s handler, so an unhandled call looked handled. It now requires
+  the `.then` to be chained directly onto its own call.
+
+A contract check that only passes on a clean file proves nothing about whether
+it works. Both of those bugs were found by trying to break it.
+
+**What this cost.** Two runs of work on a task that was already finished, plus a
+brief asserting a false premise with the confidence of a verified one. The
+general lesson: an unverified claim about a system is worth nothing, and the way
+to tell the difference is to ask what the claimant could actually observe.
+
 ## Standing rule
 
 Do not copy a figure out of a brief into code, a document that will outlive the
 brief, or a commit message. Query it, or cite where it came from and when it was
 measured.
+
+When a brief describes a file, a count, or a state, establish what the brief
+process could actually see before acting on the description. If the answer is
+"nothing", the description is invention and the gap is in observability, not in
+the work.

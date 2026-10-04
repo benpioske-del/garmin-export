@@ -16,11 +16,12 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-291 passed, 1 skipped in 107.80s
+327 passed, 1 skipped in 129.87s
 ```
 
 | File | Tests |
 | --- | --- |
+| `tests/test_dashboard_contract.py` | 36 |
 | `tests/test_training_data.py` | 59 |
 | `tests/test_brief_bridge.py` | 56 |
 | `tests/test_dashboard_api.py` | 38 |
@@ -33,7 +34,7 @@ $ python -m pytest
 | `tests/test_gps_guard.py` | 13 |
 | `tests/test_paths_and_guards.py` | 9 |
 | `tests/test_history_safety.py` | 2 |
-| **Total** | **292** (291 pass, 1 skip) |
+| **Total** | **328** (327 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -231,6 +232,16 @@ Recorded so they are not reintroduced by a later brief:
   and `53`/`55` appear in these documents only inside the Git version string
   `2.53.0.windows.4`. The claim could not be traced to any code, fixture or
   command output, and was withdrawn rather than investigated as a real finding.
+- **"dashboard/index.html ... remains disconnected from the tested data layer;
+  it has zero references to garmin_export.csv, trainloop.db, or the new
+  services."** Asserted by the `connect-dashboard-to-data-layer` brief of
+  2026-10-04, in a commit landing *on top of* `776a918`, which had already
+  implemented and tested all three routes. The dashboard was fetching them. The
+  brief process cannot read `dashboard/index.html` -- it is gitignored and holds
+  private athlete data -- so every dashboard claim it has made is invention,
+  including two different inline-array counts (54, then 133). Now that
+  `docs/DASHBOARD_AUDIT.md` is generated from the real file and committed, the
+  claim is checkable. See [SUPERVISOR_BRIEF_ERRORS.md](SUPERVISOR_BRIEF_ERRORS.md).
 - **"The standing verification state is 57 FIT files, 57 activities, 58 open
   reviews, 207 passed / 1 skipped."** Asserted as authoritative by the
   `connect-dashboard-to-data-layer` brief of 2026-10-04, which also instructed
