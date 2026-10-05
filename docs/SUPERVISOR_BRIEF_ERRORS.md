@@ -182,3 +182,135 @@ When a brief describes a file, a count, or a state, establish what the brief
 process could actually see before acting on the description. If the answer is
 "nothing", the description is invention and the gap is in observability, not in
 the work.
+---
+
+# Fourth run: the repository went private and the writer went blind
+
+Commit `09b5a1a`, 2026-10-05. This one is worth reading on its own, because it
+identifies the cause of the three runs above.
+
+The brief says, in its own words:
+
+> Retrieval of `SUPERVISOR_BRIEF.md`, `docs/IMPLEMENTATION_INVENTORY.md`, and
+> `docs/VERIFICATION_REPORT.md` failed through the available fetch tool.
+
+Every fetch failed. The reason:
+
+    $ curl -o /dev/null -w '%{http_code}' https://raw.githubusercontent.com/.../CREW_BRIEF.md
+    404
+
+for every file, including `SUPERVISOR_BRIEF.md`, which the same run had just
+committed. **The repository is private.** An anonymous fetch of a private
+repository returns 404, which is indistinguishable from a file that does not
+exist.
+
+    $ curl -s https://api.github.com/repos/benpioske-del/garmin-export   # anonymous
+    404
+    $ python export_publish.py --check
+    visibility  : private (probed, not assumed)
+
+`export_publish.py --check` had been reporting `private` correctly since before
+this run. Nothing read it.
+
+So this is not a carelessness problem and no amount of better prompting fixes it.
+The brief process fetches anonymously over HTTP; the moment the repository went
+private that channel returned nothing at all. The writer then filled the gap from
+memory, and its memory was months stale.
+
+## What it got wrong this time
+
+| Brief claim | Actual |
+|---|---|
+| PRIMARY TASK: `connect-dashboard-to-data-layer` | done: routes, dashboard wiring, 56 tests |
+| "57 FIT files and 57 activities" | 58 and 58 |
+| "58 open reviews: 57 `timezone_uncertain` and 1 `activity_gap`" | 59: 58 and 1 |
+| "207 passed and 1 skipped" | 429 passed and 1 skipped (430 collected) |
+| "`dashboard/index.html` is a 954 KB gitignored file" | 946 KB, and unreadable to the writer |
+| "dashboard has no references to the new services" | consumes all three APIs |
+
+The `954 KB` is the tell. A writer that cannot open a file still produced a file
+size for it.
+
+## The primary task is a re-implementation hazard, not just a false claim
+
+Three briefs claimed the dashboard was disconnected. This one does not stop at
+claiming it: it promotes the claim to PRIMARY TASK and specifies a full
+implementation, including modifying `garmin_server.py`, adding routes, and
+rewriting `dashboard/index.html`.
+
+All of that already exists:
+
+    garmin_server.py:150  GET /api/activities
+    garmin_server.py:225  GET /api/load
+    garmin_server.py:254  GET /api/coaching
+    garmin_server.py:276  all three wired into the dispatch table
+    dashboard/index.html:13291   window.DASHBOARD_SOURCES
+    dashboard/index.html:13531   three apiGet calls
+
+with 38 route tests in `tests/test_dashboard_api.py` and 18 real-HTTP tests in
+`tests/test_dashboard_api_http.py` covering token auth, foreign `Host` headers,
+JSON 400/404/500, and path traversal on the preserved FIT routes.
+
+The brief does not ask for authentication. It is already implemented and tested.
+
+Left alone, the next crew would be handed a detailed instruction to rebuild
+working, tested code. That is the actual risk here, and it is why the fix below
+is about observability rather than about wording the brief more carefully.
+
+## The checker is now a fact checker, not a backlink checker
+
+`brief_consistency.py` originally checked whether brief rows had task files
+behind them. That was the wrong instrument: the problem is not unbacked rows, it
+is unreadable numbers.
+
+It now measures the facts locally and compares them against what the brief
+states:
+
+    conflicting claims : 11
+      FIT files          brief says 57    actually 58
+      activities         brief says 57    actually 58
+      open reviews       brief says 58    actually 59
+      tests passed       brief says 207   actually 429
+      timezone_uncertain brief says 57    actually 58
+      dashboard          brief says disconnected
+                         actually consumes /api/activities, /api/load, /api/coaching
+
+Every conflict is a number or a state the writer could not read from this
+repository. None are close calls.
+
+It also found a bug in itself. The previous version parsed zero rows from this
+brief, because the table had become prose, and then exited 0. Losing the task
+table entirely was reported as a clean bill. A brief with no recognisable rows is
+now a failure, with a test that says so.
+
+## What actually fixes it
+
+Nothing in the repository. The brief process runs in CrewAI Studio, in the
+cloud, and fetches this repository anonymously. A private repository is not
+readable that way.
+
+Two options, and the choice is the athlete's:
+
+1. **Give the cloud flow a read-only token.** Fine-grained, `Contents: Read` on
+   this one repository, and it can expire. Configure it in CrewAI Studio as a
+   secret. It must never be pasted into a task, a brief, a commit, or a chat.
+
+2. **Do not give it repository access, and treat its briefs as what they are**:
+   untrusted prose generated without access to the data. `tasks/` remains the
+   queue, and `brief_consistency.py` is the gate that refuses to let a stale
+   number pass as current.
+
+Option 1 restores the channel. Option 2 accepts the blind writer and guards it.
+Doing both is also fine, and the guard should stay either way: a token fixes the
+fetch, and the checker catches whatever the fetch still cannot cover, which is
+everything gitignored.
+
+Note that `dashboard/` is gitignored and always will be. No token fixes that. The
+dashboard claims are unfixable by configuration, which is why the checker reads
+the file locally instead of asking the writer about it.
+
+And the rule from the third run stands unchanged: when a brief describes a file,
+a count, or a state, establish what the writer could actually see before acting
+on the description. The answer here is "nothing, because the repository is
+private", which makes the description invention and the gap an observability
+problem rather than a work problem.

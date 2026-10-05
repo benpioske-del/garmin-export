@@ -5,14 +5,34 @@
 A sanitized export of one runner's Garmin activity log, published so an AI crew can
 analyse training without access to the original device or the owner's machine.
 
-**This repository is public *today*, and the publisher probes whether that is still
-true.** Anything committed here while it is public is readable by anyone, forever
+> ### READ THIS FIRST: the repository is PRIVATE
+>
+> It is private as of 2026-10-05. Every anonymous fetch returns **404**, including
+> `raw.githubusercontent.com` and `api.github.com`. A 404 here does not mean a file
+> is missing; it means you are unauthenticated.
+>
+> **If you cannot fetch this file, you cannot fetch anything here, and you must not
+> write a brief from memory.** Four briefs have been written that way and all four
+> were wrong about the same things: the dashboard integration (done since long
+> before), the corpus size (58, not 57), the open review count (59, not 58), and the
+> test count (429, not 207). Those are not judgement errors. They are the shape of
+> a writer with no access to the data.
+>
+> Before writing any number or asserting any state, ask how you obtained it. If the
+> answer is "I recall", it does not go in the brief.
+>
+> For a read-only fetch, use the contents API with a fine-grained token
+> (`Contents: Read`, this repository only). See below. Never put the token in a
+> brief, a task, a commit, or a chat message.
+
+**The publisher probes whether the repository is public, and does not assume it.**
+Anything committed here while it was public is readable by anyone, forever
 (Git history is public too, so a deleted row does not really disappear).
 
 ### If the repo is later made private
 
-The owner has said they may switch this repository to private. Nothing here needs to
-change for that to work, but **the plain URLs stop working**, so check first:
+This already happened. Nothing here needed to change for it to work, but **the
+plain URLs stopped working**, so check first:
 
 - `publish_state.json` carries `repo_visibility`, which is **probed on every publish**,
   not assumed. Treat it as the source of truth, not this paragraph.
@@ -203,6 +223,33 @@ recovery-debt maths, which the dashboard computes but this export cannot.
 A run can earn a high letter grade and still sit below population median. Presenting
 those as the same number is the main analytical error to avoid.
 
+### Current verified state, 2026-10-05
+
+If you cannot fetch this file, this is the last known good. It is a floor, not a
+source: it goes stale, which is the entire problem. Re-derive it if you can.
+
+| Fact | Value | How to re-derive |
+|---|---|---|
+| Repository visibility | **private** | anonymous raw URL returns 404 |
+| FIT files | 58 | count in the local export |
+| Activities | 58 | `SELECT COUNT(*) FROM activities` |
+| Open reviews | 59 | 58 `timezone_uncertain` + 1 `activity_gap` |
+| FIT files with lap records | 58 of 58 | `python brief_consistency.py` |
+| Tests | 429 passed, 1 skipped (430 collected) | `python -m pytest` |
+| Dashboard API routes | 3, implemented and tested | `python dashboard_contract.py` |
+| Dashboard consumes the API | yes, all three | `python dashboard_contract.py` |
+
+**`connect-dashboard-to-data-layer` is complete.** `garmin_server.py` serves
+`/api/activities`, `/api/load` and `/api/coaching` from the canonical data layer,
+`dashboard/index.html` consumes all three, and 56 tests cover it including 18
+against a real bound HTTP server. Four briefs have asked for this work. Do not
+rebuild it. Verify with `python dashboard_contract.py`, which prints `PASS`.
+
+The task queue is `tasks/`, which holds two files: `001-example-task.md` (a
+placeholder) and `002-log-a-5k-pr.md` (blocked on published per-mile splits).
+`SUPERVISOR_BRIEF.md` is prose and is not the queue. A brief naming a task with no
+file in `tasks/` is not a task.
+
 ### Known weak spots, disclosed
 
 - `censusPct` uses a **crude, hand-entered anchor table** with a flat `+12`/`+13`
@@ -212,7 +259,6 @@ those as the same number is the main analytical error to avoid.
   trend, not a confident percentile.
 
 ### Per-mile splits: available locally, not yet published
-
 **Do not claim per-mile splits are unavailable.** They are not. Every one of the 58
 local `.FIT` files carries lap records, at roughly one-mile intervals, and
 `garmin_export.csv` exposes only `Best Lap Time`. A previous brief asserted the data
