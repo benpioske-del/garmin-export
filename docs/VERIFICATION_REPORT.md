@@ -1,4 +1,4 @@
-﻿# Verification report
+# Verification report
 
 Supervisor brief Task 10. Everything below was run in the working tree on
 2026-10-01. Commands and results are reproduced as observed.
@@ -16,7 +16,7 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-367 passed, 1 skipped (368 collected)
+407 passed, 1 skipped (408 collected)
 ```
 
 | File | Tests |
@@ -36,7 +36,8 @@ $ python -m pytest
 | `tests/test_paths_and_guards.py` | 9 |
 | `tests/test_history_safety.py` | 2 |
 | `tests/test_publish_scope.py` | 17 |
-| **Total** | **368** (367 pass, 1 skip) |
+| `tests/test_publish_flow.py` | 40 |
+| **Total** | **408** (407 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV

@@ -1,4 +1,4 @@
-﻿# Implementation inventory
+# Implementation inventory
 
 Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 
@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 367 passed, 1 skipped (Windows symlink case) |
+| Tests | 407 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -89,7 +89,7 @@ an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 367 passed, 1 skipped. |
+| `python -m pytest` | Works. 407 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -127,6 +127,40 @@ the live corpus and is not supported â€” there was nothing to reconcile. Th
 database was one run behind until `trainloop bootstrap` was re-run on
 2026-10-04; it is the import step that closes this, not `load`, which only
 computes.
+
+## Publish lock and repo visibility
+
+Two scheduled tasks (`Garmin Export Publish`, `Garmin Export Publish PM`) run the
+publisher unattended at 07:15 and 18:15. It commits and pushes whatever is in the
+working tree, which is how half-finished work reached the public repo once already.
+
+The coach now brackets its work with the publish lock:
+
+```
+python export_publish.py --lock      # scheduled runs stand down, exit 0, push nothing
+python export_publish.py --unlock    # released even on failure; 45 min staleness anyway
+```
+
+The lock lives in the local data directory, so it can never be committed or read by
+the crew. `CREW_TASKS.md` documents the protocol.
+
+`repo_visibility` in `garmin_export.meta.json` used to be the literal string
+`"public - readable without a token"`. It is now **probed** on every run, by issuing
+an anonymous `HEAD` to the raw URL: that is exactly the property the supervisor flow
+depends on, and it needs no token to test. The owner may make the repo private, so the
+publisher prints fetch instructions that match the probed state — plain `curl` while
+public, the contents API with `$GITHUB_TOKEN` while private, and the conservative
+token form when the probe cannot reach GitHub.
+
+Making the repo private stops future reads; it does not un-publish what was already
+committed while public.
+
+`guard_token_content()` scans the text files a commit would contain for credential
+patterns, reusing `SECRET_PATTERNS` from `capture_supervisor_brief.py` rather than
+duplicating them. `guard_secrets()` only inspected file *names*, so a token pasted into
+prose would have passed. Exemptions are explicit (`GUARD_IMPL`,
+`SYNTHETIC_CREDENTIAL_FILES`) and each is pinned to a file that exists, because an
+exemption for a deleted file is a silent hole.
 
 ## Coaching rationale fixtures
 
@@ -278,7 +312,7 @@ The supervisor reads this file and `VERIFICATION_REPORT.md` as its evidence
 base, so a stale number here becomes a wrong instruction in the next brief.
 Two things were corrected on 2026-10-01 after a run acted on them:
 
-- The **152-test** count was stale; it is 367.
+- The **152-test** count was stale; it is 407.
 - **`profile.json` was described as empty**; it carries `hr_max` and field
   notes, and only the remaining fields are `null`.
 

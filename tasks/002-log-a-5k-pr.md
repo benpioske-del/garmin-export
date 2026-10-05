@@ -1,4 +1,4 @@
-﻿---
+---
 id: 002
 status: blocked
 priority: high

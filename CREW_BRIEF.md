@@ -5,8 +5,40 @@
 A sanitized export of one runner's Garmin activity log, published so an AI crew can
 analyse training without access to the original device or the owner's machine.
 
-**This repository is public.** Anything committed here is readable by anyone, forever
+**This repository is public *today*, and the publisher probes whether that is still
+true.** Anything committed here while it is public is readable by anyone, forever
 (Git history is public too, so a deleted row does not really disappear).
+
+### If the repo is later made private
+
+The owner has said they may switch this repository to private. Nothing here needs to
+change for that to work, but **the plain URLs stop working**, so check first:
+
+- `garmin_export.meta.json` carries `repo_visibility`, which is **probed on every
+  publish**, not assumed. Treat it as the source of truth, not this paragraph.
+- `public`: fetch over plain `raw.githubusercontent.com`, no credentials needed.
+- `private`: the raw URL returns **404**. Use the contents API with a read-only token:
+
+  ```
+  gh api repos/benpioske-del/garmin-export/contents/garmin_export.csv --jq .content | base64 -d
+  ```
+
+  or, without `gh`:
+
+  ```
+  curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" \
+    https://api.github.com/repos/benpioske-del/garmin-export/contents/garmin_export.csv
+  ```
+
+- `unknown`: the probe could not reach GitHub (offline). Assume a token is required.
+
+**Never ask the runner to paste a token into a task file, a commit, or any file in
+this repo.** Read it from the environment at fetch time. If the repo goes private and
+the crew cannot authenticate, say so in your output rather than silently reporting
+stale data as current.
+
+Note the trade-off: private visibility protects the data going forward, but it does
+**not** un-publish anything already committed while the repo was public.
 
 ### What is deliberately NOT here
 
@@ -29,7 +61,7 @@ fetch it over a plain URL. Handle it accordingly.
 
 | File | Purpose |
 | --- | --- |
-| `garmin_export.csv` | The activity log. **57 runs.** This is the file the crew reads. |
+| `garmin_export.csv` | The activity log. This is the file the crew reads. Row count changes as the watch syncs, so take the number from `garmin_export.meta.json` rather than from this file. |
 | `garmin_export.meta.json` | Row count, date range, per-source counts, and the newest `.FIT` on the device. |
 | `profile.json` | Athlete parameters needed to reproduce the cohort/population math. **Unfilled by default** - see below. |
 | `publish_state.json` | Raw URL, branch, last publish time, and a hash of the data. |
@@ -95,8 +127,10 @@ This runs on a schedule twice daily, so **the data self-updates as long as the w
 has synced**. It is not a frozen snapshot. Check `latest_run` in the meta file before
 making any claim about current fitness.
 
-The publisher is at `C:\Users\benpi\Downloads\export_publish.py`, with FIT decoding in
-`garmin_fit_reader.py`. It commits only when the underlying data actually changes.
+The publisher is `export_publish.py` **in this repository**, with FIT decoding in
+`garmin_fit_reader.py`. It commits only when the underlying data actually changes. It
+probes repo visibility on every run and records the result in
+`garmin_export.meta.json` as `repo_visibility`.
 
 ### Raw URLs can lag a push by a few minutes
 
@@ -174,7 +208,8 @@ those as the same number is the main analytical error to avoid.
 - `censusPct` uses a **crude, hand-entered anchor table** with a flat `+12`/`+13`
   offset from a world-referenced pace. Treat population percentiles as a coarse
   estimate, never as a ranking. The dashboard says so in its own UI.
-- Sample size is small. 57 runs supports a trend, not a confident percentile.
+- Sample size is small. The run count (see `garmin_export.meta.json`) supports a
+  trend, not a confident percentile.
 
 ---
 

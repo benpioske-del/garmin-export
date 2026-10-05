@@ -26,6 +26,9 @@ import re
 import shutil
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -420,6 +423,72 @@ def build_csv():
     return meta, cols
 
 
+def scan_secrets(text):
+    """Secret-shaped matches only; GPS has its own guard and its own exemptions."""
+    from capture_supervisor_brief import SECRET_PATTERNS
+    found = []
+    for pat, kind in SECRET_PATTERNS:
+        for m in re.finditer(pat, text):
+            sample = m.group(0)
+            if RESERVED_DOMAIN.search(sample):
+                # example.com/.net/.org are reserved by RFC 2606 and can never be
+                # a real address, so documentation using one is not a leak.
+                continue
+            if len(sample) > 24:
+                sample = sample[:12] + "..." + sample[-6:]
+            found.append((kind, sample))
+            break
+    return found
+
+
+def guard_token_content(extra=()):
+    """Refuse to publish a file whose *contents* look like a credential.
+
+    `guard_secrets()` only looks at file names, which is not enough now that the
+    brief and the fetch instructions talk about `GITHUB_TOKEN`. A pasted token in
+    prose is exactly the shape that slips through a name-based check. The
+    patterns are reused from capture_supervisor_brief rather than duplicated.
+    """
+    exempt = set(GUARD_IMPL) | set(SYNTHETIC_CREDENTIAL_FILES)
+    for rel in extra:
+        if rel in exempt:
+            continue
+        p = os.path.join(REPO, rel)
+        if not os.path.isfile(p):
+            continue
+        try:
+            text = open(p, encoding="utf-8", errors="replace").read()
+        except OSError:
+            continue
+        found = scan_secrets(text)
+        if found:
+            kinds = ", ".join(sorted({kind for kind, _ in found}))
+            die("refusing to publish %s" % rel,
+                "its contents match: %s\n"
+                "A token pasted into a file is the one mistake a name-based check "
+                "cannot catch. Remove it and read the value from the environment "
+                "instead. If this really is synthetic, add the path to "
+                "SYNTHETIC_CREDENTIAL_FILES on purpose." % kinds)
+
+
+def publishable_text_paths():
+    """Tracked, text-shaped files the publisher would put in a commit."""
+    out = []
+    for rel in code_paths() + [CANON, META, ".gitignore", "publish_state.json"]:
+        if rel.endswith((".py", ".md", ".json", ".csv", ".toml", ".html")):
+            out.append(rel)
+    for base, _dirs, names in os.walk(os.path.join(REPO, "tasks")):
+        for name in sorted(names):
+            if name.endswith(".md"):
+                out.append(os.path.relpath(os.path.join(base, name), REPO).replace("\\", "/"))
+    for extra in ("CREW_BRIEF.md", "profile.json", "CREW_TASKS.md",
+                  "SUPERVISOR_BRIEF.md", "TASKS.md"):
+        if os.path.exists(os.path.join(REPO, extra)):
+            out.append(extra)
+    seen = set()
+    return [p for p in out if not (p in seen or seen.add(p))]
+
+
 def guard_secrets():
     r = run(["git", "status", "--porcelain"])
     for line in r.stdout.splitlines():
@@ -436,6 +505,7 @@ def guard_secrets():
                 print("  ! %s is not in .gitignore - refusing to continue" % bad)
                 sys.exit(1)
     guard_gps_content()
+    guard_token_content(publishable_text_paths())
 
 
 # Files we refuse to publish at all. The dashboard embeds an exact latitude and
@@ -450,6 +520,18 @@ LOCAL_ONLY = ("dashboard/index.html",)
 GUARD_IMPL = ("export_publish.py", "capture_supervisor_brief.py",
               "tests/test_gps_guard.py", "tests/test_capture_supervisor.py",
               "tests/test_brief_bridge.py")
+
+# Test files that carry deliberately fake credentials so the guards can be proven
+# to fire. Separate from GUARD_IMPL because the reason is different: these hold
+# invented secrets rather than the patterns themselves. Listed explicitly for the
+# same reason, so an exemption cannot be granted by accident.
+SYNTHETIC_CREDENTIAL_FILES = ("tests/test_dashboard_api_http.py",
+                              "tests/test_publish_flow.py")
+
+# Domains reserved by RFC 2606 for documentation. An address at one of these can
+# never belong to a person, so seeing one in a doc comment is not a leak.
+RESERVED_DOMAIN = re.compile(
+    r"@(?:example\.(?:com|net|org)|test|invalid|localhost)\b", re.IGNORECASE)
 
 # The only coordinate pairs permitted to appear in this repository, and every
 # one of them is synthetic. They are listed explicitly because a fixture has to
@@ -674,6 +756,121 @@ def report_tasks():
         print("tasks       : none pending")
 
 
+def probe_visibility(remote, branch, timeout=8):
+    """Whether an unauthenticated client can read the published CSV.
+
+    This is the property the supervisor flow actually depends on: it fetches the
+    raw URL with no credentials. Probing the raw URL tests that directly and
+    needs no token, so it does not depend on `gh` being installed or logged in.
+    Returns "public", "private", or "unknown" when the network is unavailable.
+    """
+    url = raw_url(remote, branch)
+    if not url:
+        return "unknown"
+    req = urllib.request.Request(url, method="HEAD")
+    req.add_header("User-Agent", "garmin-export-visibility-probe")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return "public" if resp.status == 200 else "unknown"
+    except urllib.error.HTTPError as exc:
+        # An anonymous request to a private repo is answered with 404. Treat any
+        # refusal as private: the practical consequence is the same.
+        return "private" if exc.code in (401, 403, 404) else "unknown"
+    except Exception:
+        return "unknown"
+
+
+def fetch_instructions(remote, branch, visibility):
+    """How the supervisor flow should fetch the CSV at the current visibility.
+
+    A raw.githubusercontent.com URL only works while the repo is public, so the
+    instructions have to change with it. No token is ever embedded: the private
+    form reads the token from the environment at fetch time.
+    """
+    m = re.search(r"github\.com[:/]([^/]+)/([^/.]+)", remote)
+    if not m:
+        return ["(remote %r is not a GitHub URL; fetch %s by hand)" % (remote, CANON)]
+    if visibility == "public":
+        return ["curl -fsSL %s" % raw_url(remote, branch)]
+    slug = "repos/%s/%s/contents/%s" % (m.group(1), m.group(2), CANON)
+    if visibility == "unknown":
+        headline = ("Visibility could not be probed (offline?); assuming a token is "
+                    "required, which is the safe reading.")
+    else:
+        headline = ("The repo is %s, so the raw URL is not readable without a token."
+                    % visibility)
+    return [
+        "# %s" % headline,
+        "# Put a read-only token in GITHUB_TOKEN; it is never written to the repo.",
+        "gh api %s --jq .content | base64 -d > %s" % (slug, CANON),
+        "# or, without gh:",
+        "#   curl -fsSL -H \"Authorization: Bearer $GITHUB_TOKEN\" \\",
+        "#     https://api.github.com/%s" % slug,
+    ]
+
+
+LOCK_NAME = ".garmin_publish.lock"
+
+
+def lock_path():
+    """Local-only lock file, deliberately outside the repository.
+
+    It lives in the data directory so it can never be staged by the publisher or
+    read by CrewAI from the repo.
+    """
+    return os.path.join(paths.data_dir(), LOCK_NAME)
+
+
+def hold_lock(stale_minutes=45):
+    """Mark the repo as being worked on, so scheduled publishes stand down."""
+    p = lock_path()
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as fh:
+        json.dump({"holder": os.environ.get("USERNAME") or "unknown",
+                   "pid": os.getpid(),
+                   "at": datetime.now(timezone.utc).isoformat()}, fh)
+    return p
+
+
+def release_lock():
+    try:
+        os.remove(lock_path())
+        return True
+    except OSError:
+        return False
+
+
+def lock_age_minutes():
+    try:
+        return (time.time() - os.path.getmtime(lock_path())) / 60.0
+    except OSError:
+        return None
+
+
+def lock_holder():
+    """Who took the lock, for the stand-down message."""
+    try:
+        with open(lock_path(), encoding="utf-8") as fh:
+            return json.load(fh).get("holder", "unknown")
+    except (OSError, ValueError):
+        return "unknown"
+
+
+def current_branch():
+    branch = run(["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip() or "main"
+    return "main" if branch == "HEAD" else branch
+
+
+def is_locked(stale_minutes=45):
+    """Whether a publish should stand down.
+
+    A lock older than `stale_minutes` is treated as abandoned, so a crashed
+    editor or a killed run cannot silently stop the daily publish forever.
+    """
+    age = lock_age_minutes()
+    return age is not None and age < stale_minutes
+
+
 def raw_url(remote, branch):
     m = re.search(r"github\.com[:/]([^/]+)/([^/.]+)", remote)
     if not m:
@@ -700,7 +897,17 @@ def build_commit_message(run_count, latest_run, staged, export_only):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="report only, change nothing")
+    ap.add_argument("--lock", action="store_true",
+                    help="hold the publish lock so scheduled runs stand down")
+    ap.add_argument("--unlock", action="store_true", help="release the publish lock")
     a = ap.parse_args()
+
+    if a.unlock:
+        print("lock        : %s" % ("released" if release_lock() else "was not held"))
+        return 0
+    if a.lock:
+        print("lock        : held at %s" % hold_lock())
+        return 0
 
     ver = need_git()
     print("git         : %s" % ver)
@@ -711,6 +918,20 @@ def main():
 
     remote = need_repo()
     print("origin      : %s" % remote)
+
+    branch = current_branch()
+    visibility = probe_visibility(remote, branch)
+    print("visibility  : %s (probed, not assumed)" % visibility)
+
+    age = lock_age_minutes()
+    if is_locked():
+        print("\npublish lock: held %.0f min ago by %s" % (
+            age, lock_holder()))
+        print("            : standing down so a half-finished change is not")
+        print("              committed and pushed. Release with --unlock.")
+        return 0
+    if age is not None:
+        print("publish lock: stale (%.0f min old), ignoring" % age)
 
     stray = unpublished_scripts()
     if stray:
@@ -805,9 +1026,6 @@ def main():
         except Exception:
             prev = {}
 
-    branch = run(["rev-parse", "--abbrev-ref", "HEAD"]).stdout.strip() or "main"
-    if branch == "HEAD":
-        branch = "main"
     url = raw_url(remote, branch)
 
     # Fold in anything a CrewAI crew committed to GitHub before we build on top
@@ -825,7 +1043,7 @@ def main():
         json.dump({"raw_url": url, "branch": branch, "at": meta["generated_utc"],
                    "run_count": meta["run_count"], "latest_run": meta["latest_run"],
                    "data_sha": data_sha, "code_sha": code_sha,
-                   "repo_visibility": "public - readable without a token"},
+                   "repo_visibility": "%s - probed %s" % (visibility, datetime.now(timezone.utc).isoformat())},
                   fh, indent=2)
         fh.write("\n")
 
@@ -871,11 +1089,13 @@ def main():
             r.stderr.strip().splitlines()[-1] if r.stderr.strip() else "")
     print("pushed      : origin/%s" % branch)
 
-    print("\nraw download url")
-    print(url)
-    print("\nThis repo is PUBLIC, so that URL is readable with no token.")
-    print("CrewAI can poll it directly. If you ever make the repo private")
-    print("again, that same URL will start returning 404.")
+    print("\nvisibility  : %s" % visibility)
+    print("\nhow the supervisor flow should fetch %s" % CANON)
+    for line in fetch_instructions(remote, branch, visibility):
+        print("  " + line)
+    if visibility != "public":
+        print("\nThe raw URL returns 404 without a token while the repo is private:")
+        print("  %s" % url)
     return 0
 
 
