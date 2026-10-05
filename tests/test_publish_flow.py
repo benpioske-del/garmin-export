@@ -369,3 +369,47 @@ def test_docs_naming_repo_visibility_name_the_right_file(doc):
         assert "publish_state.json" in para, (
             "%s mentions repo_visibility in a paragraph that does not name "
             "publish_state.json" % doc)
+
+class TestVerifyChannel:
+    """"The crew has a token" is a claim about configuration, not about the world.
+
+    A token that is present but expired, mis-scoped, or never handed to the fetch
+    tool produces exactly the same blind brief as no token. These tests pin that
+    the verifier reports rather than assumes, and that it never leaks the value.
+    """
+
+    REMOTE = "https://github.com/benpioske-del/garmin-export.git"
+
+    def test_absent_token_is_reported_as_broken(self, monkeypatch):
+        monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+        monkeypatch.delenv("GH_TOKEN", raising=False)
+        r = export_publish.verify_channel(self.REMOTE, "main")
+        assert r["token_present"] is False
+        assert r["ok"] is False
+        assert "not set" in r["detail"]
+
+    def test_non_github_remote_is_refused_clearly(self):
+        r = export_publish.verify_channel("https://example.invalid/x.git", "main")
+        assert r["ok"] is False
+        assert "not a GitHub URL" in r["detail"]
+
+    def test_bad_token_is_reported_not_guessed(self, monkeypatch):
+        monkeypatch.setenv("GITHUB_TOKEN", "ghp_notARealToken000000000000000000000")
+        r = export_publish.verify_channel(self.REMOTE, "main")
+        assert r["token_present"] is True
+        assert r["ok"] is False, "a rejected token must not read as success"
+
+    def test_the_token_value_is_never_returned(self, monkeypatch):
+        secret = "ghp_notARealToken000000000000000000000"
+        monkeypatch.setenv("GITHUB_TOKEN", secret)
+        r = export_publish.verify_channel(self.REMOTE, "main")
+        blob = json.dumps(r)
+        assert secret not in blob
+        assert secret not in repr(r["readable"])
+
+    def test_git_metadata_is_not_used_as_a_stand_in_for_a_token(self):
+        """git can push here without GITHUB_TOKEN set. That is not a token."""
+        r = export_publish.verify_channel(self.REMOTE, "main")
+        assert r["token_present"] is False, (
+            "verify_channel must read the environment, not infer from the fact "
+            "that git happens to be authenticated")

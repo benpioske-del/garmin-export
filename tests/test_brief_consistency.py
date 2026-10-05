@@ -10,6 +10,7 @@ is the drift worth catching. When the brief legitimately changes, update
 KNOWN_UNBACKED and KNOWN_CONFLICTS and say why in the commit.
 """
 
+import json
 import os
 import re
 
@@ -177,3 +178,60 @@ def test_missing_brief_yields_no_rows(monkeypatch, tmp_path):
     monkeypatch.setattr(B, "BRIEF", str(tmp_path / "nope.md"))
     assert B.brief_rows() == []
     assert B.unbacked_rows() == []
+
+
+# --- brief_facts.json --------------------------------------------------------
+
+def test_write_facts_produces_a_readable_document(tmp_path):
+    out = tmp_path / "brief_facts.json"
+    doc = B.write_facts(path=str(out), commit="abc1234", visibility="private")
+    assert doc["commit"] == "abc1234"
+    assert doc["repo_visibility"] == "private"
+    assert json.loads(out.read_text(encoding="utf-8"))["corpus"] == doc["corpus"]
+
+
+def test_facts_document_carries_the_numbers_a_brief_gets_wrong(tmp_path):
+    doc = B.write_facts(path=str(tmp_path / "f.json"))
+    facts = B.measured_facts()
+    assert doc["corpus"]["fit_files"] == facts["fit_files"]
+    assert doc["corpus"]["activities"] == facts["activities"]
+    assert doc["reviews"]["open"] == facts["open_reviews"]
+    assert doc["reviews"]["open"] == sum(doc["reviews"]["by_reason"].values())
+    assert doc["tests"]["passed"] == facts["tests_passed"]
+
+
+def test_facts_document_states_the_dashboard_is_wired(tmp_path):
+    doc = B.write_facts(path=str(tmp_path / "f.json"))
+    if not doc["dashboard"]:
+        pytest.skip("server or dashboard absent")
+    assert len(doc["dashboard"]["dashboard_calls"]) == 3
+    assert len(doc["dashboard"]["server_routes"]) == 3
+
+
+def test_facts_document_records_a_refusal_as_a_refusal(tmp_path):
+    """A refusal is the honest answer and must not be laundered into a state."""
+    doc = B.write_facts(path=str(tmp_path / "f.json"))
+    coaching = doc["coaching"]
+    assert "state" in coaching
+    if coaching["state"] in ("confirmation_required", "data_insufficient"):
+        assert coaching["advisory"] is False
+        assert coaching["reasons"]
+
+
+def test_facts_document_carries_no_gps_or_activity_identifiers(tmp_path):
+    """This file is published. It must hold counts and states, nothing else."""
+    import re as _re
+    raw = (tmp_path / "f.json").as_posix()
+    B.write_facts(path=raw)
+    text = open(raw, encoding="utf-8").read()
+    for banned in ("position_lat", "position_long", "latitude", "longitude",
+                   "start_local", "garmin_fit", ".fit", "weight", "body_fat"):
+        assert banned not in text, banned
+    assert not _re.search(r"\b17\d{8}\b", text), "an activity id leaked"
+
+
+def test_facts_file_is_not_itself_a_source_of_staleness(tmp_path):
+    """It records the commit it describes, so a stale copy is recognisable."""
+    doc = B.write_facts(path=str(tmp_path / "f.json"), commit="deadbee")
+    assert doc["generated_utc"].endswith("Z")
+    assert doc["commit"] == "deadbee"

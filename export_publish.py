@@ -52,6 +52,7 @@ REPO = paths.repo_dir()
 CANON = "garmin_export.csv"
 META = "garmin_export.meta.json"
 STATE = os.path.join(REPO, "publish_state.json")
+FACTS = "brief_facts.json"
 # Raw FIT and the Garmin CSV export stay in the local data directory. They must
 # never be written into the repository, which is public.
 SRC_DIR = paths.data_dir()
@@ -475,7 +476,7 @@ def guard_token_content(extra=()):
 def publishable_text_paths():
     """Tracked, text-shaped files the publisher would put in a commit."""
     out = []
-    for rel in code_paths() + [CANON, META, ".gitignore", "publish_state.json"]:
+    for rel in code_paths() + [CANON, META, ".gitignore", "publish_state.json", FACTS]:
         if rel.endswith((".py", ".md", ".json", ".csv", ".toml", ".html")):
             out.append(rel)
     for base, _dirs, names in os.walk(os.path.join(REPO, "tasks")):
@@ -810,6 +811,51 @@ def fetch_instructions(remote, branch, visibility):
     ]
 
 
+def verify_channel(remote, branch, timeout=10):
+    """Can an authenticated client actually read the published files?
+
+    "The crew has a GitHub token" is not a fact about the world, it is a fact
+    about a configuration, and the two come apart silently: a token that is
+    present, expired, scoped to another repository, or simply never handed to
+    the fetch tool produces exactly the same brief as no token at all.
+
+    This reads the token from the environment and never writes, logs, echoes, or
+    returns it. It reports which files are readable and what the server said.
+
+    Returns a dict: {"token_present", "ok", "detail", "readable"}.
+    """
+    m = re.search(r"github\.com[:/]([^/]+)/([^/.]+)", remote)
+    if not m:
+        return {"token_present": False, "ok": False,
+                "detail": "remote is not a GitHub URL", "readable": []}
+    token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
+    if not token:
+        return {"token_present": False, "ok": False,
+                "detail": "GITHUB_TOKEN is not set in this process, so an "
+                          "authenticated fetch cannot work from here",
+                "readable": []}
+    owner, repo = m.group(1), m.group(2)
+    readable = []
+    detail = ""
+    for name in (CANON, "brief_facts.json", "CREW_BRIEF.md", "SUPERVISOR_BRIEF.md"):
+        url = "https://api.github.com/repos/%s/%s/contents/%s?ref=%s" % (
+            owner, repo, name, branch)
+        req = urllib.request.Request(url, method="HEAD")
+        req.add_header("Authorization", "Bearer %s" % token)
+        req.add_header("User-Agent", "garmin-export-channel-verify")
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status == 200:
+                    readable.append(name)
+        except urllib.error.HTTPError as exc:
+            detail = "%s -> HTTP %s %s" % (name, exc.code, exc.reason)
+        except Exception as exc:
+            detail = "%s -> %s" % (name, exc)
+    return {"token_present": True, "ok": bool(readable),
+            "detail": detail or ("readable: %s" % ", ".join(readable)),
+            "readable": readable}
+
+
 LOCK_NAME = ".garmin_publish.lock"
 
 
@@ -1048,7 +1094,19 @@ def main():
                   fh, indent=2)
         fh.write("\n")
 
-    tracked = [CANON, META, ".gitignore", "publish_state.json"]
+    # Regenerate the machine-readable facts a brief is supposed to quote. A brief
+    # that cannot fetch prose can still fetch this, and it carries the commit it
+    # describes so a stale copy is recognisable as stale.
+    try:
+        import brief_consistency
+        brief_consistency.write_facts(commit=code_sha, visibility=visibility)
+        tracked_facts = [FACTS]
+        print("facts        : %s regenerated" % FACTS)
+    except Exception as exc:
+        tracked_facts = []
+        print("facts        : could not regenerate (%s)" % exc)
+
+    tracked = [CANON, META, ".gitignore", "publish_state.json"] + tracked_facts
     for extra in ("CREW_BRIEF.md", "profile.json", "CREW_TASKS.md",
                   "SUPERVISOR_BRIEF.md", "TASKS.md"):
         if os.path.exists(os.path.join(REPO, extra)):
@@ -1075,7 +1133,7 @@ def main():
         print("raw url     : %s" % url)
         return 0
 
-    export_only = {CANON, META, "publish_state.json"}
+    export_only = {CANON, META, "publish_state.json", FACTS}
     staged = [ln.strip() for ln in run(["diff", "--cached", "--name-only"]).stdout.splitlines()
               if ln.strip()]
     msg = build_commit_message(meta["run_count"], meta["latest_run"], staged, export_only)
@@ -1091,6 +1149,18 @@ def main():
     print("pushed      : origin/%s" % branch)
 
     print("\nvisibility  : %s" % visibility)
+    if visibility != "public":
+        chan = verify_channel(remote, branch)
+        print("\nauthenticated fetch channel")
+        print("  token in this process : %s" % ("yes" if chan["token_present"]
+                                                else "no (GITHUB_TOKEN unset)"))
+        print("  result                : %s" % ("OK" if chan["ok"] else "BROKEN"))
+        print("  detail                : %s" % chan["detail"])
+        if not chan["ok"]:
+            print("\n  A brief written now would be written blind. Having a token in")
+            print("  the crew's configuration is not the same as the crew being able")
+            print("  to read with it. Check: scope is this repository, Contents: Read,")
+            print("  not expired, and the fetch tool actually receives it.")
     print("\nhow the supervisor flow should fetch %s" % CANON)
     for line in fetch_instructions(remote, branch, visibility):
         print("  " + line)

@@ -225,8 +225,13 @@ those as the same number is the main analytical error to avoid.
 
 ### Current verified state, 2026-10-05
 
+> **Fetch `brief_facts.json` first.** It is regenerated on every publish and holds
+> these same figures as machine-readable JSON, with the commit it describes. Quote
+> it; do not recall it. The table below is the same content for a human reader and
+> it goes stale — that is the whole problem.
+
 If you cannot fetch this file, this is the last known good. It is a floor, not a
-source: it goes stale, which is the entire problem. Re-derive it if you can.
+source. Re-derive it if you can.
 
 | Fact | Value | How to re-derive |
 |---|---|---|
