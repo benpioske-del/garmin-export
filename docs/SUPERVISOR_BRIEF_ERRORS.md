@@ -138,6 +138,40 @@ brief asserting a false premise with the confidence of a verified one. The
 general lesson: an unverified claim about a system is worth nothing, and the way
 to tell the difference is to ask what the claimant could actually observe.
 
+## 2026-10-04 21:13 (third run): four claims, four of them false
+
+Commit `0e88c33`, "chore: update SUPERVISOR_BRIEF.md via CrewAI flow". The brief's
+task table listed ten items as `IN PROGRESS`. Four of its factual claims did not
+survive checking:
+
+| Brief claim | Actual | How it was checked |
+| --- | --- | --- |
+| `connect-dashboard-to-data-layer` **TOP PRIORITY**: dashboard "remains disconnected... zero references to `garmin_export.csv`, `trainloop.db`, or the new services" | **False.** Three API surfaces wired and audited | `dashboard/index.html:13291-13333` has `window.DASHBOARD_SOURCES` and three `apiGet` calls; `python dashboard_contract.py` → `PASS 3 surfaces` |
+| "deterministic fixtures and complete rationale snapshots are **not evidenced**" | **False.** Nine goldens committed | `tests/fixtures/recommend/*.json` (9), `tests/recommend_scenarios.py`, `docs/COACHING_POLICY_AUDIT.md` |
+| "**57** timezone_uncertain reviews remain open" | **58** | `SELECT COUNT(*) ... WHERE resolved_utc IS NULL` → 58 + 1 activity_gap = 59 |
+| "Per-mile splits are **unavailable**" | **False.** All 58 FIT files carry lap records | `fit.get_messages('lap')` over every file in `garmin_fit/` → 58/58 non-empty |
+
+The dashboard claim is the serious one, and it is now the *third* consecutive brief
+to assert it. The brief process has no way to observe `dashboard/index.html`, because
+the file is gitignored: it is private by design, since it embeds a running journal,
+body weight and coordinates. So the claim is not a reasoning error. It is an
+observability gap, and it will be re-asserted every run until something changes.
+
+Two of the four errors are staleness rather than invention: the rationale fixtures
+landed in commits after this brief was written, and the review count had already
+drifted. That distinction matters, because staleness is bounded by how often CrewAI
+runs, while invention is bounded by nothing.
+
+The splits claim is the expensive one. It was used to justify never analysing
+within-run pace decay. The data to do that has been sitting in the FIT files the
+whole time.
+
+**Note on the task table.** None of these ten `IN PROGRESS` items has a backing file
+in `tasks/`. The queue holds two files: `001-example-task.md` (a placeholder) and
+`002-log-a-5k-pr.md`. The brief's table is prose, not the queue. `CREW_TASKS.md`
+already says `tasks/` is the real queue, but nothing enforces that a brief entry
+traces to a task file.
+
 ## Standing rule
 
 Do not copy a figure out of a brief into code, a document that will outlive the

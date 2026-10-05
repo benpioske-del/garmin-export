@@ -112,6 +112,7 @@ def die(msg, hint=None):
 PUBLISHED_MODULES = frozenset([
     "activities.py",
     "brief_bridge.py",
+    "brief_consistency.py",
     "capture_supervisor_brief.py",
     "dashboard_contract.py",
     "export_publish.py",

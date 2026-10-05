@@ -16,7 +16,7 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-412 passed, 1 skipped (413 collected)
+422 passed, 1 skipped (423 collected)
 ```
 
 | File | Tests |
@@ -37,7 +37,8 @@ $ python -m pytest
 | `tests/test_history_safety.py` | 2 |
 | `tests/test_publish_scope.py` | 17 |
 | `tests/test_publish_flow.py` | 45 |
-| **Total** | **413** (412 pass, 1 skip) |
+| `tests/test_brief_consistency.py` | 10 |
+| **Total** | **423** (422 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV

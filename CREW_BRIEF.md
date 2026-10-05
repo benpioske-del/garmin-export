@@ -211,6 +211,25 @@ those as the same number is the main analytical error to avoid.
 - Sample size is small. The run count (see `garmin_export.meta.json`) supports a
   trend, not a confident percentile.
 
+### Per-mile splits: available locally, not yet published
+
+**Do not claim per-mile splits are unavailable.** They are not. Every one of the 58
+local `.FIT` files carries lap records, at roughly one-mile intervals, and
+`garmin_export.csv` exposes only `Best Lap Time`. A previous brief asserted the data
+did not exist and used that to rule out within-run pace-decay analysis; that was wrong,
+and it is the reason task `002` is still blocked.
+
+Two things follow:
+
+- A 5K time can be **measured** from laps rather than projected from average pace.
+  Until the coach publishes a splits column, the published schema still cannot support
+  that, so a PR remains unprovable *from this repo alone*.
+- `Number of Laps` and `Best Lap Time` are FIT-only columns, so a CSV-only row has no
+  split information at all. Check `_source_file` before reasoning about laps.
+
+The `.FIT` files are local-only and are never published. If the crew needs split-level
+data, ask the coach to publish a splits column; do not infer that it does not exist.
+
 ---
 
 ## Rules for the crew

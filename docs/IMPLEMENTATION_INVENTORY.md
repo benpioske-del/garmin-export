@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 412 passed, 1 skipped (Windows symlink case) |
+| Tests | 422 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -89,7 +89,7 @@ an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 412 passed, 1 skipped. |
+| `python -m pytest` | Works. 422 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -317,7 +317,7 @@ The supervisor reads this file and `VERIFICATION_REPORT.md` as its evidence
 base, so a stale number here becomes a wrong instruction in the next brief.
 Two things were corrected on 2026-10-01 after a run acted on them:
 
-- The **152-test** count was stale; it is 412.
+- The **152-test** count was stale; it is 422.
 - **`profile.json` was described as empty**; it carries `hr_max` and field
   notes, and only the remaining fields are `null`.
 
