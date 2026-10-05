@@ -15,17 +15,18 @@
       "Stop and seek a qualified clinician for pain that persists, altered gait, chest pain, or any medical concern. Nothing here is a diagnosis."
     ],
     "evidence": {
+      "days_since_last_run": 1,
+      "run_days_28d": 4,
+      "run_days_7d": 4,
       "run_load_28d": 600.0,
       "run_unavailable": [],
-      "runs_28d": 4,
-      "runs_7d": 4,
-      "strength_28d": 0,
+      "strength_days_28d": 0,
       "strength_load_28d": null,
       "strength_unavailable": []
     },
     "limitation": "Not enough recorded history to judge load.",
     "reasons": [
-      "only 4 runs in 28 days, need 8"
+      "only 4 training days with runs in 28 days, need 8"
     ],
     "state": "data_insufficient"
   },

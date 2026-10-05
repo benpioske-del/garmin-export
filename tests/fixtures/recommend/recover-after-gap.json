@@ -1,0 +1,63 @@
+{
+  "covers": [
+    "available"
+  ],
+  "description": "Eight chronic days and nothing in the acute window, so the last run was eight days ago. Without the gap branch this fell through to the thin-window refusal, which reported the arithmetic instead of the situation. recover was advertised by available_states() with no branch that could return it.",
+  "expected_state": "recover",
+  "fixed_as_of": "2026-10-04T12:00:00Z",
+  "hr_max": 198,
+  "recommend": {
+    "advisory": true,
+    "disclaimers": [
+      "Workload ratio, a monitoring signal only. Not an injury probability, risk score or diagnosis.",
+      "Not medical advice.",
+      "Stop and seek a qualified clinician for pain that persists, altered gait, chest pain, or any medical concern. Nothing here is a diagnosis."
+    ],
+    "evidence": {
+      "days_since_last_run": 8,
+      "run_days_28d": 8,
+      "run_days_7d": 0,
+      "run_load_28d": 1200.0,
+      "run_unavailable": [],
+      "strength_days_28d": 0,
+      "strength_load_28d": null,
+      "strength_unavailable": []
+    },
+    "limitation": "Return gradually over one to two weeks; do not resume at pre-break volume.",
+    "reasons": [
+      "8 days since the last run, at or above the 7-day gap bound"
+    ],
+    "state": "recover"
+  },
+  "scenario": "recover-after-gap",
+  "unavailable": {
+    "run": [],
+    "strength": []
+  },
+  "windows": {
+    "14": {
+      "combined_load": 600.0,
+      "run_confidence": "medium",
+      "run_days": 4,
+      "run_load": 600.0,
+      "strength_days": 0,
+      "strength_load": null
+    },
+    "28": {
+      "combined_load": 1200.0,
+      "run_confidence": "medium",
+      "run_days": 8,
+      "run_load": 1200.0,
+      "strength_days": 0,
+      "strength_load": null
+    },
+    "7": {
+      "combined_load": null,
+      "run_confidence": "unverified",
+      "run_days": 0,
+      "run_load": null,
+      "strength_days": 0,
+      "strength_load": null
+    }
+  }
+}

@@ -181,15 +181,31 @@ def compute(conn, as_of=None, hr_max=None, default_rpe=None):
     return out
 
 
-def acwr(acute, chronic):
-    """Acute:chronic workload ratio.
+def acwr(acute_7d_total, chronic_28d_total):
+    """Acute:chronic workload ratio, canonical form.
+
+    Acute is the trailing 7-day total. Chronic is the mean week over 28 days,
+    i.e. the 28-day total divided by four. Comparing a 7-day *rate* against a
+    28-day *rate* is what makes the ratio exceed 1.0 at all; comparing the two
+    sums directly cannot, because the 7-day window is a subset of the 28-day one
+    and so acute <= chronic always holds.
+
+    With rates, the documented interpretation zones apply as written:
+
+        below 0.80   fresh / low
+        0.80 - 1.30   build
+        1.30 - 1.50   maintain, with a caution
+        1.50 and up   high
 
     A monitoring signal only. Not an injury probability or a risk score, and
     not a clinical measure of anything.
     """
-    if chronic in (None, 0) or acute is None:
+    if chronic_28d_total in (None, 0) or acute_7d_total is None:
         return None
-    return round(acute / chronic, 2)
+    chronic_mean_week = chronic_28d_total / 4.0
+    if chronic_mean_week == 0:
+        return None
+    return round(acute_7d_total / chronic_mean_week, 2)
 
 
 def save_snapshot(conn, result, state, confidence, confirmation):

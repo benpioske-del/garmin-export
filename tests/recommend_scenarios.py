@@ -186,21 +186,55 @@ SCENARIOS = (
     Scenario(
         "build-band",
         terms.STATE_BUILD,
-        days_ago=(0, 1, 2, 3, 4, 5, 6, 7),
+        days_ago=(1, 2, 3, 8, 10, 12, 14, 16, 18, 20, 22),
         covers=("available",),
-        description="Eight consecutive days ending at the fixed instant, so "
-                    "the ratio is 1.0 and lands in the build band. Note that "
-                    "runs_7d and runs_28d count distinct DAYS, not sessions: "
-                    "two runs on one day collapse to one entry. Reaching this "
-                    "band needs every counted day inside the acute window.",
+        description="Three acute days against a chronic block of eight on a "
+                    "two-day stride. Three of eleven training days lands the "
+                    "ratio at 1.09, inside the build band. Note the gates count "
+                    "distinct DAYS, not sessions, so two runs on one day collapse "
+                    "to one entry.",
+    ),
+    Scenario(
+        "caution-band-spike",
+        terms.STATE_MAINTAIN,
+        days_ago=(1, 2, 3, 4, 8, 10, 12, 14, 16, 18, 20, 22),
+        covers=("available",),
+        description="One more acute day puts the ratio at 1.33, inside the "
+                    "1.30-1.50 caution band. Holds current volume and adds "
+                    "nothing. This band was unreachable while the ratio compared "
+                    "two window sums.",
+    ),
+    Scenario(
+        "deload-band-concentration",
+        terms.STATE_DELOAD,
+        days_ago=(1, 2, 3, 4, 5, 8, 10, 12, 14, 16, 18, 20, 22),
+        covers=("available",),
+        description="Five acute days against the same chronic block puts the "
+                    "ratio at 1.54, at or above the high bound, so the state is "
+                    "deload. The old sum-based ratio read this shape as 0.65 and "
+                    "called it 'build'; recommending progression during a spike "
+                    "is the defect this scenario pins.",
+    ),
+    Scenario(
+        "recover-after-gap",
+        terms.STATE_RECOVER,
+        days_ago=(8, 10, 12, 14, 16, 18, 20, 22),
+        covers=("available",),
+        description="Eight chronic days and nothing in the acute window, so the "
+                    "last run was eight days ago. Without the gap branch this "
+                    "fell through to the thin-window refusal, which reported the "
+                    "arithmetic instead of the situation. recover was advertised "
+                    "by available_states() with no branch that could return it.",
     ),
     Scenario(
         "maintain-low-ratio",
         terms.STATE_MAINTAIN,
-        days_ago=(1, 5, 9, 13, 17, 21, 25, 3, 7, 11),
+        days_ago=(1, 2, 3, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
+                  22, 23, 24, 25, 26, 27),
         covers=("available",),
-        description="Load spread thinly across the window. A low ratio is not "
-                    "on its own a reason to add volume, so this maintains.",
+        description="Three acute days against eighteen chronic days, ratio 0.57. "
+                    "A low ratio is not on its own a reason to add volume, so "
+                    "this maintains.",
     ),
 )
 

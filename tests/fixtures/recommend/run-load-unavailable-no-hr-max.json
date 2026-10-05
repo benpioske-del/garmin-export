@@ -15,6 +15,9 @@
       "Stop and seek a qualified clinician for pain that persists, altered gait, chest pain, or any medical concern. Nothing here is a diagnosis."
     ],
     "evidence": {
+      "days_since_last_run": 1,
+      "run_days_28d": 0,
+      "run_days_7d": 0,
       "run_load_28d": null,
       "run_unavailable": [
         {
@@ -58,15 +61,13 @@
           "reason": "no hr_max supplied"
         }
       ],
-      "runs_28d": 0,
-      "runs_7d": 0,
-      "strength_28d": 0,
+      "strength_days_28d": 0,
       "strength_load_28d": null,
       "strength_unavailable": []
     },
-    "limitation": "Not enough recorded history to judge load.",
+    "limitation": "Running load needs average heart rate and a max estimate.",
     "reasons": [
-      "only 0 runs in 28 days, need 8"
+      "running load unavailable: [{'activity_id': 'run-009', 'reason': 'no hr_max supplied'}, {'activity_id': 'run-008', 'reason': 'no hr_max supplied'}, {'activity_id': 'run-007', 'reason': 'no hr_max supplied'}]"
     ],
     "state": "data_insufficient"
   },

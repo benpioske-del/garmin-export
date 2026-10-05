@@ -1,0 +1,64 @@
+{
+  "covers": [
+    "available"
+  ],
+  "description": "One more acute day puts the ratio at 1.33, inside the 1.30-1.50 caution band. Holds current volume and adds nothing. This band was unreachable while the ratio compared two window sums.",
+  "expected_state": "maintain",
+  "fixed_as_of": "2026-10-04T12:00:00Z",
+  "hr_max": 198,
+  "recommend": {
+    "advisory": true,
+    "disclaimers": [
+      "Workload ratio, a monitoring signal only. Not an injury probability, risk score or diagnosis.",
+      "Not medical advice.",
+      "Stop and seek a qualified clinician for pain that persists, altered gait, chest pain, or any medical concern. Nothing here is a diagnosis."
+    ],
+    "evidence": {
+      "acwr": 1.33,
+      "days_since_last_run": 1,
+      "run_days_28d": 12,
+      "run_days_7d": 4,
+      "run_load_28d": 1800.0,
+      "run_unavailable": [],
+      "strength_days_28d": 0,
+      "strength_load_28d": null,
+      "strength_unavailable": []
+    },
+    "limitation": "Hold current volume and do not add load this week.",
+    "reasons": [
+      "acute:chronic 1.33 is in the 1.3-1.5 caution band"
+    ],
+    "state": "maintain"
+  },
+  "scenario": "caution-band-spike",
+  "unavailable": {
+    "run": [],
+    "strength": []
+  },
+  "windows": {
+    "14": {
+      "combined_load": 1200.0,
+      "run_confidence": "medium",
+      "run_days": 8,
+      "run_load": 1200.0,
+      "strength_days": 0,
+      "strength_load": null
+    },
+    "28": {
+      "combined_load": 1800.0,
+      "run_confidence": "medium",
+      "run_days": 12,
+      "run_load": 1800.0,
+      "strength_days": 0,
+      "strength_load": null
+    },
+    "7": {
+      "combined_load": 600.0,
+      "run_confidence": "medium",
+      "run_days": 4,
+      "run_load": 600.0,
+      "strength_days": 0,
+      "strength_load": null
+    }
+  }
+}

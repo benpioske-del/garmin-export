@@ -58,47 +58,52 @@ REGENERATE = bool(os.environ.get("REGENERATE_SNAPSHOTS"))
 
 # States the fixtures demonstrate, derived from the scenarios rather than
 # asserted in the abstract.
-REACHABLE = ("build", "maintain", "data_insufficient", "confirmation_required")
+REACHABLE = ("build", "maintain", "recover", "deload",
+             "data_insufficient", "confirmation_required")
 
-# Advertised by terms.CONTROL_STATES but not returnable by recommend().
-UNREACHABLE_ADVERTISED = ("recover", "deload")
+# Nothing in terms.CONTROL_STATES is advertised without a branch that returns it.
+UNREACHABLE_ADVERTISED = ()
 
-# Branch conditions in recommend() that no input can satisfy, with why.
-KNOWN_DEFECTS = {
+# Defects that were fixed rather than tolerated. Kept as a ledger so that a
+# regression names the change it undid, and so the audit document stays
+# checkable against the code.
+FIXED_DEFECTS = {
     "deload-band-unreachable": {
-        "where": "recommend.py: HIGH_ACWR = 1.5",
-        "why": "ratio = 7d_sum / 28d_sum and the 7-day window is a subset of "
+        "where": "loadcalc.acwr",
+        "was": "ratio = 7d_sum / 28d_sum, and the 7-day window is a subset of "
                "the 28-day window, so ratio <= 1.0 always",
-        "consequence": "the system can never recommend reducing load",
+        "now": "ratio = 7d_sum / (28d_sum / 4): acute week against mean "
+               "chronic week, which is the canonical rate form",
+        "consequence_removed": "the system could never recommend reducing load",
     },
     "caution-band-unreachable": {
         "where": "recommend.py: CAUTION_ACWR = 1.3",
-        "why": "same ceiling as above",
-        "consequence": "the caution band is dead code",
+        "was": "same ceiling as above",
+        "now": "reachable whenever the acute week exceeds chronic by 30%",
+        "consequence_removed": "the caution band is no longer dead code",
     },
     "recover-never-returned": {
         "where": "recommend.recommend",
-        "why": "no branch returns terms.STATE_RECOVER",
-        "consequence": "available_states() advertises a state that cannot occur",
-    },
-    "run-load-none-branch-unreachable": {
-        "where": 'recommend.py: if w28["run_load"] is None',
-        "why": "compute() skips runs whose load is None before counting them "
-               "as days, so runs_28d >= 8 implies run_load is not None",
-        "consequence": "the unavailable-input branch never runs",
-    },
-    "ratio-none-branch-unreachable": {
-        "where": "recommend.py: if ratio is None",
-        "why": "chronic sums to more than zero whenever runs_28d >= 8, since "
-               "every counted day contributes a positive load",
-        "consequence": "dead code",
+        "was": "no branch returned terms.STATE_RECOVER",
+        "now": "a training gap of RECOVER_GAP_DAYS or more returns recover, "
+               "checked before the thin-window refusal that used to mask it",
+        "consequence_removed": "available_states() no longer advertises an "
+                               "impossible state",
     },
     "missing-input-reported-as-missing-history": {
-        "where": "recommend.py: MIN_RUNS_28D check precedes the load check",
-        "why": "runs without a computable load are dropped before counting, so "
-               "a missing hr_max presents as runs_28d == 0",
-        "consequence": "the athlete is told they lack history rather than "
-                       "that a required input is absent",
+        "where": "recommend.recommend check order",
+        "was": "the MIN_RUN_DAYS_28D count check preceded the load-availability "
+               "check, so a missing hr_max presented as 'only 0 runs in 28 days'",
+        "now": "the load-availability branch runs first and names the absent "
+               "input; the count is treated as a symptom",
+        "consequence_removed": "the athlete is told which input to supply",
+    },
+    "runs-counted-days-not-sessions": {
+        "where": "recommend.MIN_RUN_DAYS_7D / MIN_RUN_DAYS_28D",
+        "was": "the constants were named MIN_RUNS_*, implying sessions, while "
+               "the code counted distinct days",
+        "now": "renamed to MIN_RUN_DAYS_* and the reasons say 'training days'",
+        "consequence_removed": "the evidence keys match what they measure",
     },
 }
 
@@ -291,53 +296,67 @@ class TestStateReachability:
         produced_deload = []
         shapes = 0
 
-        # Distinct days only: runs_7d/runs_28d count days, so two runs on one
-        # day would collapse and the sweep would understate the space.
+        # Distinct days only: the gates count days, so two runs on one day
+        # would collapse and the sweep would understate the space.
+        #
+        # Chronic days are placed on a 2-day stride rather than a 3-day one. At
+        # 3 days, only six chronic days fit inside the 28-day window and the
+        # MIN_RUN_DAYS_28D gate rejects every shape, so the space this swept
+        # contained no advisory state at all. The two starts are what make
+        # build and recover reachable: a dense chronic block balanced against
+        # the acute week, and a chronic block far enough back to leave a gap.
         for recent in range(0, 10):
-            for older in range(0, 10):
-                for moving in (1800, 3600, 7200):
-                    for avg_hr in (140, 165, 185):
-                        for hr_max in (HR_MAX, None):
-                            for review in ("resolved", "open"):
-                                days = list(range(1, recent + 1))
-                                days += [12 + 3 * i for i in range(older)]
-                                conn.execute("DELETE FROM activities")
-                                for i, ago in enumerate(days):
-                                    t = end - datetime.timedelta(days=ago)
-                                    z = t.strftime("%Y-%m-%dT%H:%M:%SZ")
-                                    conn.execute(
-                                        "INSERT INTO activities (activity_id,"
-                                        " source_system, sport, title, start_utc,"
-                                        " start_local, timezone_source,"
-                                        " distance_mi, moving_time_s, avg_hr,"
-                                        " value_state, confidence, confirmation,"
-                                        " review_state, first_seen_utc,"
-                                        " last_updated_utc) VALUES"
-                                        " (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                                        ("s%d" % i, "sweep", "running", "Sweep",
-                                         z, z, "device_local", 6.0, moving,
-                                         avg_hr, "present", "medium",
-                                         "confirmed", review, z, z))
-                                conn.commit()
-                                shapes += 1
-                                result = recommend.recommend(
-                                    conn, as_of=FIXED_AS_OF, hr_max=hr_max)
-                                seen.add(result["state"])
-                                if result["state"] == terms.STATE_DELOAD:
-                                    produced_deload.append(
-                                        (recent, older, moving, avg_hr, hr_max))
+            for chronic in range(0, 15):
+                for chronic_start in (8, 12, 18):
+                    for moving in (1800, 3600, 7200):
+                        for avg_hr in (140, 165, 185):
+                            for hr_max in (HR_MAX, None):
+                                for review in ("resolved", "open"):
+                                    days = list(range(1, recent + 1))
+                                    days += [chronic_start + 2 * i
+                                             for i in range(chronic)]
+                                    if not days:
+                                        continue
+                                    conn.execute("DELETE FROM activities")
+                                    for i, ago in enumerate(days):
+                                        if ago > 27:
+                                            break
+                                        t = end - datetime.timedelta(days=ago)
+                                        z = t.strftime("%Y-%m-%dT%H:%M:%SZ")
+                                        conn.execute(
+                                            "INSERT INTO activities (activity_id,"
+                                            " source_system, sport, title, start_utc,"
+                                            " start_local, timezone_source,"
+                                            " distance_mi, moving_time_s, avg_hr,"
+                                            " value_state, confidence, confirmation,"
+                                            " review_state, first_seen_utc,"
+                                            " last_updated_utc) VALUES"
+                                            " (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                                            ("s%d" % i, "sweep", "running", "Sweep",
+                                             z, z, "device_local", 6.0, moving,
+                                             avg_hr, "present", "medium",
+                                             "confirmed", review, z, z))
+                                    conn.commit()
+                                    shapes += 1
+                                    result = recommend.recommend(
+                                        conn, as_of=FIXED_AS_OF, hr_max=hr_max)
+                                    seen.add(result["state"])
+                                    if result["state"] == terms.STATE_DELOAD:
+                                        produced_deload.append(
+                                            (recent, chronic, chronic_start,
+                                             moving, avg_hr, hr_max))
         conn.close()
         return seen, shapes, produced_deload
 
-    def test_sweep_never_produces_deload_or_recover(self, tmp_path):
+    def test_sweep_now_produces_deload_and_recover(self, tmp_path):
+        """Every advertised state must be reachable by some input."""
         seen, shapes, produced_deload = self._sweep(tmp_path)
         assert shapes > 1000, "sweep was too small to be evidence: %d" % shapes
-        assert not produced_deload, (
-            "deload became reachable in %d shapes; the acute:chronic ceiling "
-            "changed and the policy needs reviewing: %s"
-            % (len(produced_deload), produced_deload[:3]))
-        assert terms.STATE_RECOVER not in seen
-        assert terms.STATE_DELOAD not in seen, sorted(seen)
+        assert produced_deload, (
+            "deload went unreachable again; the rate-based chronic changed")
+        assert terms.STATE_DELOAD in seen, sorted(seen)
+        assert terms.STATE_RECOVER in seen, sorted(seen)
+        assert not UNREACHABLE_ADVERTISED
 
     def test_sweep_reaches_exactly_the_documented_states(self, tmp_path):
         seen, shapes, _ = self._sweep(tmp_path)
@@ -345,57 +364,67 @@ class TestStateReachability:
             "sweep of %d shapes produced %s, documented as %s"
             % (shapes, sorted(seen), sorted(REACHABLE)))
 
-    def test_recover_has_no_branch_at_all(self):
-        # The one state whose unreachability is structural rather than
-        # arithmetic: there is no code path that produces it.
+    def test_recover_has_a_branch_that_names_its_bound(self):
+        # recover was previously advertised by terms.CONTROL_STATES with no
+        # branch capable of returning it.
         src = inspect.getsource(recommend.recommend)
-        assert "STATE_RECOVER" not in src, (
-            "recover now has a branch; update KNOWN_DEFECTS and the inventory")
-        assert "recover" in terms.CONTROL_STATES, (
-            "recover left CONTROL_STATES without a decision")
+        assert "STATE_RECOVER" in src
+        assert recommend.RECOVER_GAP_DAYS >= 1, (
+            "a zero-day gap bound would make recover unconditional")
 
-    def test_ratio_is_bounded_by_one(self):
-        # The reason deload is unreachable. Asserted so that changing the
-        # chronic calculation cannot happen silently.
-        assert loadcalc.WINDOWS == (7, 14, 28), (
-            "window set changed; re-examine the acute:chronic ceiling")
-        assert recommend.HIGH_ACWR > 1.0, (
-            "HIGH_ACWR was lowered to at most 1.0, which would make deload "
-            "reachable and silently change the policy")
+    def test_ratio_can_exceed_one(self):
+        # The ratio is now a rate comparison, so 1.0 is an interior value rather
+        # than a ceiling. A week at 1.5x the average week must read as 1.5.
+        assert loadcalc.WINDOWS == (7, 14, 28)
+        assert recommend.HIGH_ACWR > 1.0
+        assert loadcalc.acwr(1500.0, 2000.0) == 3.0
 
-    def test_missing_input_is_still_misreported(self, recorded):
-        # Pins the defect rather than tolerating it silently. This test is
-        # expected to be INVERTED when the rationale is fixed to name the
-        # absent input.
+    def test_missing_input_now_names_the_absent_input(self, recorded):
+        """Inverted when the rationale was fixed to name what is absent."""
         for name in ("run-load-unavailable-no-hr-max",
                      "run-load-unavailable-no-avg-hr"):
             reasons = " ".join(recorded[name]["recommend"]["reasons"])
-            assert "hr_max" not in reasons and "avg_hr" not in reasons, (
-                "%s now names the missing input; invert this test and remove "
-                "'missing-input-reported-as-missing-history' from KNOWN_DEFECTS"
-                % name)
-            assert "only 0 runs" in reasons, (
-                "%s no longer reports missing history; re-check the fix" % name)
+            assert "hr_max" in reasons or "avg_hr" in reasons, (
+                "%s stopped naming the missing input" % name)
+            assert "only 0 runs" not in reasons, (
+                "%s regressed to blaming missing history" % name)
+            assert recorded[name]["recommend"]["evidence"]["run_days_28d"] == 0
 
 
-class TestKnownDefectsAreAccurate:
-    """The defect list must describe the code as it actually is."""
+class TestFixedDefectsStayFixed:
+    """The ledger must describe the code as it actually is, both ways."""
 
-    def test_ratio_ceiling_holds(self):
-        assert loadcalc.acwr(600.0, 600.0) == 1.0
-        # A 7-day sum can never exceed a 28-day sum over the same records.
-        assert loadcalc.acwr(700.0, 700.0) == 1.0
-        assert loadcalc.acwr(600.0, 1500.0) == 0.4
+    def test_ratio_compares_a_week_against_a_mean_week(self):
+        # Steady state is a 28-day total of four equal weeks, so ratio 1.0.
+        # Loading the whole 28-day volume into one week reads 4.0, which is the
+        # spike the old sum-based comparison could never see.
+        assert loadcalc.acwr(600.0, 2400.0) == 1.0
+        assert loadcalc.acwr(600.0, 600.0) == 4.0
+        assert loadcalc.acwr(1200.0, 2400.0) == 2.0
+        assert loadcalc.acwr(600.0, 1200.0) == 2.0
 
-    def test_zero_chronic_gives_none_not_infinity(self):
+    def test_live_ratio_is_inside_the_operating_range(self):
+        """A regression here would make every recommendation meaningless."""
+        acute, chronic = 780.8, 3364.4
+        assert loadcalc.acwr(acute, chronic) == 0.93
+        assert recommend.LOW_ACWR < loadcalc.acwr(acute, chronic) < recommend.CAUTION_ACWR
+
+    def test_every_ledger_entry_names_a_fixed_thing(self):
+        assert FIXED_DEFECTS, "the ledger should not be emptied silently"
+        for name, entry in FIXED_DEFECTS.items():
+            assert {"where", "was", "now", "consequence_removed"} <= set(entry), name
+
+    def test_zeros_and_none_still_guard(self):
         assert loadcalc.acwr(100.0, 0) is None
         assert loadcalc.acwr(100.0, None) is None
+        assert loadcalc.acwr(100.0, 0.4) == 1000.0, (
+            "a near-zero chronic is a genuine spike, not an error")
 
     def test_unavailable_runs_are_not_counted_as_days(self):
         src = inspect.getsource(loadcalc.compute)
         assert "if load is None:" in src and "continue" in src, (
             "compute() no longer skips unavailable runs; the unreachability "
-            "analysis in KNOWN_DEFECTS needs redoing")
+            "analysis in FIXED_DEFECTS needs redoing")
 
     def test_load_version_is_recorded_in_every_window(self, recorded):
         # A rationale that does not say which load formula produced it cannot

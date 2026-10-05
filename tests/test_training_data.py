@@ -458,7 +458,11 @@ def test_load_version_is_recorded(db):
 def test_acwr_is_unavailable_without_chronic():
     assert loadcalc.acwr(100, None) is None
     assert loadcalc.acwr(100, 0) is None
-    assert loadcalc.acwr(100, 80) == 1.25
+    # chronic is the 28-day total, so a steady week reads 1.0 when the month
+    # holds four equal weeks. A month of only 80 against an acute week of 100 is
+    # a fivefold spike, not 1.25.
+    assert loadcalc.acwr(100, 400) == 1.0
+    assert loadcalc.acwr(100, 80) == 5.0
 
 
 def test_snapshot_persists_the_inputs(db):
