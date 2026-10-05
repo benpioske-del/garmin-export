@@ -14,8 +14,8 @@ true.** Anything committed here while it is public is readable by anyone, foreve
 The owner has said they may switch this repository to private. Nothing here needs to
 change for that to work, but **the plain URLs stop working**, so check first:
 
-- `garmin_export.meta.json` carries `repo_visibility`, which is **probed on every
-  publish**, not assumed. Treat it as the source of truth, not this paragraph.
+- `publish_state.json` carries `repo_visibility`, which is **probed on every publish**,
+  not assumed. Treat it as the source of truth, not this paragraph.
 - `public`: fetch over plain `raw.githubusercontent.com`, no credentials needed.
 - `private`: the raw URL returns **404**. Use the contents API with a read-only token:
 
@@ -64,7 +64,7 @@ fetch it over a plain URL. Handle it accordingly.
 | `garmin_export.csv` | The activity log. This is the file the crew reads. Row count changes as the watch syncs, so take the number from `garmin_export.meta.json` rather than from this file. |
 | `garmin_export.meta.json` | Row count, date range, per-source counts, and the newest `.FIT` on the device. |
 | `profile.json` | Athlete parameters needed to reproduce the cohort/population math. **Unfilled by default** - see below. |
-| `publish_state.json` | Raw URL, branch, last publish time, and a hash of the data. |
+| `publish_state.json` | Raw URL, branch, last publish time, a hash of the data, and the probed `repo_visibility`. |
 
 Read `garmin_export.meta.json` first. It reports how current the data is and where it
 came from.
@@ -129,8 +129,8 @@ making any claim about current fitness.
 
 The publisher is `export_publish.py` **in this repository**, with FIT decoding in
 `garmin_fit_reader.py`. It commits only when the underlying data actually changes. It
-probes repo visibility on every run and records the result in
-`garmin_export.meta.json` as `repo_visibility`.
+probes repo visibility on every run and records the result in `publish_state.json`
+as `repo_visibility`.
 
 ### Raw URLs can lag a push by a few minutes
 

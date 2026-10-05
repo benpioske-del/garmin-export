@@ -13,6 +13,7 @@ things matter:
 
 import json
 import os
+import re
 import time
 
 import pytest
@@ -326,3 +327,45 @@ def test_publishable_paths_have_no_duplicates():
 def test_real_repository_passes_the_secret_guard():
     """The guard must pass the real tree, or publishing is permanently wedged."""
     export_publish.guard_token_content(export_publish.publishable_text_paths())
+
+
+# --- where repo_visibility actually lands -------------------------------------
+
+def test_publish_state_records_the_probed_visibility():
+    """Pinned because it was documented as living in the wrong file.
+
+    `garmin_export.meta.json` is built by build_csv(), which knows nothing about
+    visibility; the probed value is written to publish_state.json in main().
+    """
+    state = json.load(open(os.path.join(export_publish.REPO, "publish_state.json"),
+                           encoding="utf-8"))
+    vis = state.get("repo_visibility")
+    assert vis, "publish_state.json has no repo_visibility"
+    assert vis.split()[0] in ("public", "private", "unknown")
+
+
+def test_visibility_is_absent_from_the_csv_meta():
+    """It must live in exactly one file, so it cannot disagree with itself."""
+    meta = json.load(open(os.path.join(export_publish.REPO, "garmin_export.meta.json"),
+                          encoding="utf-8"))
+    assert "repo_visibility" not in meta
+
+
+@pytest.mark.parametrize("doc", ["CREW_BRIEF.md", "CREW_TASKS.md",
+                                 "docs/IMPLEMENTATION_INVENTORY.md"])
+def test_docs_naming_repo_visibility_name_the_right_file(doc):
+    """Every paragraph that mentions repo_visibility must say where it lives.
+
+    The docs claimed `garmin_export.meta.json`, which never had the field. Pointing
+    a reader at the wrong file is worse than not documenting it at all.
+    """
+    path = os.path.join(export_publish.REPO, doc)
+    if not os.path.isfile(path):
+        pytest.skip("%s not present" % doc)
+    text = open(path, encoding="utf-8").read()
+    for para in re.split(r"\n\s*\n", text):
+        if "repo_visibility" not in para:
+            continue
+        assert "publish_state.json" in para, (
+            "%s mentions repo_visibility in a paragraph that does not name "
+            "publish_state.json" % doc)
