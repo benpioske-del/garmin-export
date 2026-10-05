@@ -1,248 +1,242 @@
 UNVERIFIED LLM OUTPUT
 
 # Athletic Performance Hub \ Supervisor Brief
-## Generated: 2026-10-04
+## Generated: 2026-10-05
 ## Run by: CrewAI Flow Supervisor
 
 ---
 ## CLOSED TASKS
 
-brief-transport | Live direct push, inbox, and clipboard transport verified. Transport is complete and must not be reopened.
-
-brief-transport-cross-second-idem | Commit 3054d6a. Cross-second idempotency is fixed and verified.
-
+brief-transport | Evidence from SUPERVISOR_BRIEF.md: live direct push, inbox, and clipboard transport verified; transport is complete and must not be reopened.
+brief-transport-cross-second-idem | Commit 3054d6a; cross-second idempotency is fixed and verified.
 profile-hr-max | Evidence confirms profile.json contains hr_max=198.
-
-data-layer-and-provenance | Commit 4051291. Migrations 001 through 006 are applied and no migrations are pending.
-
+data-layer-and-provenance | Commit 4051291; migrations 001 through 006 are applied and no migrations are pending.
 fit-audit-and-guard | Evidence confirms 0 parse failures, 57/57 FIT files accepted, and the GPS guard is verified.
 
 ---
 ## VERIFICATION (open tasks from previous brief)
 
-establish-authenticated-athlete-ownership | BLOCKED / DEMOTED | Direct evidence states that there is no authentication or multi-athlete separation; the system is intentionally local, single-subject, and single-user.
-
+establish-authenticated-athlete-ownership | BLOCKED / DEMOTED | Direct evidence states there is no authentication or multi-athlete separation; the system is intentionally local, single-subject, and single-user.
 complete-athlete-profile-and-timezone-provenance | IN PROGRESS | profile.json has hr_max=198, while age, sex, resting_hr, weight_lb, and height_in remain null; 57 timezone_uncertain reviews remain open.
-
-formalize-continuity-review-without-synthetic-activities | IN PROGRESS | One activity_gap review remains open for the 2026-06-26 to 2026-07-05 gap; no evidence supports creating synthetic activity or load records.
-
+formalize-continuity-review-without-synthetic-activities | IN PROGRESS | One activity_gap review remains open; no evidence supports creating synthetic activity or load records.
 capture-confirmed-strength-history | IN PROGRESS | There are 0 confirmed strength sessions; strength_load is null, which is not equivalent to zero.
-
 implement-gated-weather-enrichment | IN PROGRESS | weather.py has a gate, but no coordinates or provider-backed observations are evidenced.
-
 make-coaching-rationales-deterministic-and-auditable | IN PROGRESS | recommend.py provides six control states and refusal-first behavior, but deterministic fixtures and complete rationale snapshots are not evidenced.
-
 stabilize-running-load-before-progression | IN PROGRESS | Refusal is correctly returned while 11 activities in the relevant window have unresolved timezone reviews; broader progression fixtures and policy validation remain incomplete.
-
 build-long-run-pace-durability | IN PROGRESS | Per-mile splits are unavailable, so within-run pace decay must not be claimed; distance-band guidance, route comparability, and elevation handling are not fully evidenced.
-
 introduce-conservative-runner-strength | IN PROGRESS | The safety boundary is present because strength_load remains null; recommendation rules, injury gating, scheduling, and fixtures are not fully evidenced.
-
 harden-bridge-and-release-quality-gates | IN PROGRESS | No linter, formatter, type checker, CI workflow, pre-commit configuration, or dependency lockfile is configured; bridge idempotency is already closed.
-
 document-conservative-training-signals | IN PROGRESS | Unsupported HR-zone claims were withdrawn, but generated rationales do not yet explicitly identify all missing, provisional, derived, and refused inputs.
-
 connect-dashboard-to-data-layer | IN PROGRESS - TOP PRIORITY | dashboard/index.html is served by garmin_server.py but remains disconnected from the tested data layer; it has zero references to garmin_export.csv, trainloop.db, or the new services.
 
 ---
 ## SUPERVISOR DECISIONS
 
-The authoritative standing facts for this run are 57 FIT files, 57 activities, 58 open reviews, 207 passed / 1 skipped, and hr_max=198. The open reviews comprise 57 timezone_uncertain reviews and 1 activity_gap review.
+The data layer is implemented and tested. activities.py, loadcalc.py, recommend.py, and migrations 001 through 006 are real and tested, but dashboard/index.html is not using them. The primary work is therefore to connect the existing dashboard to the existing server-backed data layer.
 
-The five closed slugs remain closed and must not be reopened. Their evidence is listed above. In particular, profile-hr-max is complete because hr_max=198 is present, and data-layer-and-provenance is complete because migrations 001 through 006 are applied with none pending.
+The authoritative corpus contains 57 FIT files and 57 activities. The verification baseline is 207 passed / 1 skipped. These values must be preserved and must not be replaced with a different activity count or reconciliation premise.
 
-The primary defect is integration, not absence of implementation. activities.py, loadcalc.py, recommend.py, and migrations 001 through 006 are real and tested, but the primary dashboard is not using them. The dashboard continues to rely on raw FIT paths or inline data rather than migration-backed canonical responses.
+There are 58 open reviews: 57 timezone_uncertain reviews and 1 activity_gap review. These reviews must remain visible in provenance and limitation state. The dashboard must not silently treat unresolved data as complete, and it must not create synthetic activities or synthetic load records to close gaps.
 
-The primary task is therefore connect-dashboard-to-data-layer. It must connect the existing dashboard to the existing server and data-layer modules without introducing a replacement service, framework, authentication layer, or duplicate calculation path.
+profile.json has hr_max=198. Other profile values remain null where they are not supported by evidence. Null values must remain distinct from zero or an inferred athlete value.
 
-Authentication is intentionally demoted. This is a local, single-user, single-athlete system, and no second-athlete or non-local deployment requirement is evidenced.
+The recommendation system is refusal-first. The dashboard must render available, missing, provisional, unresolved, and refused states explicitly, including the reason for a refusal. strength_load remains null and must not be displayed as zero.
 
-The 57 timezone_uncertain reviews and the single activity_gap review must remain visible. No synthetic activities, synthetic load records, HR-zone distributions, or unsupported continuity claims may be introduced.
+The dashboard must continue to be dashboard/index.html served by garmin_server.py. The integration must use the tested Python modules directly. No replacement service, framework, database, authentication layer, or duplicate JavaScript calculation path is authorized.
 
-The following premises are rejected and must not become tasks or implementation requirements:
+The closed slugs remain closed and must not be reopened. Authentication and athlete ownership are intentionally demoted because this remains a local, single-athlete system with no current multi-user requirement.
 
-- 55/56/59 activity reconciliation
-- HR-zone distributions
-- OPENCODE_INSTRUCTIONS.md
-- A 56-activity corpus
-
-The dashboard integration may preserve raw FIT display routes, but raw FIT routes must not remain the authoritative source for the new canonical activity, load, or coaching panels.
+Rejected premises remain rejected: 55/56/59 reconciliation, HR-zone distributions, OPENCODE_INSTRUCTIONS.md, and a 56-activity corpus must not become implementation requirements or backlog tasks.
 
 ---
 ## PRIMARY TASK
+
 ### connect-dashboard-to-data-layer
 
-Connect dashboard/index.html to the existing tested data layer through garmin_server.py. Do not create a new service, framework, authentication layer, database, or replacement UI.
+Implement the server-backed dashboard integration without replacing the existing local workflow.
 
-#### Required inspection
+#### Scope and constraints
 
-Before editing, inspect:
+- Keep `dashboard/index.html` as the primary UI.
+- Keep `garmin_server.py` as the local HTTP server.
+- Use the existing data-layer modules:
+  - `activities.py` for canonical activity data.
+  - `loadcalc.py` for load calculations.
+  - `recommend.py` for coaching, refusal, and recommendation state.
+  - Existing provenance and review structures for uncertainty and unavailable data.
+- Do not introduce a new service, web framework, database, authentication layer, or duplicate calculation path.
+- Do not calculate canonical activities, load, or recommendations in JavaScript.
+- Do not parse FIT files directly from the browser.
+- Do not add synthetic activities, synthetic load records, HR-zone distributions, unsupported classifications, or inferred athlete profile values.
 
-- garmin_server.py route registration, request parsing, response helpers, and error conventions.
-- The callable interfaces and return structures in activities.py, loadcalc.py, and recommend.py.
-- The migration-backed persistence interfaces used by the existing data layer.
-- dashboard/index.html to identify inline arrays, raw FIT fetches, and the panels that represent activities, load, and coaching.
+#### Inspect the existing interfaces
 
-Use the actual module interfaces found in the repository. Do not invent function names or duplicate calculations in the server or browser.
+Before editing, inspect the public functions, data structures, and error behavior in:
 
-#### Required server routes
+- `activities.py`
+- `loadcalc.py`
+- `recommend.py`
+- `garmin_server.py`
+- `dashboard/index.html`
 
-Add same-origin JSON routes to garmin_server.py:
+Reuse the existing interfaces wherever possible. If an adapter is needed, keep it in `garmin_server.py` or a small existing server-side module and make it a thin serialization layer. Do not create a second interpretation of the activity corpus.
 
-##### GET /api/activities
+#### Add JSON API routes to garmin_server.py
 
-- Call the existing activities.py data-layer interface.
-- Read canonical activity records from the migration-backed data source.
-- Do not rebuild the activity list from raw FIT files in the route.
-- Preserve activity provenance, review status, timezone status, and any other status fields returned by the data layer.
-- Return a stable JSON response using the server's existing response conventions.
-- Preserve the authoritative 57-activity corpus without adding synthetic records.
+Add localhost JSON routes using the server's existing routing conventions:
 
-##### GET /api/load
+- `GET /api/activities`
+  - Return the canonical activity collection from `activities.py`.
+  - Include the authoritative activity count and activity rows.
+  - Preserve activity identifiers, timestamps, dates, sport/type, duration, distance, and other fields already exposed by the data layer.
+  - Include review and provenance fields when available.
+  - Preserve unresolved timezone status rather than silently normalizing it away.
 
-- Call loadcalc.py for the requested load windows.
-- Support 7-day, 14-day, and 28-day windows through a query parameter or one stable response containing all three windows.
-- Prefer a stable response containing all three windows if that matches the existing module interface and avoids repeated requests.
-- Return calculated values together with availability, refusal, provenance, and review metadata supplied by the data layer.
-- Do not convert null, unavailable, or refused values into numeric zero.
-- Preserve strength_load as null when no confirmed strength history exists.
-- Do not calculate or expose HR-zone distributions.
+- `GET /api/load`
+  - Return the load values produced by `loadcalc.py`.
+  - Include the 7-day, 14-day, and 28-day windows.
+  - Include the calculation status and relevant provenance or limitation state.
+  - Preserve null, missing, provisional, and refused values without converting them to zero.
+  - Ensure unresolved reviews affect the response according to the existing load policy.
 
-Malformed window parameters must produce a clear client error response. Internal data-layer failures must produce a controlled JSON error without a normal browser stack trace.
+- `GET /api/coaching`
+  - Return recommendation and coaching state from `recommend.py`.
+  - Include the control state, recommendation status, refusal state, rationale, and input provenance.
+  - Expose missing, unresolved, provisional, derived, available, and refused inputs.
+  - Preserve `strength_load: null` as null.
+  - Return the refusal reason when the recommendation system refuses to provide a recommendation.
 
-##### GET /api/coaching
+Route names may follow existing local conventions if equivalent routes are already present, but the dashboard must have stable JSON endpoints with the behavior above. Responses must include an appropriate JSON content type and controlled error payloads.
 
-- Call recommend.py directly.
-- Return the current coaching or refusal state, rationale, blocking conditions, and relevant provenance and review fields exposed by the module.
-- Preserve all distinctions between available, provisional, unavailable, refused, null, and numeric zero.
-- Ensure unresolved timezone reviews can remain visible in the response and can block recommendations where the existing policy requires refusal.
-- Do not add unsupported coaching claims or fabricate strength, weather, continuity, or HR-zone inputs.
+#### Preserve provenance and refusal semantics
 
-#### Route behavior and failure handling
+The API and UI must make limitations visible:
 
-- Reuse existing server routing and JSON serialization conventions.
-- Do not silently fall back to raw FIT calculations when a canonical data-layer call fails.
-- Return appropriate status codes for malformed requests and internal failures.
-- Keep error bodies machine-readable and safe for browser display.
-- Do not expose Python stack traces in normal API responses.
-- Keep existing raw FIT routes, including fit-list and fit/<name>, functional.
+- The 57 `timezone_uncertain` reviews and 1 `activity_gap` review must remain represented in review or provenance state.
+- Relevant recommendations must remain refused while required timezone reviews are unresolved.
+- Missing profile fields must remain missing.
+- `strength_load` null must remain distinct from numeric zero.
+- No unresolved review may be hidden by a browser-side fallback.
+- No unsupported HR-zone chart or HR-zone classification may be added.
+- No synthetic activity or load record may be generated.
 
-#### Required dashboard changes
+Use a consistent response shape where practical, for example an object containing `data`, `status`, `provenance`, `reviews`, and `errors`. Match existing project conventions when they differ. The exact shape is implementation-owned, but it must be documented in code or tests and consumed consistently by the dashboard.
 
-Update dashboard/index.html to make same-origin fetch requests to the new routes:
+#### Replace the dashboard authoritative data source
 
-- Fetch /api/activities for the canonical activity list.
-- Fetch /api/load for 7-day, 14-day, and 28-day load state.
-- Fetch /api/coaching for the current coaching or refusal state.
+Update `dashboard/index.html` so initial loading uses the server JSON routes.
 
-Render the API responses in the relevant dashboard panels:
+- Fetch `/api/activities`, `/api/load`, and `/api/coaching` through the same origin.
+- Render API responses as the authoritative state.
+- Remove the approximately 54 inline JavaScript arrays as authoritative state.
+- Legacy arrays may remain only as explicitly marked fallback or debug data if removal would break compatibility; they must never override successful API responses.
+- Do not allow fallback data to hide API errors or unresolved review state.
+- Keep existing `fit-list` and `fit/<name>` behavior unless verification shows that a route is no longer needed.
+- Ensure the page is loaded through `garmin_server.py`, not opened as a standalone file.
 
-- Show canonical activities from the activities response.
-- Show 7-day, 14-day, and 28-day load values or their explicit unavailable/refused states.
-- Show coaching status, rationale, and blocking conditions.
-- Show review and provenance indicators where the API provides them.
-- Keep null visibly distinct from zero.
-- Keep unavailable visibly distinct from refused.
-- Keep provisional and derived states visibly distinct from confirmed values.
-- Keep the 57 timezone_uncertain reviews and the one activity_gap review visible through the activity or coaching status.
-- Preserve strength_load as null rather than displaying it as zero.
-- Do not claim a synthetic activity for the activity gap.
-- Do not introduce HR-zone displays.
+#### Render required dashboard state
 
-Remove or disable affected inline arrays as authoritative sources. Inline data may remain only for unrelated UI behavior or temporary loading and empty states. The canonical activity, load, and coaching panels must be populated from API responses.
+The dashboard must render:
 
-Keep unrelated dashboard behavior intact. Existing raw FIT display paths may remain available as supporting views, but the new canonical panels must not depend on those raw endpoints.
+- The canonical activity total and activity rows from `/api/activities`.
+- The 7-day load from `/api/load`.
+- The 14-day load from `/api/load`.
+- The 28-day load from `/api/load`.
+- Review counts and relevant provenance limitations.
+- Recommendation and coaching state from `/api/coaching`.
+- Refused recommendations with their refusal reason.
+- Missing values as missing or unavailable.
+- Provisional or unresolved values with a visible status.
+- Null strength data as unavailable or not recorded, never as zero.
 
-#### Tests and verification
+The interface may preserve its current visual presentation, but displayed activity, load, and coaching values must originate from the API responses.
 
-Add focused tests that verify:
+#### Add integration coverage
 
-- /api/activities returns the canonical activity response.
-- /api/load supports 7-day, 14-day, and 28-day requests.
-- /api/coaching returns the current coaching or refusal response.
-- Malformed load parameters produce a controlled client error.
-- Data-layer refusal states are returned without coercion.
-- Unavailable values remain unavailable.
-- null remains distinct from numeric zero.
-- strength_load remains null when no confirmed strength history exists.
-- Each route invokes the corresponding existing data-layer module.
-- The routes do not duplicate load or recommendation calculations.
-- Raw fit-list and fit/<name> routes still work.
+Add or update tests to verify:
 
-Run the existing test suite. The standing target is 207 passed / 1 skipped unless an implementation change legitimately changes the count. Report any changed count and explain the cause.
+- Each new API route returns JSON.
+- Each route uses the real `activities.py`, `loadcalc.py`, and `recommend.py` data-layer behavior.
+- The activities endpoint returns the standing corpus of 57 activities.
+- The load endpoint returns 7-day, 14-day, and 28-day values from `loadcalc.py`.
+- The coaching endpoint returns refusal state while relevant timezone reviews remain unresolved.
+- Review and provenance information is preserved in serialized responses.
+- `strength_load: null` is not converted to zero.
+- Malformed requests return controlled JSON errors.
+- Data-layer exceptions return controlled JSON errors without exposing an uncontrolled traceback to the browser.
+- The dashboard consumes API data and does not use inline arrays as authoritative state.
+- No second activity interpretation is introduced.
+- The existing baseline remains at 207 passed / 1 skipped, or any changed result is explained with direct evidence.
 
-Perform a localhost browser smoke test against dashboard/index.html. Verify through the browser network panel or equivalent evidence that:
+Do not write tests based on rejected premises. Do not add tests for HR-zone distributions, 55/56/59 reconciliation, a 56-activity corpus, or OPENCODE_INSTRUCTIONS.md.
 
-- The dashboard requests /api/activities.
-- The dashboard requests /api/load.
-- The dashboard requests /api/coaching.
-- The rendered canonical panels use returned API data rather than inline authoritative arrays.
-- Refused, unavailable, null, zero, and review states render distinctly.
-- Raw FIT display paths continue to work.
+#### Validate through the local workflow
 
-#### Completion criteria
+Run the existing test command and record the result. Then:
 
-Do not mark this task complete until all of the following are directly evidenced:
+1. Start `garmin_server.py`.
+2. Fetch `/api/activities` with a local HTTP client.
+3. Fetch `/api/load` with a local HTTP client.
+4. Fetch `/api/coaching` with a local HTTP client.
+5. Confirm each response is valid JSON and contains the required provenance and status fields.
+6. Load `dashboard/index.html` through the local server.
+7. Confirm the browser console has no data-loading errors.
+8. Confirm the activity table, load values, review state, and coaching state are API-backed.
+9. Confirm refused recommendations and null strength data are rendered correctly.
+10. Confirm legacy inline arrays do not override API responses.
+11. Confirm the existing `fit-list` and `fit/<name>` compatibility behavior remains intact.
+12. Report the final test result and the routes verified.
 
-- garmin_server.py exposes /api/activities, /api/load, and /api/coaching.
-- The routes call activities.py, loadcalc.py, and recommend.py.
-- dashboard/index.html fetches and renders the three API surfaces.
-- Inline authoritative activity, load, and coaching data is removed or disabled.
-- Review, provenance, refusal, unavailable, null, and zero semantics are preserved.
-- Raw FIT routes remain functional.
-- Focused tests pass.
-- The existing suite is run and its result is recorded.
-- Local browser smoke verification confirms API-backed rendering.
-- No synthetic activities, unsupported metrics, HR-zone classifications, or rejected corpus premises are introduced.
-
-No athlete decision is required. Endpoint shape, response wrapping, and the transition away from inline authoritative arrays are engineering decisions to be made from the existing module and server conventions. No question should be sent to the athlete for this task.
+No athlete-only decision is required for this implementation. Endpoint naming and response serialization should be chosen consistently by the implementation while preserving the existing dashboard presentation.
 
 ---
 ## BACKLOG (ranked, do not execute until primary task is done)
 
-Rank: high | complete-athlete-profile-and-timezone-provenance | Resolve remaining profile fields and document timezone provenance without weakening conservative refusal behavior; do not reopen profile-hr-max.
+rank: high | complete-athlete-profile-and-timezone-provenance | Complete supported profile fields and resolve or document the 57 timezone-uncertain reviews without inventing athlete data.
 
-Rank: high | formalize-continuity-review-without-synthetic-activities | Manage the remaining activity-gap review while retaining the prohibition on synthetic activities and synthetic load records.
+rank: high | formalize-continuity-review-without-synthetic-activities | Resolve the remaining activity-gap review using evidence and continuity documentation, never by creating synthetic activities or load records.
 
-Rank: medium-high | capture-confirmed-strength-history | Add a safe path for recording confirmed strength sessions while preserving strength_load=null when no confirmed history exists.
+rank: medium | capture-confirmed-strength-history | Add only athlete-confirmed strength sessions so null strength load remains distinct from zero.
 
-Rank: medium-high | implement-gated-weather-enrichment | Complete weather enrichment only when coordinates, provider behavior, provenance, and failure handling are evidenced.
+rank: medium | implement-gated-weather-enrichment | Use weather enrichment only when coordinates, provider observations, and the existing gate are available and auditable.
 
-Rank: medium | make-coaching-rationales-deterministic-and-auditable | Add deterministic fixtures and rationale snapshots for recommend.py, including explicit missing, provisional, derived, unavailable, and refused inputs.
+rank: medium | make-coaching-rationales-deterministic-and-auditable | Add deterministic fixtures and complete rationale snapshots for the existing refusal-first coaching states.
 
-Rank: medium | harden-bridge-and-release-quality-gates | Add CI, linting, formatting, type checks, dependency locking, and backup/restore verification without reopening closed bridge idempotency work.
+rank: medium | harden-bridge-and-release-quality-gates | Add appropriate CI, linting, formatting, dependency, and backup/restore safeguards while leaving closed bridge idempotency work closed.
 
-Rank: medium | document-conservative-training-signals | Document current training signals, refusal behavior, and missing-input handling without introducing HR-zone distributions.
+rank: medium | document-conservative-training-signals | Document missing, provisional, derived, available, and refused inputs without introducing unsupported HR-zone claims.
 
-Rank: medium-low | stabilize-running-load-before-progression | Complete broader load and progression validation after the dashboard exposes canonical load and refusal states; retain refusal when unresolved timezone reviews make a window unreliable.
+rank: medium | stabilize-running-load-before-progression | Complete running-load policy validation and fixtures while preserving refusal during unresolved timezone conditions.
 
-Rank: low | build-long-run-pace-durability | Develop only from evidenced distance-band, route, elevation, and split data; do not claim within-run pace decay without per-mile splits.
+rank: low | build-long-run-pace-durability | Establish evidence-based distance-band and route-comparable guidance without claiming within-run pace decay where per-mile splits are unavailable.
 
-Rank: low | introduce-conservative-runner-strength | Add strength recommendations only with explicit safety, injury, scheduling, and data-availability gates; do not fabricate strength load.
+rank: low | introduce-conservative-runner-strength | Define strength recommendation rules, injury gating, scheduling, and fixtures only after the null-strength safety boundary is preserved.
 
-Demoted | establish-authenticated-athlete-ownership | Authentication and multi-athlete ownership are not current priorities for this local, single-user, single-athlete system. Reconsider only if a second athlete or non-local deployment requirement is introduced.
+rank: demoted-last | establish-authenticated-athlete-ownership | Defer authentication and athlete ownership until a second athlete or multi-user requirement exists; the current system remains local and single-athlete.
 
 ---
 ## NEXT SUPERVISOR CHECK
 
-connect-dashboard-to-data-layer | Verify that garmin_server.py exposes the three API routes, each route invokes the existing data-layer module, dashboard/index.html fetches and renders those responses, review and null/refused semantics are preserved, raw FIT routes still work, focused tests pass, the standing suite result is recorded, and localhost browser smoke evidence confirms API-backed rendering.
+connect-dashboard-to-data-layer | Verify that `garmin_server.py` serves the new JSON routes, that dashboard/index.html consumes them as its authoritative source, that 57 activities are rendered from the data layer, that 7-day, 14-day, and 28-day loads are server-backed, that unresolved reviews and refusal state remain visible, that null strength data is not rendered as zero, and that the test baseline is 207 passed / 1 skipped or has a directly documented variance.
 
-complete-athlete-profile-and-timezone-provenance | Verify whether unresolved profile fields and the 57 timezone_uncertain reviews have been documented or resolved without weakening refusal behavior.
+complete-athlete-profile-and-timezone-provenance | Recheck supported profile fields and the count and provenance of the 57 timezone_uncertain reviews.
 
-formalize-continuity-review-without-synthetic-activities | Verify the single activity_gap review remains honestly represented and that no synthetic activity or load record was created.
+formalize-continuity-review-without-synthetic-activities | Recheck the remaining activity_gap review and confirm no synthetic activity or load record was introduced.
 
-capture-confirmed-strength-history | Verify any recorded strength sessions are confirmed and that missing strength history remains null rather than zero.
+capture-confirmed-strength-history | Recheck whether any strength session is athlete-confirmed and ensure null remains distinct from zero.
 
-implement-gated-weather-enrichment | Verify provider-backed weather observations have coordinates, provenance, and failure handling before any enrichment is treated as available.
+implement-gated-weather-enrichment | Recheck coordinates, provider-backed observations, and weather gate behavior.
 
-make-coaching-rationales-deterministic-and-auditable | Verify deterministic fixtures and rationale snapshots cover available, provisional, unavailable, refused, and missing-input states.
+make-coaching-rationales-deterministic-and-auditable | Recheck deterministic fixtures, rationale snapshots, and refusal-first behavior.
 
-stabilize-running-load-before-progression | Verify load and progression policies remain conservative while unresolved timezone reviews affect the relevant window.
+stabilize-running-load-before-progression | Recheck timezone review gating, running-load fixtures, and progression refusal behavior.
 
-build-long-run-pace-durability | Verify no unsupported within-run pace-decay claim is made without per-mile splits.
+build-long-run-pace-durability | Recheck evidence for distance-band guidance and confirm no unsupported within-run pace decay claim.
 
-introduce-conservative-runner-strength | Verify recommendations preserve safety gates and do not convert absent strength history into zero.
+introduce-conservative-runner-strength | Recheck strength safety boundaries, recommendation rules, injury gating, and fixtures.
 
-harden-bridge-and-release-quality-gates | Verify release-quality tooling, dependency locking, and backup/restore evidence are present without reopening closed transport work.
+harden-bridge-and-release-quality-gates | Recheck quality-gate configuration while preserving the closed bridge idempotency evidence.
 
-document-conservative-training-signals | Verify documentation identifies missing, provisional, derived, unavailable, and refused inputs and contains no HR-zone distribution claims.
+document-conservative-training-signals | Recheck that generated rationales identify missing, provisional, derived, available, and refused inputs without adding HR-zone claims.
+
+establish-authenticated-athlete-ownership | Recheck that authentication remains demoted and is not treated as a prerequisite for dashboard integration.
