@@ -301,17 +301,25 @@ def write_facts(path=None, commit=None, code_sha=None, visibility=None):
 
 
 def facts_digest(doc):
-    """Content digest of a facts document.
+    """Content digest of a facts document: did the substance change?
 
-    Excludes two fields on purpose:
+    Three fields are excluded, each for its own reason, and all three were bugs
+    before they were fields:
 
-    * `generated_utc`, because a fresh stamp on otherwise identical figures is
-      not a change. Hashing it would make every scheduled run look like new
-      data and commit forever.
-    * `facts_sha` itself, because a digest cannot cover its own output.
+    * `generated_utc` - a fresh stamp on identical figures is not a change.
+      Hashing it made every scheduled run commit.
+    * `facts_sha` - a digest cannot cover its own output.
+    * `commit` - this is the subtlest one. `commit` is the HEAD the publisher is
+      about to commit *onto*, so including it made the document differ from
+      itself the instant it was committed: HEAD moved, next run wrote a new
+      HEAD, hash differed, committed again. An unbounded loop, twice a day.
+      Proven in RUN 1/2/3 and diagnosed by zeroing this one field.
+
+    So the digest covers only what the publisher observes: corpus counts, review
+    breakdown, test results, split availability, coaching state, visibility.
     """
     stable = {k: v for k, v in doc.items()
-              if k not in ("generated_utc", "facts_sha")}
+              if k not in ("generated_utc", "facts_sha", "commit")}
     return hashlib.sha256(
         json.dumps(stable, sort_keys=True).encode("utf-8")).hexdigest()
 

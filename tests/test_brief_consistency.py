@@ -267,3 +267,23 @@ def test_two_generations_of_the_same_state_agree(tmp_path):
         "regenerating facts must be idempotent, or the publisher commits on "
         "every scheduled run no matter what changed")
     assert a["generated_utc"] != b["generated_utc"]
+
+
+def test_facts_digest_excludes_the_commit_it_describes():
+    """The loop this prevents: commit is HEAD, committing moves HEAD.
+
+    If commit were inside the digest, publishing would rewrite the facts with
+    the HEAD it is committing onto, that commit would move HEAD, and the next
+    scheduled run would differ again - committing forever with no change in the
+    underlying data. Verified live before this test existed.
+    """
+    base = {"corpus": {"fit_files": 58}, "generated_utc": "x"}
+    assert B.facts_digest(dict(base, commit="aaaaaaa")) == \
+        B.facts_digest(dict(base, commit="bbbbbbb"))
+
+
+def test_facts_digest_still_tracks_visibility():
+    """Excluding volatile fields must not blind it to a real change."""
+    base = {"corpus": {"fit_files": 58}}
+    assert B.facts_digest(dict(base, repo_visibility="public")) != \
+        B.facts_digest(dict(base, repo_visibility="private"))
