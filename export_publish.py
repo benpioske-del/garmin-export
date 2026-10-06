@@ -926,6 +926,16 @@ def raw_url(remote, branch):
         m.group(1), m.group(2), branch, CANON)
 
 
+def _file_sha(path):
+    """Content digest of one file, or None if it cannot be read."""
+    if not os.path.isfile(path):
+        return None
+    hc = hashlib.sha256()
+    with open(path, "rb") as fh:
+        hc.update(fh.read())
+    return hc.hexdigest()
+
+
 def build_commit_message(run_count, latest_run, staged, export_only):
     """Commit message that describes what is actually in the commit.
 
@@ -1079,7 +1089,30 @@ def main():
     # of it, otherwise the push is rejected and the local clone stays wedged.
     sync_with_remote(branch)
 
-    if prev.get("data_sha") == data_sha and prev.get("code_sha") == code_sha:
+    # Regenerate the facts a brief is supposed to quote, before the change
+    # detection below, so it tracks reality on a quiet run too. A brief that
+    # cannot fetch prose can still fetch this, and it carries the commit it
+    # describes so a stale copy is recognisable as stale.
+    #
+    # This runs before the early return on purpose. When it ran after, a week
+    # with no new activities and no code change returned early and left the
+    # facts file describing an older commit, which is the exact staleness the
+    # file exists to prevent.
+    tracked_facts = []
+    facts_sha = None
+    try:
+        import brief_consistency
+        brief_consistency.write_facts(code_sha=code_sha, visibility=visibility)
+        tracked_facts = [FACTS]
+        facts_sha = _file_sha(os.path.join(REPO, FACTS))
+        print("facts        : %s regenerated" % FACTS)
+    except Exception as exc:
+        # A missing facts file is a degraded brief, not a failed publish. The
+        # CSV is the product; this is the annotation on it.
+        print("facts        : could not regenerate (%s)" % exc)
+
+    if (prev.get("data_sha") == data_sha and prev.get("code_sha") == code_sha
+            and prev.get("facts_sha") == facts_sha):
         run(["git", "checkout", "--", META, "publish_state.json"])
         print("data unchanged since last publish - no commit needed.")
         report_tasks()
@@ -1090,21 +1123,10 @@ def main():
         json.dump({"raw_url": url, "branch": branch, "at": meta["generated_utc"],
                    "run_count": meta["run_count"], "latest_run": meta["latest_run"],
                    "data_sha": data_sha, "code_sha": code_sha,
+                   "facts_sha": facts_sha,
                    "repo_visibility": "%s - probed %s" % (visibility, datetime.now(timezone.utc).isoformat())},
                   fh, indent=2)
         fh.write("\n")
-
-    # Regenerate the machine-readable facts a brief is supposed to quote. A brief
-    # that cannot fetch prose can still fetch this, and it carries the commit it
-    # describes so a stale copy is recognisable as stale.
-    try:
-        import brief_consistency
-        brief_consistency.write_facts(commit=code_sha, visibility=visibility)
-        tracked_facts = [FACTS]
-        print("facts        : %s regenerated" % FACTS)
-    except Exception as exc:
-        tracked_facts = []
-        print("facts        : could not regenerate (%s)" % exc)
 
     tracked = [CANON, META, ".gitignore", "publish_state.json"] + tracked_facts
     for extra in ("CREW_BRIEF.md", "profile.json", "CREW_TASKS.md",

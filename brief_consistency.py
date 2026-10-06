@@ -240,14 +240,18 @@ def dashboard_conflict():
     return None
 
 
-def write_facts(path=None, commit=None, visibility=None):
+def write_facts(path=None, commit=None, code_sha=None, visibility=None):
     """Write brief_facts.json: the numbers, machine-generated, for a brief to read.
 
     `CREW_BRIEF.md` states these figures in prose, which is fine for a reader and
     useless as a source: prose ages, and a writer that fetches nothing has no way
     to tell current from stale. This file is regenerated on every publish and
-    carries a commit and a timestamp, so a brief can quote it instead of
-    remembering it.
+    carries the commit it describes, so a brief can quote it instead of
+    remembering it, and a stale copy is recognisable as stale.
+
+    `commit` is a git SHA and `code_sha` is the publisher's content digest. They
+    are different things and are recorded separately: a reader who wants to check
+    out the commit needs a real SHA, and conflating them makes the field a lie.
 
     Counts and states only. No activity identifiers, no timestamps of individual
     activities, nothing GPS-bearing: this file is published.
@@ -263,6 +267,7 @@ def write_facts(path=None, commit=None, visibility=None):
             "unreadable, say so; do not fill the gap from memory."),
         "generated_utc": _utcnow(),
         "commit": commit,
+        "code_sha": code_sha,
         "repo_visibility": visibility,
         "corpus": {
             "fit_files": facts.get("fit_files"),
