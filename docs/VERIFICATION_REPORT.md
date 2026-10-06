@@ -16,7 +16,7 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-440 passed, 1 skipped (441 collected)
+446 passed, 1 skipped (447 collected)
 ```
 
 | File | Tests |
@@ -37,8 +37,8 @@ $ python -m pytest
 | `tests/test_history_safety.py` | 2 |
 | `tests/test_publish_scope.py` | 17 |
 | `tests/test_publish_flow.py` | 50 |
-| `tests/test_brief_consistency.py` | 21 |
-| **Total** | **441** (440 pass, 1 skip) |
+| `tests/test_brief_consistency.py` | 27 |
+| **Total** | **447** (446 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -188,6 +188,40 @@ columns.
 coordinate, because a decimal such as `44.95` is indistinguishable from
 legitimate training data. Manual review remains necessary. This is recorded in
 the inventory rather than papered over.
+
+### `brief_facts.json` regeneration, and the loop it briefly caused
+
+The publisher now regenerates `brief_facts.json` on every run so a brief can
+quote machine-readable figures instead of recalling them. Regenerating it also
+means deciding whether anything actually changed, and that decision briefly went
+wrong in a way worth recording:
+
+`export_publish.py` decides to stand down by comparing recorded digests against
+current ones. Three fields had to be excluded from the facts digest before that
+comparison was correct, and each exclusion was found by watching it fail:
+
+| Field | Why it had to go |
+| --- | --- |
+| `generated_utc` | A fresh stamp on identical figures is not a change. Hashing it made every run commit. |
+| `facts_sha` | A digest cannot cover its own output. |
+| `commit` | The subtle one. `commit` is HEAD, so publishing moved the value being hashed: HEAD moved, the file recorded the new HEAD, the digest differed, it committed again. Unbounded. |
+
+The third one is self-reference, not a timestamp bug, and it is the reason
+`commit` sits outside the digest while still being published in the file. The
+first two attempts are visible in history as six commits sharing the message
+`garmin export: 58 runs, latest 2026-10-01`; they are harmless and were already
+pushed, so they were left rather than force-rewritten.
+
+Verification is a three-run check: run twice with no data change and the second
+run must print `data unchanged since last publish - no commit needed.` and leave
+`git status` clean. The early-return path restores `brief_facts.json` along with
+`publish_state.json`, because a quiet run rewrites its timestamp and would
+otherwise leave the tree permanently dirty.
+
+Pinned by `test_facts_digest_ignores_the_timestamp`,
+`test_facts_digest_excludes_the_commit_it_describes`, and
+`test_two_generations_of_the_same_state_agree` in
+`tests/test_brief_consistency.py`.
 
 ## Privacy checks
 
