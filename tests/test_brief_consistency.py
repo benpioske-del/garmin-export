@@ -235,3 +235,35 @@ def test_facts_file_is_not_itself_a_source_of_staleness(tmp_path):
     doc = B.write_facts(path=str(tmp_path / "f.json"), commit="deadbee")
     assert doc["generated_utc"].endswith("Z")
     assert doc["commit"] == "deadbee"
+
+def test_facts_digest_ignores_the_timestamp():
+    """A fresh stamp on identical figures is not a change.
+
+    The publisher decides whether to commit by comparing facts_sha. If the
+    digest covered generated_utc, every scheduled run would look like new data
+    and commit twice a day forever, which is the exact churn the early-return
+    exists to prevent.
+    """
+    d1 = {"generated_utc": "2026-10-05T00:00:00Z", "corpus": {"fit_files": 58}}
+    d2 = {"generated_utc": "2026-10-06T00:00:00Z", "corpus": {"fit_files": 58}}
+    assert B.facts_digest(d1) == B.facts_digest(d2)
+
+
+def test_facts_digest_notices_a_real_change():
+    d1 = {"generated_utc": "2026-10-05T00:00:00Z", "corpus": {"fit_files": 58}}
+    d2 = {"generated_utc": "2026-10-05T00:00:00Z", "corpus": {"fit_files": 59}}
+    assert B.facts_digest(d1) != B.facts_digest(d2)
+
+
+def test_written_facts_carry_the_digest_they_were_measured_by(tmp_path):
+    doc = B.write_facts(path=str(tmp_path / "f.json"))
+    assert doc["facts_sha"] == B.facts_digest(doc)
+
+
+def test_two_generations_of_the_same_state_agree(tmp_path):
+    a = B.write_facts(path=str(tmp_path / "a.json"))
+    b = B.write_facts(path=str(tmp_path / "b.json"))
+    assert a["facts_sha"] == b["facts_sha"], (
+        "regenerating facts must be idempotent, or the publisher commits on "
+        "every scheduled run no matter what changed")
+    assert a["generated_utc"] != b["generated_utc"]

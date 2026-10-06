@@ -28,6 +28,7 @@ are claims with no evidence attached, which is the thing worth surfacing.
 """
 import argparse
 import glob
+import hashlib
 import json
 import os
 import re
@@ -292,10 +293,27 @@ def write_facts(path=None, commit=None, code_sha=None, visibility=None):
         "published": False,
     }
     doc["coaching"] = _coaching_facts()
+    doc["facts_sha"] = facts_digest(doc)
     with open(path, "w", encoding="utf-8") as fh:
         json.dump(doc, fh, indent=2, sort_keys=False)
         fh.write("\n")
     return doc
+
+
+def facts_digest(doc):
+    """Content digest of a facts document.
+
+    Excludes two fields on purpose:
+
+    * `generated_utc`, because a fresh stamp on otherwise identical figures is
+      not a change. Hashing it would make every scheduled run look like new
+      data and commit forever.
+    * `facts_sha` itself, because a digest cannot cover its own output.
+    """
+    stable = {k: v for k, v in doc.items()
+              if k not in ("generated_utc", "facts_sha")}
+    return hashlib.sha256(
+        json.dumps(stable, sort_keys=True).encode("utf-8")).hexdigest()
 
 
 def _utcnow():

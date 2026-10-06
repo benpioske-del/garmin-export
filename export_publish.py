@@ -1102,9 +1102,9 @@ def main():
     facts_sha = None
     try:
         import brief_consistency
-        brief_consistency.write_facts(code_sha=code_sha, visibility=visibility)
+        doc = brief_consistency.write_facts(code_sha=code_sha, visibility=visibility)
         tracked_facts = [FACTS]
-        facts_sha = _file_sha(os.path.join(REPO, FACTS))
+        facts_sha = doc.get("facts_sha")
         print("facts        : %s regenerated" % FACTS)
     except Exception as exc:
         # A missing facts file is a degraded brief, not a failed publish. The
