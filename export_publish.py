@@ -1113,7 +1113,13 @@ def main():
 
     if (prev.get("data_sha") == data_sha and prev.get("code_sha") == code_sha
             and prev.get("facts_sha") == facts_sha):
-        run(["git", "checkout", "--", META, "publish_state.json"])
+        # Restore everything written above. The facts file is in that list
+        # now: a quiet run rewrites it with a new generated_utc but decides not
+        # to commit, which would otherwise leave the tree permanently dirty.
+        restore = [META, "publish_state.json"]
+        if FACTS in tracked_facts:
+            restore.append(FACTS)
+        run(["git", "checkout", "--"] + restore)
         print("data unchanged since last publish - no commit needed.")
         report_tasks()
         print("raw url     : %s" % url)
