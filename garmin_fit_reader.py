@@ -117,6 +117,31 @@ def pace_str(min_per_mile):
     return "%d:%02d" % (total // 60, total % 60)
 
 
+def _best_5k_seconds(fit, start):
+    """Elapsed seconds at the first record whose cumulative distance >= 5000 m.
+
+    Only distance and timestamps are read. Position fields are never touched;
+    the row-level GPS guard in assert_no_gps covers the columns, and this
+    routine never looks at latitude/longitude fields by name or value.
+    """
+    if not start:
+        return None
+    for rec in fit.get_messages("record"):
+        d = {f.name: f.value for f in rec}
+        dist = d.get("distance")
+        ts = d.get("timestamp")
+        if not dist or dist < 5000.0 or not ts:
+            continue
+        try:
+            delta = (ts - start).total_seconds()
+        except Exception:  # a fixture or file with a non-datetime timestamp
+            continue
+        if delta <= 0:
+            continue
+        return delta
+    return None
+
+
 def pace_from_speed(mps):
     # Pace is time per mile, so this DIVIDES by speed. 1609.344 m per mile,
     # then seconds -> minutes. (Multiplying here inverts the ranking and makes
@@ -180,6 +205,16 @@ def read_fit(path):
         if lt and (not best_lap or t < hms_sec(best_lap)):
             best_lap = lt
 
+    # Measured 5 km crossing: the clock time at which the distance curve reaches
+    # 5000 m, from per-record cumulative distance and timestamps. Not an average
+    # pace projection. Includes any stops before the crossing, so it is recorded
+    # as a measurement, not as a "PR" - see docs/SPLITS_AUDIT.md.
+    _five_k_seconds = _best_5k_seconds(fit, start)
+    five_k = pace_str(_five_k_seconds / 60.0) if _five_k_seconds else ""
+
+    # Splits the device cut, in "M:SS" each (d >= 0.95 mi already filtered).
+    lap_splits = ", ".join(pace_str(t / 60.0) for d, t, lap in laps)
+
     # One altitude sample per record. Previously this appended both
     # enhanced_altitude and altitude when a record carried both, interleaving two
     # series into a single list; they happen to be identical on current firmware
@@ -223,6 +258,8 @@ def read_fit(path):
         "Max Run Cadence": s.get("max_running_cadence") or "",
         "Avg Pace": pace_str((timer_s / 60.0) / dist_mi),
         "Best Pace": best_pace,
+        "Best 5K Time": five_k,
+        "Lap Splits": lap_splits,
         "Total Ascent": round((s.get("total_ascent") or 0) * M_TO_FT),
         "Total Descent": round((s.get("total_descent") or 0) * M_TO_FT),
         "Avg Stride Length": (round(s["avg_step_length"] * M_TO_FT)

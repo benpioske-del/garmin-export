@@ -240,7 +240,9 @@ source. Re-derive it if you can.
 | Activities | 58 | `SELECT COUNT(*) FROM activities` |
 | Open reviews | 59 | 58 `timezone_uncertain` + 1 `activity_gap` |
 | FIT files with lap records | 58 of 58 | `python brief_consistency.py` |
-| Tests | 429 passed, 1 skipped (430 collected) | `python -m pytest` |
+| Splits published | yes (`Best 5K Time`, `Lap Splits`) | header of `garmin_export.csv` |
+| Fastest measured 5 km crossing | 24:42 on 2026-06-16, measured | `brief_facts.json` → `best_5k` |
+| Tests | 446 passed, 1 skipped (447 collected) | `python -m pytest` |
 | Dashboard API routes | 3, implemented and tested | `python dashboard_contract.py` |
 | Dashboard consumes the API | yes, all three | `python dashboard_contract.py` |
 
@@ -251,7 +253,8 @@ against a real bound HTTP server. Four briefs have asked for this work. Do not
 rebuild it. Verify with `python dashboard_contract.py`, which prints `PASS`.
 
 The task queue is `tasks/`, which holds two files: `001-example-task.md` (a
-placeholder) and `002-log-a-5k-pr.md` (blocked on published per-mile splits).
+placeholder) and `002-log-a-5k-pr.md` (**done** - the measured 5 km crossing is
+24:42 on 2026-06-16, in `best_5k`).
 `SUPERVISOR_BRIEF.md` is prose and is not the queue. A brief naming a task with no
 file in `tasks/` is not a task.
 
@@ -263,23 +266,26 @@ file in `tasks/` is not a task.
 - Sample size is small. The run count (see `garmin_export.meta.json`) supports a
   trend, not a confident percentile.
 
-### Per-mile splits: available locally, not yet published
+### Splits: measured 5 km crossing, now published
 **Do not claim per-mile splits are unavailable.** They are not. Every one of the 58
-local `.FIT` files carries lap records, at roughly one-mile intervals, and
-`garmin_export.csv` exposes only `Best Lap Time`. A previous brief asserted the data
-did not exist and used that to rule out within-run pace-decay analysis; that was wrong,
-and it is the reason task `002` is still blocked.
+FIT files carries lap records, and since this publish `garmin_export.csv` has two
+new columns:
 
-Two things follow:
+- **`Best 5K Time`** - the measured clock time at which the distance curve first
+  reaches 5 km, per activity. Not a projection from average pace.
+- **`Lap Splits`** - the device's auto-lap times.
 
-- A 5K time can be **measured** from laps rather than projected from average pace.
-  Until the coach publishes a splits column, the published schema still cannot support
-  that, so a PR remains unprovable *from this repo alone*.
-- `Number of Laps` and `Best Lap Time` are FIT-only columns, so a CSV-only row has no
-  split information at all. Check `_source_file` before reasoning about laps.
+`brief_facts.json` carries the fastest measured crossing across the corpus along
+with its date. **Measured, not a PR**: a crossing that contains a stop is the
+clock time at the distance, not the quality of the effort. Treat any mark as a
+measurement unless the runner confirms it was a genuine attempt.
 
-The `.FIT` files are local-only and are never published. If the crew needs split-level
-data, ask the coach to publish a splits column; do not infer that it does not exist.
+Task `002` previously dragged the requested "24:34 on 2026-05-21" because that
+figure contradicted the logs. The export can now support a measured mark; keep
+quoting `brief_facts.json` rather than recalling any number.
+
+`Source File` still matters: `Best Lap Time`, `Number of Laps`, `Best 5K Time`
+and `Lap Splits` are FIT-only, so a CSV-only row carries no split information.
 
 ---
 

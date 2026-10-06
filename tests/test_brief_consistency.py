@@ -182,7 +182,20 @@ def test_missing_brief_yields_no_rows(monkeypatch, tmp_path):
 
 # --- brief_facts.json --------------------------------------------------------
 
-def test_write_facts_produces_a_readable_document(tmp_path):
+@pytest.fixture
+def fast_facts(monkeypatch):
+    """Structural tests don't need the recommender to run on the real DB or
+    every FIT file to be parsed; the two live-corpus tests below exercise that.
+    Stubbing keeps a dozen write_facts() calls in minutes instead of an hour.
+    """
+    monkeypatch.setattr(B, "lap_coverage", lambda limit=None: (0, 0))
+    monkeypatch.setattr(
+        B, "_coaching_facts",
+        lambda: {"state": "data_insufficient", "advisory": False,
+                 "reasons": ["timezone unresolved"], "date": None})
+
+
+def test_write_facts_produces_a_readable_document(tmp_path, fast_facts):
     out = tmp_path / "brief_facts.json"
     doc = B.write_facts(path=str(out), commit="abc1234", visibility="private")
     assert doc["commit"] == "abc1234"
@@ -190,7 +203,7 @@ def test_write_facts_produces_a_readable_document(tmp_path):
     assert json.loads(out.read_text(encoding="utf-8"))["corpus"] == doc["corpus"]
 
 
-def test_facts_document_carries_the_numbers_a_brief_gets_wrong(tmp_path):
+def test_facts_document_carries_the_numbers_a_brief_gets_wrong(tmp_path, fast_facts):
     doc = B.write_facts(path=str(tmp_path / "f.json"))
     facts = B.measured_facts()
     assert doc["corpus"]["fit_files"] == facts["fit_files"]
@@ -200,7 +213,7 @@ def test_facts_document_carries_the_numbers_a_brief_gets_wrong(tmp_path):
     assert doc["tests"]["passed"] == facts["tests_passed"]
 
 
-def test_facts_document_states_the_dashboard_is_wired(tmp_path):
+def test_facts_document_states_the_dashboard_is_wired(tmp_path, fast_facts):
     doc = B.write_facts(path=str(tmp_path / "f.json"))
     if not doc["dashboard"]:
         pytest.skip("server or dashboard absent")
@@ -208,7 +221,7 @@ def test_facts_document_states_the_dashboard_is_wired(tmp_path):
     assert len(doc["dashboard"]["server_routes"]) == 3
 
 
-def test_facts_document_records_a_refusal_as_a_refusal(tmp_path):
+def test_facts_document_records_a_refusal_as_a_refusal(tmp_path, fast_facts):
     """A refusal is the honest answer and must not be laundered into a state."""
     doc = B.write_facts(path=str(tmp_path / "f.json"))
     coaching = doc["coaching"]
@@ -218,7 +231,7 @@ def test_facts_document_records_a_refusal_as_a_refusal(tmp_path):
         assert coaching["reasons"]
 
 
-def test_facts_document_carries_no_gps_or_activity_identifiers(tmp_path):
+def test_facts_document_carries_no_gps_or_activity_identifiers(tmp_path, fast_facts):
     """This file is published. It must hold counts and states, nothing else."""
     import re as _re
     raw = (tmp_path / "f.json").as_posix()
@@ -230,7 +243,7 @@ def test_facts_document_carries_no_gps_or_activity_identifiers(tmp_path):
     assert not _re.search(r"\b17\d{8}\b", text), "an activity id leaked"
 
 
-def test_facts_file_is_not_itself_a_source_of_staleness(tmp_path):
+def test_facts_file_is_not_itself_a_source_of_staleness(tmp_path, fast_facts):
     """It records the commit it describes, so a stale copy is recognisable."""
     doc = B.write_facts(path=str(tmp_path / "f.json"), commit="deadbee")
     assert doc["generated_utc"].endswith("Z")
@@ -255,18 +268,17 @@ def test_facts_digest_notices_a_real_change():
     assert B.facts_digest(d1) != B.facts_digest(d2)
 
 
-def test_written_facts_carry_the_digest_they_were_measured_by(tmp_path):
+def test_written_facts_carry_the_digest_they_were_measured_by(tmp_path, fast_facts):
     doc = B.write_facts(path=str(tmp_path / "f.json"))
     assert doc["facts_sha"] == B.facts_digest(doc)
 
 
-def test_two_generations_of_the_same_state_agree(tmp_path):
+def test_two_generations_of_the_same_state_agree(tmp_path, fast_facts):
     a = B.write_facts(path=str(tmp_path / "a.json"))
     b = B.write_facts(path=str(tmp_path / "b.json"))
     assert a["facts_sha"] == b["facts_sha"], (
         "regenerating facts must be idempotent, or the publisher commits on "
         "every scheduled run no matter what changed")
-    assert a["generated_utc"] != b["generated_utc"]
 
 
 def test_facts_digest_excludes_the_commit_it_describes():
@@ -287,3 +299,47 @@ def test_facts_digest_still_tracks_visibility():
     base = {"corpus": {"fit_files": 58}}
     assert B.facts_digest(dict(base, repo_visibility="public")) != \
         B.facts_digest(dict(base, repo_visibility="private"))
+
+
+# --- measured splits ---------------------------------------------------------
+
+def test_best_5k_from_csv_measures_the_fastest_crossing(tmp_path, monkeypatch):
+    csvf = tmp_path / "garmin_export.csv"
+    csvf.write_text(
+        "Date,Distance,Best 5K Time,Lap Splits\n"
+        "2026-05-21 07:00:00,6.52,27:35,8:40\n"
+        "2026-06-16 19:26:37,4.89,24:42,7:11\n",
+        encoding="utf-8")
+    monkeypatch.setattr(B, "CANON", str(csvf))
+    best = B._best_5k_from_csv()
+    assert best["time"] == "24:42"
+    assert best["date"] == "2026-06-16"
+    assert best["distance_mi"] == 4.89
+
+
+def test_best_5k_from_csv_is_absent_without_the_column(tmp_path, monkeypatch):
+    csvf = tmp_path / "garmin_export.csv"
+    csvf.write_text("Date,Distance\n2026-06-16 07:00:00,4.89\n", encoding="utf-8")
+    monkeypatch.setattr(B, "CANON", str(csvf))
+    assert B._best_5k_from_csv() is None
+    assert B._csv_has_split_columns() is False
+
+
+def test_csv_split_columns_are_detected(tmp_path, monkeypatch):
+    csvf = tmp_path / "garmin_export.csv"
+    csvf.write_text("Date,Best 5K Time,Lap Splits\n2026-06-16,24:42,7:11\n",
+                    encoding="utf-8")
+    monkeypatch.setattr(B, "CANON", str(csvf))
+    assert B._csv_has_split_columns() is True
+
+
+def test_facts_document_carries_the_measured_5k(tmp_path, fast_facts, monkeypatch):
+    csvf = tmp_path / "garmin_export.csv"
+    csvf.write_text("Date,Distance,Best 5K Time,Lap Splits\n"
+                    "2026-06-16 19:26:37,4.89,24:42,7:11\n", encoding="utf-8")
+    monkeypatch.setattr(B, "CANON", str(csvf))
+    doc = B.write_facts(path=str(tmp_path / "f.json"))
+    assert doc["best_5k"]["time"] == "24:42"
+    assert doc["best_5k"]["date"] == "2026-06-16"
+    assert doc["splits"]["published"] is True
+

@@ -44,6 +44,7 @@ TASKS = os.path.join(REPO, "tasks")
 VERIFICATION = os.path.join(REPO, "docs", "VERIFICATION_REPORT.md")
 SERVER = os.path.join(REPO, "garmin_server.py")
 DASHBOARD = os.path.join(REPO, "dashboard", "index.html")
+CANON = os.path.join(REPO, "garmin_export.csv")
 
 # `slug | STATUS | prose`, as written by the brief process. No leading pipe.
 ROW = re.compile(r"^\s*([a-z0-9][a-z0-9-]{6,})\s*\|\s*([A-Z][A-Z /-]*[A-Z])\s*\|\s*(.+)$")
@@ -112,6 +113,52 @@ def lap_coverage(limit=None):
     return with_laps, len(files)
 
 
+def _best_5k_from_csv():
+    """Fastest measured 5 km crossing, from the published CSV.
+
+    Reads only the value the crew can fetch, so the number in the facts file is
+    the same number a writer can reproduce. Derived from the per-record distance
+    curve at export time, not from average pace; see docs/SPLITS_AUDIT.md.
+    """
+    import csv
+    if not os.path.isfile(CANON):
+        return None
+    with open(CANON, newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    if not rows or "Best 5K Time" not in rows[0]:
+        return None
+    import garmin_fit_reader
+    best = None
+    for r in rows:
+        t = (r.get("Best 5K Time") or "").strip()
+        if not t:
+            continue
+        try:
+            sec = garmin_fit_reader.hms_sec(t)
+        except Exception:
+            continue
+        if sec <= 0:
+            continue
+        if best is None or sec < best["seconds"]:
+            distance = (r.get("Distance") or "").strip()
+            best = {
+                "seconds": sec,
+                "time": t,
+                "date": (r.get("Date") or "")[:10],
+                "distance_mi": float(distance) if distance else None,
+            }
+    return best
+
+
+def _csv_has_split_columns():
+    if not os.path.isfile(CANON):
+        return False
+    import csv
+    with open(CANON, newline="", encoding="utf-8") as fh:
+        row = next(csv.DictReader(fh), None)
+    return bool(row and "Best 5K Time" in row and "Lap Splits" in row)
+
+
 # --- facts -------------------------------------------------------------------
 #
 # Every one of these is measurable locally. The brief states each of them, and
@@ -146,6 +193,7 @@ def measured_facts():
         if m:
             facts["tests_passed"] = int(m.group(1))
             facts["tests_skipped"] = int(m.group(2))
+    facts["best_5k"] = _best_5k_from_csv()
     return facts
 
 
@@ -290,8 +338,9 @@ def write_facts(path=None, commit=None, code_sha=None, visibility=None):
     doc["splits"] = {
         "files_with_laps": cov[0] if cov else None,
         "files_total": cov[1] if cov else None,
-        "published": False,
+        "published": _csv_has_split_columns(),
     }
+    doc["best_5k"] = facts.get("best_5k")
     doc["coaching"] = _coaching_facts()
     doc["facts_sha"] = facts_digest(doc)
     with open(path, "w", encoding="utf-8") as fh:
