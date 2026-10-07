@@ -16,7 +16,7 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-455 passed, 1 skipped (456 collected)
+464 passed, 1 skipped (465 collected)
 ```
 
 | File | Tests |
@@ -24,7 +24,7 @@ $ python -m pytest
 | `tests/test_dashboard_contract.py` | 36 |
 | `tests/test_recommend_snapshots.py` | 23 |
 | `tests/test_training_data.py` | 59 |
-| `tests/test_brief_bridge.py` | 56 |
+| `tests/test_brief_bridge.py` | 62 |
 | `tests/test_dashboard_api.py` | 38 |
 | `tests/test_trainloop_cli.py` | 22 |
 | `tests/test_dashboard_api_http.py` | 22 |
@@ -38,8 +38,8 @@ $ python -m pytest
 | `tests/test_history_safety.py` | 2 |
 | `tests/test_publish_scope.py` | 17 |
 | `tests/test_publish_flow.py` | 50 |
-| `tests/test_brief_consistency.py` | 31 |
-| **Total** | **456** (455 pass, 1 skip) |
+| `tests/test_brief_consistency.py` | 34 |
+| **Total** | **465** (464 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -50,10 +50,17 @@ The skip is the Windows symlink case in the brief-bridge suite; the code path is
 covered on platforms that permit symlinks.
 
 Up from 90 passed / 1 skipped at the start of the data-layer round. The brief
-bridge grew from 26 to 56 tests since then: clipboard and `.txt` transports,
+bridge grew from 26 to 62 tests since then: clipboard and `.txt` transports,
 rejected-brief staging, and a `frozen_clock` fixture that advances the clock 90
 seconds to prove republishing an unchanged brief is a no-op. `test_trainloop_cli.py`
 is new.
+
+The facts gate came last: 6 bridge tests pin a brief being refused when its
+numbers contradict `measured_facts()`, the refusal naming the right number, the
+rejected brief being staged outside the repo, `--tolerate-facts` merging the
+contradiction on the record, and the compare being skipped for prose with no
+numeric claims. The conflict checkers in `test_brief_consistency.py` gained a
+`text=` argument used by that gate and an aggregation/dedupe test.
 
 ## FIT data audit
 
@@ -62,17 +69,17 @@ $ python fit_audit.py
 FIT data audit
 parser: fitparse=1.2.0 reader=1.1.0
 
-files inspected           : 58
+files inspected           : 59
 parse failures            : 0
-files readable            : 58
-files with GPS            : 58
+files readable            : 59
+files with GPS            : 59
 files without GPS         : 0
-files with usable timestamp: 58
+files with usable timestamp: 59
 files without timestamp   : 0
-session messages          : 58
-lap messages              : 523
-record messages           : 54652
-position points (counted) : 54636
+session messages          : 59
+lap messages              : 530
+record messages           : 55349
+position points (counted) : 55333
 files missing fields      : 0
 
 warnings:

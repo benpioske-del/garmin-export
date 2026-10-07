@@ -236,15 +236,20 @@ source. Re-derive it if you can.
 | Fact | Value | How to re-derive |
 |---|---|---|
 | Repository visibility | **private** | anonymous raw URL returns 404 |
-| FIT files | 58 | count in the local export |
+| FIT files | 59 | count in the local export |
 | Activities | 58 | `SELECT COUNT(*) FROM activities` |
 | Open reviews | 59 | 58 `timezone_uncertain` + 1 `activity_gap` |
-| FIT files with lap records | 58 of 58 | `python brief_consistency.py` |
+| FIT files with lap records | 59 of 59 | `python brief_consistency.py` |
 | Splits published | yes (`Best 5K Time`, `Lap Splits`) | header of `garmin_export.csv` |
 | Fastest measured 5 km crossing | 24:42 on 2026-06-16, measured | `brief_facts.json` → `best_5k` |
-| Tests | 446 passed, 1 skipped (447 collected) | `python -m pytest` |
+| Tests | 464 passed, 1 skipped (465 collected) | `python -m pytest` |
 | Dashboard API routes | 3, implemented and tested | `python dashboard_contract.py` |
 | Dashboard consumes the API | yes, all three | `python dashboard_contract.py` |
+
+**Quote `brief_facts.json`, never memory.** The bridge now refuses a brief whose
+numbers contradict measured facts, staging it for review and printing the correct
+value. If you cannot fetch the file, say you could not fetch it rather than
+recalling a count.
 
 **`connect-dashboard-to-data-layer` is complete.** `garmin_server.py` serves
 `/api/activities`, `/api/load` and `/api/coaching` from the canonical data layer,
@@ -267,7 +272,7 @@ file in `tasks/` is not a task.
   trend, not a confident percentile.
 
 ### Splits: measured 5 km crossing, now published
-**Do not claim per-mile splits are unavailable.** They are not. Every one of the 58
+**Do not claim per-mile splits are unavailable.** They are not. Every one of the 59
 FIT files carries lap records, and since this publish `garmin_export.csv` has two
 new columns:
 

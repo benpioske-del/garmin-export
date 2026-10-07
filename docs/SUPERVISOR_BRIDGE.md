@@ -176,6 +176,40 @@ is worse than one that says so. What this catches is the failure that matters:
 a transcript, an error page or a truncated response arriving where a brief was
 expected, which the coach agent would otherwise read as instructions.
 
+## The facts gate
+
+A brief may state the counts it cannot fetch. The bridge compares every numeric
+claim the brief makes against `measured_facts()` — FIT files, activities, open
+reviews and their reason breakdown, tests passed, and the dashboard claim — and
+**refuses to merge a brief whose numbers contradict the measured values**:
+
+```
+[!] refusing to commit: 2 claim(s) contradict measured facts
+    - activities          states 57, actual is 58  | 57 activities are the corpus
+    - open reviews        states 57, actual is 59  | 57 open reviews
+```
+
+The correct values are printed so the brief can be corrected at its source, the
+rejected text is staged for review under `GARMIN_BRIDGE_STAGE` (outside the
+repo) labelled as rejected by the facts gate, nothing is written and nothing is
+pushed. This is refuse-on-measurable-wrong, not refuse-on-unknowable: a brief
+whose numbers cannot be compared because the corpus is unavailable merges with
+a visible warning (fail-open on infrastructure, fail-closed on provable error).
+
+A deliberate override exists for the period while the crew's fetch is broken or
+the athlete is editing the brief by hand:
+
+```
+python brief_bridge.py ingest --tolerate-facts
+Run CrewAI Supervisor.cmd --tolerate-facts
+```
+
+`--tolerate-facts` merges the contradiction **on the record**: it prints the
+wrong claims and their correct values before writing, and the committed brief
+still starts with the "Every figure below is unverified" block, so a reader is
+never silently handed a number that is known to be wrong. Use it when the human
+is fixing the brief, not as a default.
+
 ## Two scanners, and what happens when one objects
 
 Nothing reaches `main` without passing two independent checks:
