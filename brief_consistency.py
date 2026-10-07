@@ -229,10 +229,16 @@ CLAIM_PATTERNS = [
 ]
 
 
-def claim_conflicts(facts=None):
-    """(label, stated, actual, line) for every number in the brief that is wrong."""
+def claim_conflicts(facts=None, text=None):
+    """(label, stated, actual, line) for every number in `text` that is wrong.
+
+    `text` defaults to the committed brief, so the historical call with no
+    arguments still checks the file; a text argument lets a merge gate check an
+    incoming brief before it is written.
+    """
     facts = facts or measured_facts()
-    text = _read(BRIEF)
+    if text is None:
+        text = _read(BRIEF)
     out = []
     for pattern, key, label in CLAIM_PATTERNS:
         if key not in facts or facts[key] is None:
@@ -251,14 +257,16 @@ def claim_conflicts(facts=None):
     return out
 
 
-def reason_conflicts(facts=None):
+def reason_conflicts(facts=None, text=None):
     """Breakdown mismatches, e.g. '57 timezone_uncertain' when there are 58."""
     facts = facts or measured_facts()
+    if text is None:
+        text = _read(BRIEF)
     breakdown = facts.get("review_breakdown") or {}
     if not breakdown:
         return []
     out = []
-    for line in _read(BRIEF).splitlines():
+    for line in text.splitlines():
         for reason, actual in breakdown.items():
             m = re.search(r"(\d+)\s*`?%s`?" % re.escape(reason), line, re.I)
             if m and int(m.group(1)) != actual:
@@ -267,7 +275,29 @@ def reason_conflicts(facts=None):
     return out
 
 
-def dashboard_conflict():
+def numeric_conflicts(text=None, facts=None):
+    """Every wrong number in `text`, from any of the three conflict checks.
+
+    `text` defaults to the committed brief and `facts` to measured_facts(), so
+    a call with no arguments is the existing per-claim checker. The merge gate
+    calls it with candidate text to decide whether a brief may be written.
+    """
+    out = claim_conflicts(facts=facts, text=text)
+    out = out + reason_conflicts(facts=facts, text=text)
+    dash = dashboard_conflict(text=text)
+    if dash:
+        out.append(dash)
+    seen, result = set(), []
+    for item in out:
+        key = tuple(item[:3])
+        if key in seen:
+            continue
+        seen.add(key)
+        result.append(item)
+    return result
+
+
+def dashboard_conflict(text=None):
     """The dashboard claim, in either direction.
 
     This is the claim four briefs in a row got wrong. It is checked as prose
@@ -276,8 +306,9 @@ def dashboard_conflict():
     wiring = dashboard_wiring()
     if not wiring or not wiring["server_routes"] or not wiring["dashboard_calls"]:
         return None
+    if text is None:
+        text = _read(BRIEF)
     connected = len(wiring["dashboard_calls"]) == 3
-    text = _read(BRIEF)
     claims_disconnected = re.search(
         r"dashboard[^\n.]{0,80}?(not\s+connected|disconnected|has\s+no\s+"
         r"references|not\s+been\s+connected|no\s+data-layer)", text, re.I)

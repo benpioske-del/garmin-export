@@ -671,3 +671,94 @@ def test_capture_does_not_silently_swallow_a_missing_command(fake_repo, monkeypa
                         lambda *a, **k: (_ for _ in ()).throw(FileNotFoundError()))
     with pytest.raises(SystemExit):
         brief_bridge.capture_flow(command="no-such-binary-xyz")
+
+
+# ------------------------------------------------------------ facts gate
+
+def test_commit_refuses_numbers_that_contradict_measured_facts(fake_repo,
+                                                              monkeypatch):
+    monkeypatch.setattr(brief_bridge.BC, "numeric_conflicts",
+                        lambda text=None, facts=None:
+                        [("activities", 57, 58, "57 activities accepted")])
+    assert brief_bridge.commit_brief(BRIEF, source="facts-gate") == 1
+    assert not (fake_repo / "SUPERVISOR_BRIEF.md").exists()
+
+
+def test_commit_prints_the_actual_value_in_the_refusal(fake_repo, monkeypatch,
+                                                       capsys):
+    monkeypatch.setattr(brief_bridge.BC, "numeric_conflicts",
+                        lambda text=None, facts=None:
+                        [("activities", 57, 58, "57 activities accepted")])
+    brief_bridge.commit_brief(BRIEF, source="facts-gate")
+    out = capsys.readouterr().out
+    assert "states 57, actual is 58" in out
+    assert "quote brief_facts.json" in out
+    assert "Nothing was written and nothing was" in out
+
+
+def test_commit_stages_a_facts_rejection_outside_the_repo(fake_repo,
+                                                          monkeypatch):
+    monkeypatch.setattr(brief_bridge.BC, "numeric_conflicts",
+                        lambda text=None, facts=None:
+                        [("open reviews", 57, 58, "57 open reviews")])
+    assert brief_bridge.commit_brief(BRIEF, source="facts-gate") == 1
+    stage = os.environ["GARMIN_BRIDGE_STAGE"]
+    staged = [n for n in os.listdir(stage) if n.endswith(".rejected.md")]
+    assert staged, "a rejected brief must be staged for review"
+    body = open(os.path.join(stage, staged[0]), encoding="utf-8").read()
+    assert "REJECTED BY THE FACTS GATE" in body
+    assert "open reviews: stated 57, actual 58" in body
+
+
+def test_tolerate_facts_merges_the_contradiction_on_the_record(fake_repo,
+                                                               monkeypatch,
+                                                               capsys):
+    monkeypatch.setattr(brief_bridge.BC, "numeric_conflicts",
+                        lambda text=None, facts=None:
+                        [("activities", 57, 58, "57 activities accepted")])
+    assert brief_bridge.commit_brief(BRIEF, source="facts-gate",
+                                     tolerate_facts=True) == 0
+    assert (fake_repo / "SUPERVISOR_BRIEF.md").exists()
+    out = capsys.readouterr().out
+    assert "merging anyway" in out
+    assert "actual is 58" in out
+
+
+def test_facts_gate_does_not_compare_when_the_brief_has_no_numeric_hints(
+        fake_repo, monkeypatch):
+    prose = (
+        "# Supervisor Brief\n\n"
+        "## Task 1\n"
+        "Document the existing architecture in the inventory, naming exact "
+        "file paths for the importer, the schema layer and the test commands "
+        "that prove the three pieces are wired. This is deliberately long "
+        "prose so it clears the minimum-length check, which is small but "
+        "non-zero.\n\n"
+        "## Task 2\n"
+        "Add an explicit completeness state per day, and never let a missing "
+        "day be recorded as a rest day without an explicit confirmation from "
+        "the athlete. Padding keeps this body comfortably above the length "
+        "floor that the bridge enforces before anything else runs.\n\n"
+        "## NEXT SUPERVISOR CHECK\n"
+        "Confirm the inventory names the real schema and that nothing is "
+        "marked done without command output behind it.\n"
+    )
+    assert len(prose) > 500
+    calls = []
+    monkeypatch.setattr(brief_bridge.BC, "numeric_conflicts",
+                        lambda text=None, facts=None: calls.append(True) or [])
+    assert brief_bridge.commit_brief(prose, source="no-hints") == 0
+    assert calls == [], "a prose-only brief must not pay for the facts gate"
+    assert (fake_repo / "SUPERVISOR_BRIEF.md").exists()
+
+
+def test_facts_gate_falls_open_when_the_compare_cannot_run(fake_repo,
+                                                           monkeypatch,
+                                                           capsys):
+    def broken(text=None, facts=None):
+        raise RuntimeError("corpus gone")
+    monkeypatch.setattr(brief_bridge.BC, "numeric_conflicts", broken)
+    assert brief_bridge.commit_brief(BRIEF, source="facts-gate") == 0
+    out = capsys.readouterr().out
+    assert "facts gate unavailable" in out
+    assert (fake_repo / "SUPERVISOR_BRIEF.md").exists()

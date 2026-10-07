@@ -108,12 +108,52 @@ def test_a_brief_matching_reality_reports_no_conflicts(tmp_path, monkeypatch):
         "accepted corpus.\n"
         "open-review-state | accepted | %d open reviews.\n"
         "test-state | accepted | %d passed and %d skipped.\n"
-        % (facts["fit_files"], facts["activities"], facts["open_reviews"],
+% (facts["fit_files"], facts["activities"], facts["open_reviews"],
            facts["tests_passed"], facts["tests_skipped"])
     )
     open(B.BRIEF, "w", encoding="utf-8").write(good)
     assert B.claim_conflicts(facts) == []
     assert B.reason_conflicts(facts) == []
+
+
+def test_conflict_checkers_check_text_as_well_as_the_file(tmp_path, monkeypatch):
+    """The merge gate passes an incoming brief; the file-based calls stay whole."""
+    facts = B.measured_facts()
+    monkeypatch.setattr(B, "BRIEF", str(tmp_path / "b.md"))
+    open(B.BRIEF, "w", encoding="utf-8").write(
+        "%d activities and %d open reviews\n"
+        % (facts["activities"], facts["open_reviews"]))
+    assert B.claim_conflicts(facts) == []
+    wrong = "%d activities\n" % (facts["activities"] + 1)
+    found = B.claim_conflicts(facts, text=wrong)
+    assert found and found[0][0] == "activities"
+    assert found[0][1] == facts["activities"] + 1
+    assert found[0][2] == facts["activities"]
+
+
+def test_numeric_conflicts_aggregates_and_dedupes(tmp_path, monkeypatch):
+    facts = B.measured_facts()
+    monkeypatch.setattr(B, "BRIEF", str(tmp_path / "b.md"))
+    wrong = "%d activities\n%d activities again\n%d open reviews\n" % (
+        facts["activities"] + 1, facts["activities"] + 1,
+        facts["open_reviews"] + 1)
+    open(B.BRIEF, "w", encoding="utf-8").write("nothing numeric")
+    out = B.numeric_conflicts(text=wrong)
+    labels = [item[0] for item in out]
+    assert labels.count("activities") == 1, out
+    assert "open reviews" in labels, out
+    assert B.numeric_conflicts(
+        text="%d activities and %d open reviews\n"
+             % (facts["activities"], facts["open_reviews"])) == []
+    assert B.numeric_conflicts(text="all prose, no claims") == []
+
+
+def test_numeric_conflicts_includes_the_dashboard_claim(tmp_path, monkeypatch):
+    if B.dashboard_wiring() is None:
+        pytest.skip("server or dashboard absent")
+    monkeypatch.setattr(B, "BRIEF", str(tmp_path / "b.md"))
+    out = B.numeric_conflicts(text="The dashboard is not connected yet.")
+    assert any(item[0] == "dashboard" for item in out), out
 
 
 def test_dashboard_wiring_is_measured_not_assumed():

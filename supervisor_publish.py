@@ -50,16 +50,20 @@ def main():
                     help="publish the brief on the clipboard instead of the inbox")
     ap.add_argument("--no-publish", action="store_true",
                     help="validate the brief but do not commit or push")
+    ap.add_argument("--tolerate-facts", action="store_true",
+                    help="merge a brief whose numbers contradict measured facts")
     a = ap.parse_args()
 
     dry = ["--dry-run"] if a.dry_run or a.no_publish else []
+    tolerate = ["--tolerate-facts"] if a.tolerate_facts else []
     brief_rc = 0
     if a.paste:
         brief_rc = _run("capture brief from clipboard",
-                        [os.path.join(HERE, "brief_bridge.py"), "paste"] + dry)
+                        [os.path.join(HERE, "brief_bridge.py"), "paste"]
+                        + dry + tolerate)
     elif not a.skip_capture:
         brief_rc = _run("capture brief", [os.path.join(HERE, "brief_bridge.py"),
-                                          "ingest"] + dry)
+                                          "ingest"] + dry + tolerate)
     if brief_rc != 0:
         print("\nthe brief was rejected. See the staging path above; it is "
               "outside the repository and safe to read locally.")

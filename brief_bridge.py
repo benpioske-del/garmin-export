@@ -54,6 +54,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import paths  # noqa: E402
 import capture_supervisor_brief as capture  # noqa: E402
+import brief_consistency as BC  # noqa: E402
 
 REPO = paths.repo_dir()
 
@@ -120,28 +121,33 @@ def _safe_stem(source):
     return stem.strip("._-")[:60] or "brief"
 
 
-def stage_rejected(text, source, problems, reason):
+def stage_rejected(text, source, problems, reason, heading=None, note=None,
+                   pattern_label="Triggered patterns:"):
     """Write a rejected brief to local staging for manual review.
 
     Returns the path written, or None if it could not be staged. Never raises:
     a failure to stage must not hide the original refusal.
     """
+    if heading is None:
+        heading = "# REJECTED BY THE PRIVACY SCANNER - NOT COMMITTED, NOT PUBLISHED"
+    if note is None:
+        note = ("This file is local-only. It exists because it failed the scanner, so it\n"
+                "may still contain the credential or coordinate that caused the refusal.\n"
+                "Review it, fix the source of the leak, then re-run the capture.\n"
+                "Do not commit it and do not paste it anywhere public.")
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     name = "%s-%s.rejected.md" % (stamp, _safe_stem(source))
     body = [
         "---",
-        "# REJECTED BY THE PRIVACY SCANNER - NOT COMMITTED, NOT PUBLISHED",
+        heading,
         "rejected_utc: %s" % datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source: %s" % source,
         "reason: %s" % reason,
         "---",
         "",
-        "This file is local-only. It exists because it failed the scanner, so it",
-        "may still contain the credential or coordinate that caused the refusal.",
-        "Review it, fix the source of the leak, then re-run the capture.",
-        "Do not commit it and do not paste it anywhere public.",
+        note,
         "",
-        "Triggered patterns:",
+        pattern_label,
     ]
     for kind, sample in (problems or [("unknown", "n/a")]):
         body.append("  - %s: %s" % (kind, sample))
@@ -287,6 +293,33 @@ def validate(brief, name):
     return problems
 
 
+# Words and shapes that make a brief a candidate for the facts gate. A brief
+# with none of these is checked anyway by the structure report, but the gate's
+# comparison against measured facts is expensive enough that prose without any
+# number-like claim does not pay for it.
+_FACTS_GATE_HINT = re.compile(
+    r"(?:fit\s+files?|activit\w*|review\w*|\bpassed\b|\bdashboard\b|"
+    r"\d{1,2}:\d{2}|(?<!\S)\d+[ \t]+[a-zA-Z]\w*)", re.I)
+
+
+def _facts_conflicts(text):
+    """Wrong numbers in an incoming brief, or [] when they cannot be compared.
+
+    The gate is fail-open on infrastructure failure: a brief is merged when the
+    facts cannot be measured, because blocking it would stall the flow over a
+    problem that is not its fault. The refusal that matters is a number that is
+    measurably and provably wrong.
+    """
+    if not _FACTS_GATE_HINT.search(text):
+        return []
+    try:
+        return BC.numeric_conflicts(text=text)
+    except Exception as exc:
+        print("  ! facts gate unavailable; merging without a numeric check: %s"
+              % exc)
+        return []
+
+
 def publish(target):
     """Hand the git work to export_publish.py so the guards and sync are reused."""
     r = subprocess.run([sys.executable, os.path.join(HERE, "export_publish.py")],
@@ -298,11 +331,15 @@ def publish(target):
     return r.returncode, (r.stdout or "") + (r.stderr or "")
 
 
-def commit_brief(text, source="stdin", name=None, dry_run=False):
+def commit_brief(text, source="stdin", name=None, dry_run=False,
+                 tolerate_facts=False):
     """Validate, write and publish a brief. Returns a process exit code.
 
     Restores the previous file if publishing fails, so a rejected brief never
     leaves a bad file sitting in the worktree for the next run to inherit.
+    A brief whose numbers contradict measured facts is refused before anything
+    is written, unless `tolerate_facts` is set and the contradiction is merged
+    on the record.
     """
     if name is None:
         name = ALLOWED_NAMES[0]
@@ -342,6 +379,42 @@ def commit_brief(text, source="stdin", name=None, dry_run=False):
         print("%s is already current; nothing to publish" % name)
         print("  brief_id %s unchanged since the last capture" % brief_id[:16])
         return 0
+
+    conflicts = _facts_conflicts(brief)
+    if conflicts:
+        if not tolerate_facts:
+            print("[!] refusing to commit: %d claim(s) contradict measured facts"
+                  % len(conflicts))
+            for label, stated, actual, line in conflicts:
+                print("    - %-18s states %s, actual is %s  | %s"
+                      % (label, stated, actual, line.strip()[:70]))
+            print("\nThe crew cannot always fetch this repository; ask it to")
+            print("quote brief_facts.json instead of recalling counts, then")
+            print("re-submit. To merge the contradiction anyway, use")
+            print("--tolerate-facts and say why.")
+            staged = stage_rejected(
+                text, source,
+                [("%s: stated %s, actual %s" % (label, stated, actual), line.strip()[:80])
+                 for label, stated, actual, line in conflicts],
+                "failed the facts gate before writing",
+                heading="# REJECTED BY THE FACTS GATE - NOT COMMITTED, NOT PUBLISHED",
+                note=("This file is local-only. It was refused because its numbers "
+                      "contradict\nmeasured facts. Correct the brief to quote "
+                      "brief_facts.json and re-run,\nor merge deliberately with "
+                      "--tolerate-facts. Do not commit this file."),
+                pattern_label="Wrong claims:")
+            if staged:
+                print("\nStaged for manual review, outside the repository:")
+                print("  %s" % staged)
+            print("\nThis repo is PUBLIC. Nothing was written and nothing was")
+            print("pushed.")
+            return 1
+        print("\n[!] %d claim(s) contradict measured facts; merging anyway"
+              " (--tolerate-facts). The contradiction stays on the record:"
+              % len(conflicts))
+        for label, stated, actual, line in conflicts:
+            print("    - %-18s states %s, actual is %s  | %s"
+                  % (label, stated, actual, line.strip()[:70]))
 
     nums = re.findall(r"(?m)^\s*(\d{1,2})[.)]\s+\S", brief)
     print("brief: %d chars, appears to contain %d numbered item(s)"
@@ -397,7 +470,7 @@ def commit_brief(text, source="stdin", name=None, dry_run=False):
 BRIEF_SUFFIXES = (".md", ".markdown", ".txt")
 
 
-def paste(dry_run=False):
+def paste(dry_run=False, tolerate_facts=False):
     """Publish whatever brief is sitting on the Windows clipboard.
 
     This is the one-step path: copy the write_tasks_brief output in the CrewAI
@@ -424,7 +497,8 @@ def paste(dry_run=False):
               % inbox_dir())
         return 1
 
-    return commit_brief(text, source="clipboard", dry_run=dry_run)
+    return commit_brief(text, source="clipboard", dry_run=dry_run,
+                        tolerate_facts=tolerate_facts)
 
 
 def clipboard_text():
@@ -444,7 +518,7 @@ def clipboard_text():
     return r.stdout
 
 
-def ingest(dry_run=False):
+def ingest(dry_run=False, tolerate_facts=False):
     """Drain the drop directory. One file per commit, oldest first."""
     d = inbox_dir()
     if not os.path.isdir(d):
@@ -480,7 +554,8 @@ def ingest(dry_run=False):
             rc = 1
             continue
         print("\n=== %s ===" % n)
-        code = commit_brief(text, source="inbox:%s" % n, dry_run=dry_run)
+        code = commit_brief(text, source="inbox:%s" % n, dry_run=dry_run,
+                            tolerate_facts=tolerate_facts)
         if code != 0:
             # Left in place on purpose. A brief the guards rejected is the one
             # worth reading: it is how a credential or a coordinate gets found.
@@ -501,7 +576,8 @@ def ingest(dry_run=False):
 FLOW_CMD_ENV = "CREWAI_FLOW_CMD"
 
 
-def capture_flow(dry_run=False, timeout=900, command=None):
+def capture_flow(dry_run=False, timeout=900, command=None,
+                 tolerate_facts=False):
     """Run a configured flow command and commit whatever brief it prints.
 
     This is the transport for a flow whose runner can be invoked locally, which
@@ -543,7 +619,8 @@ def capture_flow(dry_run=False, timeout=900, command=None):
     if p.returncode != 0:
         print("    ! flow exited %d; capturing its output anyway" % p.returncode)
     print("captured %d chars of stdout" % len(text))
-    return commit_brief(text, source="flow-cmd", dry_run=dry_run)
+    return commit_brief(text, source="flow-cmd", dry_run=dry_run,
+                        tolerate_facts=tolerate_facts)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -552,6 +629,7 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "garmin-bridge/1"
     token = None
     dry_run = False
+    tolerate_facts = False
 
     def log_message(self, fmt, *args):
         # Never let a request path or header reach the log, and never the token:
@@ -660,14 +738,15 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         print("accepted %d bytes over http; validating..." % len(raw))
-        code = commit_brief(text, source="webhook", dry_run=self.dry_run)
+        code = commit_brief(text, source="webhook", dry_run=self.dry_run,
+                            tolerate_facts=self.tolerate_facts)
         if code != 0:
             self._reply(422, {"error": "refused; nothing was written or pushed"})
             return
         self._reply(200, {"status": "published"})
 
 
-def serve(port, token, host, idle_minutes, dry_run=False):
+def serve(port, token, host, idle_minutes, dry_run=False, tolerate_facts=False):
     if not token:
         die("no token configured",
             "set %s to a long random string, or pass --token.\n"
@@ -680,6 +759,7 @@ def serve(port, token, host, idle_minutes, dry_run=False):
             "front of it rather than exposing the socket directly.")
     Handler.token = token
     Handler.dry_run = dry_run
+    Handler.tolerate_facts = tolerate_facts
     httpd = ThreadingHTTPServer((host, port), Handler)
     print("brief bridge listening on http://%s:%d/brief" % (host, port))
     print("  token: from %s (not shown)" % TOKEN_ENV)
@@ -701,6 +781,8 @@ def serve(port, token, host, idle_minutes, dry_run=False):
 def main():
     ap = argparse.ArgumentParser(
         description="Commit a supervisor brief that arrived from a cloud flow.")
+    ap.add_argument("--tolerate-facts", action="store_true",
+                    help="merge a brief whose numbers contradict measured facts")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("serve", help="authenticated HTTP receiver")
@@ -727,20 +809,22 @@ def main():
 
     a = ap.parse_args()
     if a.cmd == "serve":
-        return serve(a.port, a.token, a.host, a.idle_minutes, a.dry_run)
+        return serve(a.port, a.token, a.host, a.idle_minutes, a.dry_run,
+                     a.tolerate_facts)
     if a.cmd == "ingest":
-        return ingest(a.dry_run)
+        return ingest(a.dry_run, a.tolerate_facts)
     if a.cmd == "capture":
-        return capture_flow(a.dry_run, a.timeout, a.command)
+        return capture_flow(a.dry_run, a.timeout, a.command, a.tolerate_facts)
     if a.cmd == "paste":
-        return paste(a.dry_run)
+        return paste(a.dry_run, a.tolerate_facts)
     if sys.stdin.isatty():
         die("no brief on stdin",
             "pipe one in, e.g.  type file.md | python brief_bridge.py post")
     data = sys.stdin.read()
     if len(data.encode("utf-8")) > MAX_BODY:
         die("stdin is larger than %d bytes" % MAX_BODY)
-    return commit_brief(data, source=a.source, dry_run=a.dry_run)
+    return commit_brief(data, source=a.source, dry_run=a.dry_run,
+                        tolerate_facts=a.tolerate_facts)
 
 
 if __name__ == "__main__":
