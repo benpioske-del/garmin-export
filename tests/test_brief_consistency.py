@@ -373,13 +373,37 @@ def test_csv_split_columns_are_detected(tmp_path, monkeypatch):
     assert B._csv_has_split_columns() is True
 
 
+def test_csv_split_completeness_counts_every_cell(tmp_path, monkeypatch):
+    csvf = tmp_path / "garmin_export.csv"
+    csvf.write_text(
+        "Date,Best 5K Time,Lap Splits\n"
+        "2026-06-16 19:26:37,24:42,7:11\n"
+        "2026-07-01 08:00:00,25:10,8:00, 8:05\n"
+        "2026-07-02 08:00:00,,8:30\n"
+        "2026-07-03 08:00:00,27:00,\n",
+        encoding="utf-8")
+    monkeypatch.setattr(B, "CANON", str(csvf))
+    rows, both, miss_5k, miss_laps = B._csv_split_completeness()
+    assert (rows, both, miss_5k, miss_laps) == (4, 2, 1, 1)
+
+
+def test_csv_split_completeness_is_absent_without_the_columns(tmp_path,
+                                                              monkeypatch):
+    csvf = tmp_path / "garmin_export.csv"
+    csvf.write_text("Date,Distance\n2026-06-16,4.89\n", encoding="utf-8")
+    monkeypatch.setattr(B, "CANON", str(csvf))
+    assert B._csv_split_completeness() == (0, 0, None, None)
+
+
 def test_facts_document_carries_the_measured_5k(tmp_path, fast_facts, monkeypatch):
     csvf = tmp_path / "garmin_export.csv"
     csvf.write_text("Date,Distance,Best 5K Time,Lap Splits\n"
-                    "2026-06-16 19:26:37,4.89,24:42,7:11\n", encoding="utf-8")
+"2026-06-16 19:26:37,4.89,24:42,7:11\n", encoding="utf-8")
     monkeypatch.setattr(B, "CANON", str(csvf))
     doc = B.write_facts(path=str(tmp_path / "f.json"))
     assert doc["best_5k"]["time"] == "24:42"
     assert doc["best_5k"]["date"] == "2026-06-16"
     assert doc["splits"]["published"] is True
+    assert doc["splits"]["rows_published"] == 1
+    assert doc["splits"]["rows_with_splits"] == 1
 

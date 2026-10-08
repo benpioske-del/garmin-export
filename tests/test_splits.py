@@ -61,3 +61,48 @@ def test_non_monotonic_distance_uses_first_crossing():
                      ("distance", 10.0)]),
     ]
     assert r._best_5k_seconds(FakeFitFile(records=recs), START) == 61
+
+
+# --- per-mile splits from the distance curve ---------------------------------
+
+def test_mile_splits_come_from_the_distance_curve():
+    recs = _records([0.0, 1609.344, 3218.688, 4828.032], seconds_step=360)
+    assert r._mile_splits(FakeFitFile(records=recs), START) == \
+        ["6:00", "6:00", "6:00"]
+
+
+def test_mile_splits_are_segments_not_cumulative_times():
+    recs = _records([0.0, 1609.344, 3218.688, 4828.032], seconds_step=300)
+    assert r._mile_splits(FakeFitFile(records=recs), START) == \
+        ["5:00", "5:00", "5:00"]
+
+
+def test_mile_splits_need_a_start_and_a_full_mile():
+    recs = _records([0.0, 1000.0], seconds_step=300)
+    assert r._mile_splits(FakeFitFile(records=recs), None) == []
+    assert r._mile_splits(FakeFitFile(records=[]), START) == []
+    assert r._mile_splits(FakeFitFile(records=recs), START) == []
+
+
+def test_mile_splits_skip_non_datetime_timestamps_without_crashing():
+    recs = [
+        FakeMessage([("timestamp", START), ("distance", 0.0)]),
+        FakeMessage([("timestamp", "not a time"), ("distance", 1609.344)]),
+        FakeMessage([("timestamp", START + timedelta(seconds=90)),
+                     ("distance", 1609.344)]),
+    ]
+    assert r._mile_splits(FakeFitFile(records=recs), START) == ["1:30"]
+
+
+def test_mile_splits_do_not_repeat_after_a_backward_distance_read():
+    recs = [
+        FakeMessage([("timestamp", START), ("distance", 0.0)]),
+        FakeMessage([("timestamp", START + timedelta(seconds=300)),
+                     ("distance", 1609.344)]),
+        FakeMessage([("timestamp", START + timedelta(seconds=400)),
+                     ("distance", 20.0)]),
+        FakeMessage([("timestamp", START + timedelta(seconds=700)),
+                     ("distance", 3218.688)]),
+    ]
+    assert r._mile_splits(FakeFitFile(records=recs), START) == \
+        ["5:00", "6:40"]

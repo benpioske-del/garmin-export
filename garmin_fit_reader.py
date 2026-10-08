@@ -142,6 +142,40 @@ def _best_5k_seconds(fit, start):
     return None
 
 
+def _mile_splits(fit, start):
+    """Per-mile split times from the distance curve, as M:SS strings.
+
+    Same curve-only discipline as _best_5k_seconds: cumulative distance and
+    timestamps only, position fields never touched. Used as a fallback when a
+    file carries no lap messages, so a run is still published with its split
+    column populated. One split per mile boundary, with each split the time
+    from the previous boundary; like a watch, the final partial mile is not
+    emitted as its own split.
+    """
+    if not start:
+        return []
+    splits = []
+    prev_t = 0.0
+    next_mile = 1609.344
+    for rec in fit.get_messages("record"):
+        d = {f.name: f.value for f in rec}
+        dist = d.get("distance")
+        ts = d.get("timestamp")
+        if not dist or not ts:
+            continue
+        try:
+            t = (ts - start).total_seconds()
+        except Exception:  # a fixture or file with a non-datetime timestamp
+            continue
+        if t <= 0:
+            continue
+        if dist >= next_mile:
+            splits.append(pace_str((t - prev_t) / 60.0))
+            prev_t = t
+            next_mile += 1609.344
+    return splits
+
+
 def pace_from_speed(mps):
     # Pace is time per mile, so this DIVIDES by speed. 1609.344 m per mile,
     # then seconds -> minutes. (Multiplying here inverts the ranking and makes
@@ -213,7 +247,11 @@ def read_fit(path):
     five_k = pace_str(_five_k_seconds / 60.0) if _five_k_seconds else ""
 
     # Splits the device cut, in "M:SS" each (d >= 0.95 mi already filtered).
+    # A file with no lap messages still has mile boundaries in its distance
+    # curve, so the column is populated from the curve rather than left empty.
     lap_splits = ", ".join(pace_str(t / 60.0) for d, t, lap in laps)
+    if not lap_splits:
+        lap_splits = ", ".join(_mile_splits(fit, start))
 
     # One altitude sample per record. Previously this appended both
     # enhanced_altitude and altitude when a record carried both, interleaving two

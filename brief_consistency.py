@@ -159,6 +159,32 @@ def _csv_has_split_columns():
     return bool(row and "Best 5K Time" in row and "Lap Splits" in row)
 
 
+def _csv_split_completeness():
+    """(rows, rows_with_both, missing_5k, missing_laps) for the published CSV.
+
+    Feeding the facts file this count is what makes a future backfill gap
+    visible: if a run is ever published without its splits, `rows_with_splits`
+    drops below `rows_published` and the publisher's own facts stop matching
+    the CSV it just wrote.
+    """
+    if not _csv_has_split_columns():
+        return (0, 0, None, None)
+    import csv
+    with open(CANON, newline="", encoding="utf-8") as fh:
+        rows = list(csv.DictReader(fh))
+    both = missing_5k = missing_laps = 0
+    for r in rows:
+        has5k = bool((r.get("Best 5K Time") or "").strip())
+        has_laps = bool((r.get("Lap Splits") or "").strip())
+        if has5k and has_laps:
+            both += 1
+        if not has5k:
+            missing_5k += 1
+        if not has_laps:
+            missing_laps += 1
+    return len(rows), both, missing_5k, missing_laps
+
+
 # --- facts -------------------------------------------------------------------
 #
 # Every one of these is measurable locally. The brief states each of them, and
@@ -366,10 +392,13 @@ def write_facts(path=None, commit=None, code_sha=None, visibility=None):
         "queue": sorted(queued_slugs()),
     }
     cov = lap_coverage()
+    rows_published, rows_with_splits, _, _ = _csv_split_completeness()
     doc["splits"] = {
         "files_with_laps": cov[0] if cov else None,
         "files_total": cov[1] if cov else None,
         "published": _csv_has_split_columns(),
+        "rows_published": rows_published,
+        "rows_with_splits": rows_with_splits,
     }
     doc["best_5k"] = facts.get("best_5k")
     doc["coaching"] = _coaching_facts()
@@ -499,6 +528,16 @@ def main():
         print("\nFIT files with lap records: %d/%d" % (have, seen))
         if seen and have == seen:
             print("  per-mile splits ARE available; a brief claiming otherwise is wrong")
+
+    rows_published, rows_with_splits, miss_5k, miss_laps = _csv_split_completeness()
+    if rows_published:
+        print("\npublished CSV split coverage: %d/%d rows carry Best 5K Time and"
+              " Lap Splits" % (rows_with_splits, rows_published))
+        if miss_5k:
+            print("  %d row(s) have no 5 km crossing (expected for runs under"
+                  " 5 km)" % miss_5k)
+        if miss_laps:
+            print("  %d row(s) have no lap splits" % miss_laps)
 
     if orphans:
         print("\nEach unbacked row is a claim with no task file behind it. That is not")
