@@ -1,15 +1,15 @@
 {
-  "generated_utc": "2026-10-07T02:17:18+00:00",
-  "run_count": 59,
+  "generated_utc": "2026-10-08T23:20:26+00:00",
+  "run_count": 60,
   "earliest_run": "2026-04-14",
-  "latest_run": "2026-10-06",
-  "runs_from_fit": 59,
+  "latest_run": "2026-10-08",
+  "runs_from_fit": 60,
   "runs_from_csv": 0,
   "sources": [
     "Activities (1).csv",
     "Activities.csv",
-    "garmin_fit/*.fit (59 files)"
+    "garmin_fit/*.fit (60 files)"
   ],
-  "newest_fit_file": "2026-10-06",
+  "newest_fit_file": "2026-10-08",
   "note": "Built from Garmin .FIT files, with CSV exports as fallback. Times are local wall clock; distances miles; pace min/mi. No GPS, no coordinates, no credentials. Title is withheld."
 }
