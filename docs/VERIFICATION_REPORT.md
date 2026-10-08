@@ -16,7 +16,7 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-464 passed, 1 skipped (465 collected)
+471 passed, 1 skipped (472 collected)
 ```
 
 | File | Tests |
@@ -29,7 +29,7 @@ $ python -m pytest
 | `tests/test_trainloop_cli.py` | 22 |
 | `tests/test_dashboard_api_http.py` | 22 |
 | `tests/test_fit_reader_elevation.py` | 21 |
-| `tests/test_splits.py` | 5 |
+| `tests/test_splits.py` | 10 |
 | `tests/test_provenance.py` | 18 |
 | `tests/test_capture_supervisor.py` | 16 |
 | `tests/test_fit_audit.py` | 16 |
@@ -38,8 +38,8 @@ $ python -m pytest
 | `tests/test_history_safety.py` | 2 |
 | `tests/test_publish_scope.py` | 17 |
 | `tests/test_publish_flow.py` | 50 |
-| `tests/test_brief_consistency.py` | 34 |
-| **Total** | **465** (464 pass, 1 skip) |
+| `tests/test_brief_consistency.py` | 36 |
+| **Total** | **472** (471 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -62,6 +62,13 @@ contradiction on the record, and the compare being skipped for prose with no
 numeric claims. The conflict checkers in `test_brief_consistency.py` gained a
 `text=` argument used by that gate and an aggregation/dedupe test.
 
+The splits hardening next: `garmin_fit_reader.py` now falls back to per-mile
+splits computed from the distance curve when a file carries no lap messages, so
+a run is never published with an empty split column. `brief_facts.json` carries
+the published-CSV coverage (`rows_published` / `rows_with_splits`); if a backfill
+ever drifts from the CSV they stop matching and the fact gate can see it.
+`test_splits.py` grew to 10 tests and `test_brief_consistency.py` to 36.
+
 ## FIT data audit
 
 ```
@@ -69,17 +76,17 @@ $ python fit_audit.py
 FIT data audit
 parser: fitparse=1.2.0 reader=1.1.0
 
-files inspected           : 59
+files inspected           : 60
 parse failures            : 0
-files readable            : 59
-files with GPS            : 59
+files readable            : 60
+files with GPS            : 60
 files without GPS         : 0
-files with usable timestamp: 59
+files with usable timestamp: 60
 files without timestamp   : 0
-session messages          : 59
-lap messages              : 530
-record messages           : 55349
-position points (counted) : 55333
+session messages          : 60
+lap messages              : 544
+record messages           : 56791
+position points (counted) : 56775
 files missing fields      : 0
 
 warnings:

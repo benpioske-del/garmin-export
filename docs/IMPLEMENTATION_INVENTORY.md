@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 464 passed, 1 skipped (Windows symlink case) |
+| Tests | 471 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -89,7 +89,7 @@ an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 464 passed, 1 skipped. |
+| `python -m pytest` | Works. 471 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -108,10 +108,10 @@ regression in it.
 
 ## Data state
 
-- 58 FIT files on disk, all parse, all with GPS and a usable timestamp
-- 58 rows in `garmin_export.csv`
+- 60 FIT files on disk, all parse, all with GPS and a usable timestamp
+- 60 rows in `garmin_export.csv`
 - 58 activities imported into `trainloop.db`, newest `2026-10-01`
-- 523 laps, 54,652 records, 54,636 position points
+- 544 laps, 56,791 records, 56,775 position points
 - Re-import of identical files: 58 `unchanged`, 0 audit rows written
 - **1 open date gap**: 2026-06-26 to 2026-07-05
 - **58 open `timezone_uncertain` reviews**, expected until an offset is confirmed
@@ -317,7 +317,7 @@ The supervisor reads this file and `VERIFICATION_REPORT.md` as its evidence
 base, so a stale number here becomes a wrong instruction in the next brief.
 Two things were corrected on 2026-10-01 after a run acted on them:
 
-- The **152-test** count was stale; it is 464.
+- The **152-test** count was stale; it is now 471.
 - **`profile.json` was described as empty**; it carries `hr_max` and field
   notes, and only the remaining fields are `null`.
 
