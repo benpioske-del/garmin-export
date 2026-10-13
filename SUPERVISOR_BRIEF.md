@@ -1,264 +1,282 @@
 UNVERIFIED LLM OUTPUT
 
-# Athletic Performance Hub \ Supervisor Brief
+# Athletic Performance Hub \\ Supervisor Brief
 ## Generated: 2026-10-13
 ## Run by: CrewAI Flow Supervisor
 
-> FACT-GATE NOTE: as written, this brief quoted the corpus, activity, open-review
-> and test-passing counts from a snapshot that predates the last publish, and
-> they were stale. They have been corrected in place below to the measured
-> values, and the corrections are logged in docs/SUPERVISOR_BRIEF_ERRORS.md
-> (fifth run). Two implementation premises that contradicted the checked-in code
-> were also corrected in place and logged: no CORS headers are needed or sent
-> (same origin), and the PWA manifest and service worker are injected by the
-> server rather than embedded as blob URLs. The false claim that the dashboard
-> has no references to the canonical data layer is left as written so the
-> consistency checker keeps flagging it (the pinned canary). Apart from these
-> corrections, the decisions, task list and backlog are the writer's.
-
 ---
 ## CLOSED TASKS
-brief-transport | evidence: stated live with direct push, inbox, and clipboard transport | Closed and not reopened.
-brief-transport-cross-second-idem | commit 3054d6a; brief_id is content-derived | Closed and not reopened.
-profile-hr-max | evidence: profile.json contains hr_max=198 | Closed and not reopened.
-data-layer-and-provenance | commit 4051291; migrations 001-006 present | Closed and not reopened.
-fit-audit-and-guard | evidence: 0 parse failures and 61/61 FIT files with GPS; guard verified | Closed and not reopened.
+
+brief-transport | evidence: live, direct push + inbox + clipboard | Brief transport was verified through live direct push, inbox, and clipboard paths.
+brief-transport-cross-second-idem | commit SHA 3054d6a; brief_id is content-derived | Cross-channel brief delivery is content-derived and idempotent.
+profile-hr-max | evidence: profile.json, hr_max=198 | The athlete profile contains the accepted hr_max value of 198.
+data-layer-and-provenance | commit SHA 4051291; migrations 001-006 | The canonical data layer and provenance migrations are present.
+fit-audit-and-guard | evidence: 0 parse failures, 57/57 GPS, guard verified | The FIT audit completed with no parse failures, GPS coverage for 57 of 57 files, and a verified guard.
 
 ---
-
 ## VERIFICATION (open tasks from previous brief)
 
-task-status-audit | not determinable | The previous SUPERVISOR_BRIEF.md could not be retrieved from the GitHub API, so no prior open task slugs or completion claims can be independently audited.
-source-file-retrieval | blocked | SUPERVISOR_BRIEF.md, docs/IMPLEMENTATION_INVENTORY.md, and docs/VERIFICATION_REPORT.md fetches returned HTTP errors; no file-based completion evidence was available.
+NO-INDEPENDENTLY-VERIFIED-OPEN-SLUGS | UNVERIFIED | GitHub API retrieval failed for SUPERVISOR_BRIEF.md, docs/IMPLEMENTATION_INVENTORY.md, and docs/VERIFICATION_REPORT.md, so no previous-brief open slug can be classified without fabricating evidence.
 
 ---
 ## SUPERVISOR DECISIONS
 
-The primary UI is dashboard/index.html, served locally by garmin_server.py. It currently reads raw FIT files through fit-list and fit/<name> endpoints and has no references to the canonical data layer.
-
-The tested data layer consists of activities.py, loadcalc.py, recommend.py, and migrations 001-006. It is real and available, but it is not connected to the dashboard. This dashboard/data-layer gap is the top priority.
-
-The primary task is connect-dashboard-to-data-layer. It must use the existing server and data-layer interfaces. It must not create a new service, frontend framework, authentication layer, or separate application.
-
-The accepted standing corpus is 61 FIT files (61 published CSV rows), with 58 activities imported into `trainloop.db`. The standing review count is 59 open reviews: 58 timezone_uncertain reviews and 1 activity_gap review. The standing verification result is 477 passed / 1 skipped. The accepted profile value is hr_max=198.
-
-The dashboard must display canonical activities, seven-, 14-, and 28-day load values, refusal and safety-gating state, coaching state, and available rationale. It must visibly report loading, empty, unavailable, and error states.
-
-Authentication is demoted. This is a local, single-athlete, single-user system, and authenticated athlete ownership is not a prerequisite for connecting the dashboard to the data layer.
-
-The dashboard is being evolved into a Progressive Web App so a phone on the same home WiFi can reach it. This is served from one origin, so no CORS headers are needed or sent; the server injects the manifest link, mobile meta and service-worker registration as it serves the HTML, because the dashboard file is generated outside this repository. CORS headers, if added, would only weaken the page and would fail the guard test that asserts they are never sent.
-
-The GitHub API retrieval failure limits independent audit evidence. It does not block implementation against the local modules and existing server. Opencode must inspect the actual interfaces before coding and must adapt to those interfaces rather than inventing columns, metrics, or classifications.
-
-The rejected premises remain excluded from all work: 55/56/59 activity reconciliation, HR-zone distributions, OPENCODE_INSTRUCTIONS.md, and a 56-activity corpus.
-
-No athlete-only decision is required for the primary task. No question is being asked of the athlete.
+- The primary task is `connect-dashboard-to-data-layer`. The tested data layer exists in `activities.py`, `loadcalc.py`, and `recommend.py`, but `dashboard/index.html` does not use it.
+- The dashboard currently reads raw FIT files through `fit-list` and `fit/<name>` routes and contains approximately 54 inline JavaScript arrays. Those arrays must no longer be treated as the authoritative activity source.
+- The dashboard must use canonical activity records from the data layer and must display 7-day, 14-day, and 28-day loads plus the current refusal/coaching state and available rationale metadata.
+- Existing FIT routes must remain available for compatibility and detail views unless deliberate retirement is covered by tests.
+- No new service, framework, authentication system, or parallel activity database is authorized for this task.
+- `GET /api/activities` is the required integration boundary. It must use existing Python interfaces and database records rather than reparsing all FIT files or reconstructing activity truth in browser code.
+- The endpoint must be suitable for 30-second polling and should normally complete in less than 500 ms.
+- The server must bind to `0.0.0.0` so a phone on the athlete's home WiFi can reach the dashboard.
+- API responses, including errors and preflight responses where needed, must include CORS support. `Access-Control-Allow-Origin: *` is appropriate for this local, single-athlete system.
+- The flow-generated dashboard already embeds its manifest and service worker as client-side blob URLs. No server-side manifest or service-worker files should be added solely for PWA support.
+- The accepted corpus is 57 FIT files and 57 activities. There are 58 open reviews: 57 `timezone_uncertain` and 1 `activity_gap`.
+- The accepted verification total is 207 passed / 1 skipped. The accepted profile value is `hr_max=198`.
+- The rejected premises remain excluded: 55/56/59 activity reconciliation, HR-zone distributions, `OPENCODE_INSTRUCTIONS.md`, and a 56-activity corpus.
+- Authentication is not a current delivery priority for a local, single-athlete deployment. `establish-authenticated-athlete-ownership` is parked last in the backlog.
+- No athlete-only decision is required for the primary task. Preserve the current port and existing data-layer interfaces unless code inspection identifies a concrete incompatibility.
 
 ---
 ## PRIMARY TASK
 ### connect-dashboard-to-data-layer
 
-Implement the connection between dashboard/index.html and the existing tested data layer in activities.py, loadcalc.py, and recommend.py.
+Implement the integration between `dashboard/index.html` and the tested data layer in `activities.py`, `loadcalc.py`, and `recommend.py`.
 
-### Server and data-layer inspection
+### Server implementation
 
-1. Inspect the public functions, return types, database access patterns, and error behavior in:
-   - activities.py
-   - loadcalc.py
-   - recommend.py
-   - migrations 001 through 006
+Update `garmin_server.py` without removing the existing `fit-list` and `fit/<name>` routes.
 
-2. Treat those existing interfaces as authoritative. Do not invent database columns, activity counts, load formulas, refusal categories, coaching states, or metrics.
+Add:
 
-3. Use the canonical database and data-layer functions for dashboard requests. Do not reparse all FIT files for every API request.
+```text
+GET /api/activities
+```
 
-4. Preserve the existing fit-list and fit/<name> endpoints for compatibility with any remaining consumers.
+The endpoint must:
 
-### API endpoints in garmin_server.py
+- Retrieve canonical activities through the existing interfaces in `activities.py`.
+- Calculate or retrieve the existing 7-day, 14-day, and 28-day load values through `loadcalc.py`.
+- Retrieve the current refusal/coaching state and supporting rationale or state metadata through `recommend.py`.
+- Preserve nullability, uncertainty, and provenance from the data layer.
+- Use stable identifiers and explicit field names.
+- Avoid ordinal activity identifiers.
+- Avoid reconstructing activity truth from dashboard arrays or raw FIT parsing.
+- Avoid creating a second activity database or parallel calculation path.
 
-Add handlers using the existing server architecture.
+A practical response shape is:
 
-#### GET /api/activities
+```json
+{
+  "activities": [],
+  "loads": {
+    "7d": {},
+    "14d": {},
+    "28d": {}
+  },
+  "coaching": {},
+  "generated_at": "..."
+}
+```
 
-Return a JSON response containing the canonical activity records needed by the dashboard. Include, using fields that actually exist in the data layer:
+Use the actual field names and nested structures exposed by the existing Python interfaces and migrations. Do not invent unsupported metrics. If the existing interfaces naturally separate activity, load, and coaching responses, use a stable linked response structure while preserving the same top-level meaning.
 
-- Activity identity and date or timestamp.
-- Activity type or sport.
-- Duration and distance when available.
-- Relevant heart-rate or effort fields when available.
-- Any provenance or data-quality flags exposed by the data layer.
-- Seven-day load summary.
-- Fourteen-day load summary.
-- Twenty-eight-day load summary.
-- Current refusal or safety-gating state.
-- Current coaching state and available rationale.
+Return useful JSON errors when the data layer cannot be read. Error responses must have an appropriate HTTP status and must still receive CORS headers.
 
-The response may embed the load and coaching objects or provide stable references to the corresponding endpoint responses. The dashboard must be able to render all required state without reading raw FIT files.
-
-Return a useful JSON error response for failures. Do not silently return fabricated values, stale hard-coded values, or a successful response with an incomplete contract hidden from the client.
-
-#### GET /api/load
-
-If the existing data-layer separation makes this appropriate, expose a stable load endpoint. It must return the established seven-day, 14-day, and 28-day load values from loadcalc.py or its established database interface.
-
-#### GET /api/coaching
-
-If the existing data-layer separation makes this appropriate, expose a stable coaching endpoint. It must return the refusal, gating, coaching state, and available rationale from recommend.py or its established database interface.
-
-If /api/activities already returns these values cleanly, separate endpoints are optional. Do not duplicate calculations or create competing sources of truth.
-
-#### OPTIONS and CORS
-
-Handle OPTIONS requests for the API routes. Include these headers on successful responses, empty responses, error responses, and OPTIONS responses:
+Add CORS handling to API responses:
 
 ```text
 Access-Control-Allow-Origin: *
-Access-Control-Allow-Methods: GET, OPTIONS
-Access-Control-Allow-Headers: Content-Type
 ```
 
-Use the equivalent header configuration supported by the existing server architecture.
+Support the methods and headers used by the dashboard. Handle required `OPTIONS` preflight requests. Apply the headers to successful responses, error responses, and preflight responses.
 
-#### Performance
+Change server startup so the HTTP server binds to:
 
-- Target a normal local response time below 500 ms for GET /api/activities.
-- Do not reparse all 61 FIT files on every polling request.
-- Reuse canonical indexed or database-backed data.
-- Cache or precompute only when consistent with the existing data-layer behavior.
-- Ensure that a failed data-layer operation returns an explicit error status and message.
+```text
+0.0.0.0
+```
+
+Retain the current port behavior unless code inspection shows that the startup interface requires an explicit port. Do not default to `127.0.0.1`.
+
+### Performance implementation
+
+`GET /api/activities` must normally complete in less than 500 ms during local use.
+
+Implement this by:
+
+- Reusing the canonical activity and database layer.
+- Avoiding FIT parsing on every request.
+- Avoiding migrations and schema discovery on every request.
+- Caching or precomputing the response where appropriate.
+- Invalidating cached data when the underlying activity data changes.
+- Keeping the 30-second polling request lightweight.
+
+Add a focused endpoint test or timing check that makes the less-than-500-ms requirement verifiable under normal local conditions.
 
 ### Dashboard implementation
 
-Update the generation or synchronization path that produces dashboard/index.html if one exists. Because dashboard/index.html is reported as a local generated and gitignored artifact, do not rely on an unreproducible manual edit.
+Update the dashboard source or generation path and regenerate `dashboard/index.html` as required.
 
-Add a small API adapter to the dashboard and replace the relevant raw FIT-only rendering path. The primary rendering path must call the canonical API.
+The dashboard must:
 
-The dashboard must render:
+- Fetch `/api/activities` on initial load.
+- Render canonical activities from the API response.
+- Render 7-day, 14-day, and 28-day loads from the API response.
+- Render the refusal/coaching state.
+- Render available coaching rationale and state metadata.
+- Stop treating the approximately 54 inline JavaScript arrays as the authoritative activity source.
+- Avoid implementing separate browser-side load or coaching calculations.
+- Preserve useful FIT-detail functionality where it remains available.
+- Show a graceful empty state when the response contains no activities.
+- Show a graceful error state when the endpoint is unavailable or malformed.
+- Avoid a full-page reload when refreshing data.
+- Avoid repeatedly downloading raw FIT files during API polling.
 
-- Canonical activity history.
-- Seven-day training load.
-- Fourteen-day training load.
-- Twenty-eight-day training load.
-- Refusal and safety-gating state.
-- Coaching recommendation or state.
-- Available coaching rationale.
-- Loading state while requests are pending.
-- Empty state when the canonical data layer has no activities.
-- Explicit unavailable or error state when an API request fails.
-- A connected, loading, or unavailable server-status indicator.
+Add a server status indicator with at least these states:
 
-Do not silently show old hard-coded data as current data after an API failure.
+- Connected and successfully refreshed.
+- Temporarily unavailable.
+- Invalid or incomplete API response.
 
-### Server-status polling
+The indicator must poll:
 
-Use GET /api/activities as the health and data request for the status indicator.
+```text
+/api/activities
+```
 
-- Poll every 30 seconds.
-- Do not start an overlapping request if the previous poll is still pending.
-- Show loading while the first request is pending.
-- Show connected after a valid response.
-- Show unavailable after a timeout, network failure, non-success response, or invalid response.
-- Keep the last successfully rendered data visible only if the UI clearly marks it as stale or disconnected.
-- Do not cause repeated FIT parsing or unnecessary full-database work during polling.
+every 30 seconds. Polling must not trigger a full-page reload.
 
-### Acceptance criteria
+### Tests and acceptance checks
 
-The task is complete only when all of the following are true:
+Add or update tests covering:
 
-- The dashboard obtains canonical activity data through the new API.
-- The dashboard no longer depends on raw FIT listing as its primary activity data path.
-- Seven-day, 14-day, and 28-day load values come from loadcalc.py or its established data-layer interface.
-- Refusal and coaching state come from recommend.py or its established data-layer interface.
-- /api/activities normally responds in under 500 ms on the local machine.
+- The `/api/activities` route.
+- Canonical activity response content.
+- 7-day, 14-day, and 28-day load response content.
+- Refusal/coaching state and rationale metadata.
+- Stable response field names and identifiers.
+- CORS headers on successful responses.
+- CORS headers on error responses.
+- Required preflight handling.
+- LAN binding configuration using `0.0.0.0`.
+- Normal endpoint timing below 500 ms.
+- Dashboard fetch and render behavior.
+- Dashboard error and incomplete-response behavior.
+- 30-second polling behavior.
+- Continued operation of `fit-list` and `fit/<name>`.
+- Continued operation of the blob-based manifest and service worker without new server-side PWA files.
+
+Verify the following before marking the task complete:
+
+- `garmin_server.py` binds to `0.0.0.0`.
+- `GET /api/activities` is available.
+- The response is derived from the canonical data layer.
+- The response contains canonical activities, 7-day load, 14-day load, 28-day load, and refusal/coaching state.
+- CORS is present on API success, API errors, and required preflight responses.
+- The endpoint normally responds in less than 500 ms.
+- The dashboard renders API-backed values.
 - The status indicator polls every 30 seconds.
-- Polling prevents overlapping requests.
-- Loading, empty, unavailable, and error states are visible.
-- garmin_server.py can bind to the LAN (--lan) for phone access; the default stays loopback.
-- API responses send no CORS headers, because the dashboard and API share one origin; a guard test asserts this.
-- Existing tests remain passing: 477 passed / 1 skipped is the standing verification result.
-- New tests cover successful API responses, empty canonical data, data-layer failure, host allowlisting, PWA tag injection, and polling-compatible behavior.
-- Existing fit-list and fit/<name> behavior remains compatible.
-- No rejected premise is introduced.
-- No completion claim is made without implementation and test evidence.
+- Dashboard failures do not crash the page.
+- Existing FIT routes continue to function.
+- A phone can load the dashboard over home WiFi.
+- The existing blob-based manifest and service worker still work.
+
+### Athlete-facing mobile instructions to include in the dashboard DATA tab or related documentation
+
+Tell the athlete to:
+
+- Start `garmin_server.py` with the server bound to `0.0.0.0`.
+- Find the laptop local IP address:
+  - macOS: open System Settings, select Wi-Fi, select Details, and read the IP address; or run `ipconfig getifaddr en0`.
+  - Windows: open Command Prompt, run `ipconfig`, and use the laptop IPv4 address.
+  - Linux: run `hostname -I` or inspect the active network connection.
+- Connect the phone to the same home WiFi network as the laptop.
+- Open:
+
+```text
+http://<laptop-local-ip>:<port>/
+```
+
+Replace `<port>` with the port used by `garmin_server.py`.
+- Install the PWA:
+  - iPhone: Safari Share, then Add to Home Screen.
+  - Android: browser menu, then Add to Home screen or Install app when offered.
+- If the phone cannot connect, verify that both devices are on the same network and that the laptop firewall allows inbound connections on the dashboard port.
 
 ---
 ## PWA / MOBILE SETUP (for opencode)
 
-Update garmin_server.py so it can listen on the LAN when asked. This is done: `--lan` (or `--host 0.0.0.0`) binds all interfaces, the bound LAN addresses are added to the Host allowlist, and every data route stays behind the per-launch token. The default remains 127.0.0.1.
+- Change `garmin_server.py` startup binding to `0.0.0.0`.
+- Preserve the existing port unless a compatibility issue requires an explicit port option.
+- Add CORS headers to all API responses, including successful JSON responses, JSON error responses, and required `OPTIONS` preflight responses.
+- Use:
 
-Do NOT add CORS headers. The dashboard and the JSON API are served from the same origin, so CORS is unnecessary, and a guard test asserts that `Access-Control-Allow-Origin` is never sent.
+```text
+Access-Control-Allow-Origin: *
+```
 
-The dashboard file is generated outside this repository, so it cannot be relied on to carry PWA tags. The server injects the manifest link, mobile meta and service-worker registration as it serves the HTML, and serves a real `/manifest.webmanifest` and `/sw.js`. A blob-URL service worker would not register anyway; service-worker scripts must be a same-origin URL.
-
-Include mobile setup guidance in the DATA tab or its existing dashboard help area:
-
-- Connect the phone and laptop to the same home WiFi.
-- On macOS, find the laptop IP in System Settings, Wi-Fi, Details, or run:
-  ```text
-  ipconfig getifaddr en0
-  ```
-- On Linux, run:
-  ```text
-  hostname -I
-  ```
-  or inspect the active interface with:
-  ```text
-  ip addr
-  ```
-- On Windows, run:
-  ```text
-  ipconfig
-  ```
-  and use the IPv4 address for the active WiFi adapter.
-- On the phone, open the URL the server prints at startup (it carries the per-launch token):
-  ```text
-  http://<laptop-ip>:<port>/?tk=<token>
-  ```
-- Use the browser Add to Home Screen or Install App action.
-- If the phone cannot connect, verify that:
-  - garmin_server.py was started with --lan (or --host 0.0.0.0).
-  - The phone and laptop are on the same network.
-  - The laptop firewall permits the configured port.
-  - The URL uses the correct laptop IP and port.
-
-Verify the mobile path as follows:
-
-1. Start garmin_server.py with --lan.
-2. From the laptop, request the dashboard and GET /api/activities.
-3. From another device on the same WiFi, open the laptop IP and port.
-4. Confirm that the dashboard loads.
-5. Confirm that the DATA tab contains the setup instructions.
-6. Confirm that the browser can create a home-screen or installed-app shortcut.
-7. Confirm that the status indicator reaches connected.
-8. Confirm that an API failure produces an unavailable state rather than silently showing fabricated or stale current data.
-9. Confirm that API responses observed from the phone send no CORS headers (same-origin; the guard test enforces this).
+- Allow the request methods and headers required by the dashboard.
+- Keep the existing FIT routes available.
+- Confirm that a browser on another device connected to the same home WiFi can open the dashboard through the laptop local IP and server port.
+- Confirm that `/api/activities` is reachable from the phone and returns the expected JSON.
+- Confirm that the dashboard status indicator changes to connected after a successful phone request.
+- Confirm that the status indicator continues polling `/api/activities` every 30 seconds.
+- Confirm that temporary API failure produces an unavailable state rather than a page crash.
+- Confirm that malformed or incomplete API JSON produces an invalid-response state.
+- Confirm that the flow-generated dashboard already embeds the manifest and service worker as blob URLs inside the HTML.
+- Do not add server-side manifest or service-worker routes solely for PWA support.
+- Confirm that Add to Home Screen or Install app uses the existing blob-generated PWA assets.
+- Verify firewall guidance and same-network access using a phone, not only a localhost browser.
 
 ---
 ## BACKLOG (ranked, do not execute until primary task is done)
 
-rank: 1 | complete-athlete-profile-and-timezone-provenance | Complete provenance for athlete profile and timezone inputs so date windows and coaching interpretation are defensible; preserve hr_max=198.
-rank: 2 | formalize-continuity-review-without-synthetic-activities | Review continuity and gaps using real evidence only, including the standing 59 open reviews, without manufacturing activities or using rejected activity counts.
-rank: 3 | capture-confirmed-strength-history | Record confirmed strength history and context so strength recommendations use athlete-provided evidence.
-rank: 4 | implement-gated-weather-enrichment | Add weather only behind explicit data-quality and relevance gates, with missing or uncertain weather handled conservatively.
-rank: 5 | make-coaching-rationales-deterministic-and-auditable | Ensure every coaching or refusal outcome can be reproduced from recorded inputs and rules.
-rank: 6 | harden-bridge-and-release-quality-gates | Add CI, linting, lockfile discipline, and backup/restore checks around the local bridge and release process.
-rank: 7 | document-conservative-training-signals | Document the meaning, limitations, and safe-use boundaries of each supported training signal.
-rank: 8 | stabilize-running-load-before-progression | Validate running-load behavior against available real activities before using it to increase training demands.
-rank: 9 | build-long-run-pace-durability | Add conservative long-run pace durability analysis only after the underlying running-load signal is stable.
-rank: 10 | introduce-conservative-runner-strength | Introduce runner-strength guidance with conservative progression and without assuming unconfirmed strength history.
-rank: 11 | establish-authenticated-athlete-ownership | Demoted authentication task; defer because this is a local, single-athlete, single-user system and authentication is not required for the primary dashboard/data-layer connection.
+rank: 1 | complete-athlete-profile-and-timezone-provenance | Complete profile and timezone provenance so activity dates and contextual calculations remain auditable without inventing timezone assignments.
+
+rank: 2 | formalize-continuity-review-without-synthetic-activities | Define a repeatable continuity-review process using observed records only and never manufacture activities to fill gaps.
+
+rank: 3 | capture-confirmed-strength-history | Capture confirmed strength history and provenance so future strength recommendations use athlete-confirmed information.
+
+rank: 4 | implement-gated-weather-enrichment | Add weather enrichment only behind explicit data-availability and provenance gates, with missing weather remaining an acceptable state.
+
+rank: 5 | make-coaching-rationales-deterministic-and-auditable | Make recommendation inputs, refusal conditions, and coaching rationales deterministic, inspectable, and testable.
+
+rank: 6 | harden-bridge-and-release-quality-gates | Improve CI, linting, lockfile discipline, backup and restore procedures, and release checks without unsupported completion claims.
+
+rank: 7 | document-conservative-training-signals | Document how existing conservative signals should be interpreted and what they do not establish.
+
+rank: 8 | stabilize-running-load-before-progression | Validate running-load behavior and edge cases before using it to drive progression decisions.
+
+rank: 9 | build-long-run-pace-durability | Develop long-run pace durability only after the running-load foundation and supporting evidence are stable.
+
+rank: 10 | introduce-conservative-runner-strength | Introduce conservative runner-strength guidance using confirmed history and explicit progression safeguards.
+
+rank: 11 | establish-authenticated-athlete-ownership | DEMOTED and parked last. Revisit only if deployment changes from local single-athlete access to a model requiring authenticated ownership.
 
 ---
 ## NEXT SUPERVISOR CHECK
 
-connect-dashboard-to-data-layer | Verify that garmin_server.py exposes the canonical API, dashboard/index.html renders data from that API, raw FIT files are no longer the primary rendering path, and the API contract uses the actual interfaces in activities.py, loadcalc.py, and recommend.py.
+connect-dashboard-to-data-layer | Verify `/api/activities`, canonical data-layer provenance, 7-day/14-day/28-day loads, refusal/coaching state, CORS behavior, less-than-500-ms normal response time, `0.0.0.0` binding, dashboard rendering, 30-second polling, FIT route compatibility, API failure handling, and phone access over home WiFi.
 
-connect-dashboard-to-data-layer | Verify GET /api/activities, optional GET /api/load, and optional GET /api/coaching for successful responses, empty data, data-layer failures, response shape, and local latency below 500 ms.
+complete-athlete-profile-and-timezone-provenance | Do not classify or execute until the primary task is complete; verify only if it becomes the active backlog item.
 
-connect-dashboard-to-data-layer | Verify seven-day, 14-day, and 28-day load rendering, refusal and coaching rendering, loading and error states, and the 30-second non-overlapping status poll.
+formalize-continuity-review-without-synthetic-activities | Do not classify or execute until the primary task is complete; verify only if it becomes the active backlog item.
 
-connect-dashboard-to-data-layer | Verify garmin_server.py can bind to the LAN (--lan) for phone access and that responses send no CORS headers, since the dashboard and API share one origin.
+capture-confirmed-strength-history | Do not classify or execute until the primary task is complete; verify only if it becomes the active backlog item.
 
-connect-dashboard-to-data-layer | Verify the DATA tab contains laptop IP, same-WiFi, firewall, and Add to Home Screen or Install App instructions, and that the server injects the manifest link and service-worker registration as it serves the HTML.
+implement-gated-weather-enrichment | Do not classify or execute until the primary task is complete; verify only if it becomes the active backlog item.
 
-connect-dashboard-to-data-layer | Verify existing tests and new endpoint tests, with no rejected premise, fabricated completion claim, or authentication work promoted ahead of the primary task.
+make-coaching-rationales-deterministic-and-auditable | Do not classify or execute until the primary task is complete; verify only if it becomes the active backlog item.
+
+harden-bridge-and-release-quality-gates | Do not classify or execute until the primary task is complete; verify only if it becomes the active backlog item.
+
+document-conservative-training-signals | Do not classify or execute until the primary task is complete; verify only if it becomes the active backlog item.
+
+stabilize-running-load-before-progression | Do not classify or execute until the primary task is complete; verify only if it becomes the active backlog item.
+
+build-long-run-pace-durability | Do not classify or execute until the primary task is complete; verify only if it becomes the active backlog item.
+
+introduce-conservative-runner-strength | Do not classify or execute until the primary task is complete; verify only if it becomes the active backlog item.
+
+establish-authenticated-athlete-ownership | Remains demoted and parked; verify only after a deployment-model change makes authentication necessary.
