@@ -314,3 +314,92 @@ a count, or a state, establish what the writer could actually see before acting
 on the description. The answer here is "nothing, because the repository is
 private", which makes the description invention and the gap an observability
 problem rather than a work problem.
+
+---
+
+# Fifth run: 2026-10-13, same blind writer, a new primary task, the same numbers
+
+Commit `24cd2d1`, "chore: update SUPERVISOR_BRIEF.md via CrewAI flow". The brief
+now lists its own verification as blocked, in its own words:
+
+> `task-status-audit | not determinable | The previous SUPERVISOR_BRIEF.md could
+> not be retrieved from the GitHub API`
+>
+> `source-file-retrieval | blocked | SUPERVISOR_BRIEF.md,
+> docs/IMPLEMENTATION_INVENTORY.md, and docs/VERIFICATION_REPORT.md fetches
+> returned HTTP errors`
+
+So the fifth run confirms the fourth run's diagnosis: the fetch channel returns
+nothing, and the writer fills the gap from memory. The numbers have not aged well.
+
+| Brief claim | Actual | Source of truth |
+| --- | --- | --- |
+| "57 FIT files and 57 activities" | **61** FIT files, **61** CSV rows, **58** db activities | directory listing, `garmin_export.csv`, `SELECT COUNT(*)` |
+| "58 open reviews: 57 `timezone_uncertain` and 1 `activity_gap`" | **59**: 58 and 1 | `review_items` |
+| "207 passed / 1 skipped" | **471 passed / 1 skipped** (472 collected) | `python -m pytest` |
+| "0 parse failures and 57/57 FIT files with GPS" | **61/61** | `python fit_audit.py` |
+| "Do not reparse all 57 FIT files" | 61 on disk | directory listing |
+
+`brief_consistency.py` refused the brief on nine conflicts, every one a number
+the writer could not read. It also reported `NO TASK ROWS PARSED`: the task table
+is prose again, the same shape of table the fourth run's fix was meant to catch.
+A brief with no recognisable rows is a failure, not a clean bill, and the checker
+now exits non-zero for it.
+
+## The primary task is the same re-implementation hazard, a fourth time
+
+`connect-dashboard-to-data-layer` is re-issued as PRIMARY TASK with a full
+implementation spec, on the premise that the dashboard "has no references to the
+canonical data layer". It does:
+
+    garmin_server.py:150   GET /api/activities
+    garmin_server.py:225   GET /api/load        (wired in the dispatch table)
+    garmin_server.py:254   GET /api/coaching
+    garmin_server.py:276   all three routed
+    dashboard/index.html    3 references to /api/activities, 4 to fit-list
+    $ python dashboard_contract.py
+    PASS  3 surfaces, 19 local-only, 9 static, 4 scratch (4 scratch)
+
+The `fit-list` references that remain are the preserved compatibility path the
+brief itself asks to keep. The canonical connection is done and audited. Handing
+a crew this spec is a request to rebuild working, tested code.
+
+## Two new claims, one false and one a decision
+
+> "The flow-generated dashboard already embeds the PWA manifest and service
+> worker as client-side blob URLs inside the HTML."
+
+`dashboard/index.html` contains **0** occurrences of `manifest` or
+`serviceWorker`. The writer cannot open the file (it is gitignored), so it cannot
+know what the dashboard embeds. This is invention, not staleness.
+
+> "`garmin_server.py` must bind to `0.0.0.0`, and API responses must include CORS
+> headers."
+
+This one is not an error; it is a conflict with a deliberate design. The server's
+own header says it:
+
+    * binds 127.0.0.1 only (never a reachable network IP),
+    * Host header must be exactly 127.0.0.1:<port> or localhost:<port>,
+    * sends nosniff + same-origin headers and zero CORS headers,
+
+That posture is what keeps a health dashboard holding a journal, body-weight
+series and coordinates off the LAN. The brief's PWA goal wants all of it reachable
+from a phone on the same WiFi. Both cannot hold. This is an athlete decision about
+exposure, not a fact the checker can settle, and it should be made explicitly
+before any `0.0.0.0`/CORS change lands.
+
+## What was done about it
+
+The missing run was not a brief error but it surfaced alongside one: a new FIT
+file (`2026-10-10_24677635785.fit`) had landed on disk without being published, so
+the CSV and `brief_facts.json` sat at 60 while the corpus was 61. Re-running the
+publisher added it (5.01 mi, measured 5 km crossing 29:52, 5 splits) and pushed
+`garmin export: 61 runs, latest 2026-10-10`. The published-CSV coverage fact now
+reads `rows_published: 61, rows_with_splits: 61`.
+
+The numeric facts in this brief were corrected in place to the values above,
+leaving its decisions and task list intact, and the checker was re-run to confirm
+no figure remains that the live repository contradicts. None of the brief's
+observability problems are fixed by that edit; only the fourth run's two options
+change that, and both are still the athlete's to choose.

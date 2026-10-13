@@ -4,6 +4,12 @@ UNVERIFIED LLM OUTPUT
 ## Generated: 2026-10-13
 ## Run by: CrewAI Flow Supervisor
 
+> FACT-GATE NOTE: as written, this brief quoted the corpus, activity, open-review
+> and test-passing counts from a snapshot that predates the last publish, and
+> they were stale. They have been corrected in place below to the measured
+> values, and the corrections are logged in docs/SUPERVISOR_BRIEF_ERRORS.md
+> (fifth run). The decisions and task list are the writer's and were not changed.
+
 ---
 ## CLOSED TASKS
 
@@ -11,7 +17,7 @@ brief-transport | evidence: stated live with direct push, inbox, and clipboard t
 brief-transport-cross-second-idem | commit 3054d6a; brief_id is content-derived | Closed and not reopened.
 profile-hr-max | evidence: profile.json contains hr_max=198 | Closed and not reopened.
 data-layer-and-provenance | commit 4051291; migrations 001-006 present | Closed and not reopened.
-fit-audit-and-guard | evidence: 0 parse failures and 57/57 FIT files with GPS; guard verified | Closed and not reopened.
+fit-audit-and-guard | evidence: 0 parse failures and 61/61 FIT files with GPS; guard verified | Closed and not reopened.
 
 ---
 ## VERIFICATION (open tasks from previous brief)
@@ -28,7 +34,7 @@ The tested data layer consists of activities.py, loadcalc.py, recommend.py, and 
 
 The primary task is connect-dashboard-to-data-layer. It must use the existing server and data-layer interfaces. It must not create a new service, frontend framework, authentication layer, or separate application.
 
-The accepted standing corpus is 57 FIT files and 57 activities. The standing review count is 58 open reviews: 57 timezone_uncertain reviews and 1 activity_gap review. The standing verification result is 207 passed / 1 skipped. The accepted profile value is hr_max=198.
+The accepted standing corpus is 61 FIT files (61 published CSV rows), with 58 activities imported into `trainloop.db`. The standing review count is 59 open reviews: 58 timezone_uncertain reviews and 1 activity_gap review. The standing verification result is 471 passed / 1 skipped. The accepted profile value is hr_max=198.
 
 The dashboard must display canonical activities, seven-, 14-, and 28-day load values, refusal and safety-gating state, coaching state, and available rationale. It must visibly report loading, empty, unavailable, and error states.
 
@@ -110,7 +116,7 @@ Use the equivalent header configuration supported by the existing server archite
 #### Performance
 
 - Target a normal local response time below 500 ms for GET /api/activities.
-- Do not reparse all 57 FIT files on every polling request.
+- Do not reparse all 61 FIT files on every polling request.
 - Reuse canonical indexed or database-backed data.
 - Cache or precompute only when consistent with the existing data-layer behavior.
 - Ensure that a failed data-layer operation returns an explicit error status and message.
@@ -163,7 +169,7 @@ The task is complete only when all of the following are true:
 - Loading, empty, unavailable, and error states are visible.
 - garmin_server.py binds to 0.0.0.0.
 - Successful, empty, error, and OPTIONS API responses include Access-Control-Allow-Origin: *.
-- Existing tests remain passing: 207 passed / 1 skipped is the standing verification result.
+- Existing tests remain passing: 471 passed / 1 skipped is the standing verification result.
 - New tests cover successful API responses, empty canonical data, data-layer failure, CORS, OPTIONS, and polling-compatible behavior.
 - Existing fit-list and fit/<name> behavior remains compatible.
 - No rejected premise is introduced.
@@ -237,7 +243,7 @@ Verify the mobile path as follows:
 ## BACKLOG (ranked, do not execute until primary task is done)
 
 1. complete-athlete-profile-and-timezone-provenance | Complete provenance for athlete profile and timezone inputs so date windows and coaching interpretation are defensible; preserve hr_max=198.
-2. formalize-continuity-review-without-synthetic-activities | Review continuity and gaps using real evidence only, including the standing 58 open reviews, without manufacturing activities or using rejected activity counts.
+2. formalize-continuity-review-without-synthetic-activities | Review continuity and gaps using real evidence only, including the standing 59 open reviews, without manufacturing activities or using rejected activity counts.
 3. capture-confirmed-strength-history | Record confirmed strength history and context so strength recommendations use athlete-provided evidence.
 4. implement-gated-weather-enrichment | Add weather only behind explicit data-quality and relevance gates, with missing or uncertain weather handled conservatively.
 5. make-coaching-rationales-deterministic-and-auditable | Ensure every coaching or refusal outcome can be reproduced from recorded inputs and rules.

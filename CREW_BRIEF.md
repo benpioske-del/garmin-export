@@ -14,7 +14,7 @@ analyse training without access to the original device or the owner's machine.
 > **If you cannot fetch this file, you cannot fetch anything here, and you must not
 > write a brief from memory.** Four briefs have been written that way and all four
 > were wrong about the same things: the dashboard integration (done since long
-> before), the corpus size (60, not 57), the open review count (59, not 58), and the
+> before), the corpus size (61, not 57), the open review count (59, not 58), and the
 > test count (429, not 207). Those are not judgement errors. They are the shape of
 > a writer with no access to the data.
 >
@@ -236,10 +236,10 @@ source. Re-derive it if you can.
 | Fact | Value | How to re-derive |
 |---|---|---|
 | Repository visibility | **private** | anonymous raw URL returns 404 |
-| FIT files | 60 | count in the local export |
+| FIT files | 61 | count in the local export |
 | Activities | 58 | `SELECT COUNT(*) FROM activities` |
 | Open reviews | 59 | 58 `timezone_uncertain` + 1 `activity_gap` |
-| FIT files with lap records | 60 of 60 | `python brief_consistency.py` |
+| FIT files with lap records | 61 of 61 | `python brief_consistency.py` |
 | Splits published | yes (`Best 5K Time`, `Lap Splits`) | header of `garmin_export.csv` |
 | Fastest measured 5 km crossing | 24:42 on 2026-06-16, measured | `brief_facts.json` → `best_5k` |
 | Tests | 471 passed, 1 skipped (472 collected) | `python -m pytest` |
@@ -272,7 +272,7 @@ file in `tasks/` is not a task.
   trend, not a confident percentile.
 
 ### Splits: measured 5 km crossing, now published
-**Do not claim per-mile splits are unavailable.** They are not. Every one of the 60
+**Do not claim per-mile splits are unavailable.** They are not. Every one of the 61
 FIT files carries lap records, and since this publish `garmin_export.csv` has two
 new columns:
 
