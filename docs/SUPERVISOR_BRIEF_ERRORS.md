@@ -433,3 +433,37 @@ Because the brief's numbers now agree with the repository, `KNOWN_CONFLICTS` in
 `tests/test_brief_consistency.py` is empty: the pinned-conflict test now asserts
 the brief states **no** wrong number, so a *new* fabrication fails the suite,
 which is the drift worth catching.
+
+---
+
+# Sixth run: 2026-10-13, the same brief with the same numbers, again
+
+Commit `8b86398`, "chore: update SUPERVISOR_BRIEF.md via CrewAI flow". This is
+the fifth run's brief reproduced almost verbatim, including the numbers that
+were corrected one commit earlier:
+
+| Brief claim | Actual | Source of truth |
+| --- | --- | --- |
+| "57 FIT files and 57 activities" | **61** FIT files, **61** CSV rows, **58** db activities | directory listing, `garmin_export.csv`, `SELECT COUNT(*)` |
+| "58 open reviews: 57 `timezone_uncertain` and 1 `activity_gap`" | **59**: 58 and 1 | `review_items` |
+| "207 passed / 1 skipped" | **477 passed / 1 skipped** (478 collected) | `python -m pytest` |
+| "0 parse failures and 57/57 FIT files with GPS" | **61/61** | `python fit_audit.py` |
+
+The same two contradicting implementation premises returned with it: bind to
+`0.0.0.0`, send `Access-Control-Allow-Origin: *`, and "the flow-generated
+dashboard already embeds its manifest and service worker as client-side blob
+URLs". The first two were decided against and the third is false (the server
+serves real same-origin PWA files now). All three were corrected in place as in
+the fifth run.
+
+The dashboard premise was also reissued, this time as "`dashboard/index.html`
+does not use it". `dashboard_conflict()` was widened to catch that phrasing, so
+the false claim is still flagged as the pinned canary.
+
+## What this says about the fix
+
+The numbers are not drifting; they are frozen at a pre-`b2201c7` snapshot and
+restated every run. Correcting them in place is a holding action. The only thing
+that stops it is the authenticated fetch channel (`GITHUB_TOKEN`) from the fourth
+run's Option 1, which is still unset. Until then the writer is blind and the
+guard is the only defence.
