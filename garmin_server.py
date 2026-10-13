@@ -3,20 +3,27 @@
 garmin_server.py - minimal, locked-down static server for Coach Dashboard.
 
 Serves only the dashboard HTML, the two Garmin CSV exports, and runs' FIT
-files to ONE local browser session. It is intentionally paranoid:
+files. It is locked down by default:
 
-  * binds 127.0.0.1 only (never a reachable network IP),
+  * binds 127.0.0.1 (loopback) unless `--host`/`--lan` asks for a network
+    bind, which is what a phone on the same home WiFi needs;
   * a per-launch random token must be supplied in the X-Dash-Token header
-    (opened page receives it as ?tk=... in its URL),
-  * Host header must be exactly 127.0.0.1:<port> or localhost:<port>,
-    which defeats DNS-rebinding attacks from hostile web pages,
-  * never lists directories, serves only known filenames,
-  * sends nosniff + same-origin headers and zero CORS headers,
+    (opened page receives it as ?tk=... in its URL);
+  * Host header must name the interface we bound, on the bound port -
+    127.0.0.1/localhost by default, plus this machine's LAN addresses when
+    bound to the network. The port match is what defeats DNS-rebinding attacks
+    from hostile web pages;
+  * never lists directories, serves only known filenames;
+  * sends nosniff + same-origin headers and zero CORS headers;
   * exits on its own after ~20 minutes with no requests, so nothing
     lingers in the background.
 
+Because the dashboard is served from the same origin as the JSON API, it needs
+no CORS headers to read them; CORS would only weaken the page and is not sent.
+
 Usage:
     python garmin_server.py [--port PORT] [--token TOKEN] [--open]
+                            [--lan | --host ADDRESS]
 """
 
 import argparse
@@ -28,6 +35,7 @@ import re
 import secrets
 import shlex
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -280,6 +288,10 @@ API_ROUTES = {
 
 TOKEN = ""
 PORT = 0
+# Interface to bind and the Host-header names we will answer for. Loopback by
+# default; main() widens both when asked for a network bind.
+BIND_HOST = "127.0.0.1"
+ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 last_request: float = time.time()
 SYNC_SCRIPT = os.path.join(ROOT, "garmin_sync.py")
 _sync_lock = threading.Lock()
@@ -413,6 +425,116 @@ def _run_mega_put(zip_path, argv):
     return {"ok": proc.returncode == 0, "detail": tail[:300] or "no output"}
 
 
+# ---------------------------------------------------------------------------
+# Network exposure and the mobile (PWA) extras.
+# ---------------------------------------------------------------------------
+
+def local_ipv4s():
+    """Best-effort list of this machine's non-loopback IPv4 addresses.
+
+    Used to decide which Host headers to answer for when bound to the network.
+    The UDP connect names no traffic; it only asks the routing table which local
+    address would reach the outside, which is the WiFi address a phone must use.
+    """
+    ips = set()
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ips.add(info[4][0])
+    except OSError:
+        pass
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            ips.add(s.getsockname()[0])
+        finally:
+            s.close()
+    except OSError:
+        pass
+    return sorted(ip for ip in ips if not ip.startswith("127."))
+
+
+def _host_ok(host_header):
+    """Whether to answer for this Host header.
+
+    The name must be one we bound (loopback, or a local IP in network mode) and
+    the port must match ours. Requiring the port is the DNS-rebinding defence:
+    a hostile page that resolves its own name to 127.0.0.1 still sends its own
+    Host, which we do not answer for.
+    """
+    h = (host_header or "").strip().lower()
+    if h.startswith("["):  # bracketed IPv6, e.g. [::1]:24567
+        name, _, rest = h[1:].partition("]")
+        port = rest.lstrip(":")
+    else:
+        name, _, port = h.partition(":")
+    return port == str(PORT) and name in ALLOWED_HOSTS
+
+
+# Injected into the served HTML because the dashboard is generated outside this
+# repository (it is gitignored), so tags written into the file would be lost on
+# the next regeneration. The marker makes the injection idempotent.
+PWA_MARK = "coach-pwa"
+PWA_HEAD = (
+    "<!-- %s -->\n"
+    '<link rel="manifest" href="/manifest.webmanifest">\n'
+    '<meta name="theme-color" content="#111418">\n'
+    '<meta name="mobile-web-app-capable" content="yes">\n'
+    '<meta name="apple-mobile-web-app-capable" content="yes">\n'
+    '<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">\n'
+    '<meta name="apple-mobile-web-app-title" content="Coach">\n' % PWA_MARK
+)
+PWA_SCRIPT = (
+    "<script>(function(){if('serviceWorker' in navigator){"
+    "window.addEventListener('load',function(){"
+    "navigator.serviceWorker.register('/sw.js').catch(function(){});});}})();"
+    "</script>\n"
+)
+
+MANIFEST_JSON = {
+    "name": "Coach Dashboard",
+    "short_name": "Coach",
+    "start_url": "/",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#111418",
+    "theme_color": "#111418",
+}
+
+# Network-only, caches nothing. The served HTML can contain private entries, so
+# it must not sit in a device cache; every request goes to the server. This
+# worker exists so the app is installable where a secure context allows it
+# (https or localhost). On plain http over the LAN the browser will refuse to
+# register it, and the page still works as a live home-screen shortcut.
+SW_JS = (
+    b"// Coach Dashboard service worker: network-only.\n"
+    b"self.addEventListener('install', function () { self.skipWaiting(); });\n"
+    b"self.addEventListener('activate', function (e) {\n"
+    b"  e.waitUntil(self.clients.claim());\n"
+    b"});\n"
+    b"self.addEventListener('fetch', function () {});\n"
+)
+
+
+def inject_pwa(html):
+    """Add the manifest link, mobile meta and SW registration to the HTML.
+
+    Idempotent (skips work if the marker is already present) and a no-op on
+    bytes that are not UTF-8 HTML, so it can never corrupt a served file.
+    """
+    try:
+        text = html.decode("utf-8")
+    except UnicodeDecodeError:
+        return html
+    if PWA_MARK in text:
+        return html
+    if "</head>" in text:
+        text = text.replace("</head>", PWA_HEAD + "</head>", 1)
+    if "</body>" in text:
+        text = text.replace("</body>", PWA_SCRIPT + "</body>", 1)
+    return text.encode("utf-8")
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = ""
     sys_version = ""
@@ -528,17 +650,26 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         global last_request
         last_request = time.time()
-        host = self.headers.get("Host", "").lower()
-        if host not in ("127.0.0.1:%d" % PORT, "localhost:%d" % PORT):
+        if not _host_ok(self.headers.get("Host", "")):
             return self._deny(403, "forbidden host")
         parts = urllib.parse.urlsplit(self.path)
         path = urllib.parse.unquote(parts.path)
         if path == "/ping":
             return self._send(200, b"coach-dashboard", "text/plain; charset=utf-8")
+        if path == "/manifest.webmanifest":
+            # Fetched by the browser itself, with no X-Dash-Token, so it lives
+            # above the token gate like /ping. It carries app metadata only.
+            body = json.dumps(MANIFEST_JSON).encode("utf-8")
+            return self._send(200, body, "application/manifest+json; charset=utf-8")
+        if path == "/sw.js":
+            # Also browser-initiated and token-free. Network-only, stores
+            # nothing; see SW_JS.
+            return self._send(200, SW_JS, "text/javascript; charset=utf-8")
         if path in ("/", "/index.html", "/favicon.ico"):
             try:
                 with open(resolve_dashboard_html(), "rb") as fh:
-                    return self._send(200, fh.read(), "text/html; charset=utf-8")
+                    return self._send(200, inject_pwa(fh.read()),
+                                      "text/html; charset=utf-8")
             except OSError:
                 return self._deny(404, "dashboard html not found")
         if self.headers.get("X-Dash-Token", None) != TOKEN:
@@ -583,8 +714,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         global last_request
         last_request = time.time()
-        host = self.headers.get("Host", "").lower()
-        if host not in ("127.0.0.1:%d" % PORT, "localhost:%d" % PORT):
+        if not _host_ok(self.headers.get("Host", "")):
             return self._deny(403, "forbidden host")
         if self.headers.get("X-Dash-Token", None) != TOKEN:
             return self._deny(403, "missing or wrong token")
@@ -701,10 +831,15 @@ def probe_existing_instance(port):
 
 
 def main():
-    global TOKEN, PORT, MEGACMD
+    global TOKEN, PORT, MEGACMD, BIND_HOST, ALLOWED_HOSTS
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=FIXED_PORT)
     ap.add_argument("--token", default="")
+    ap.add_argument("--host", default="127.0.0.1",
+                    help="interface to bind (default 127.0.0.1; use 0.0.0.0 "
+                         "or --lan to reach the dashboard from a phone)")
+    ap.add_argument("--lan", action="store_true",
+                    help="bind all interfaces (same as --host 0.0.0.0)")
     ap.add_argument("--megacmd", default="",
                     help="optional path (or command) for mega-put, e.g. "
                          '"C:\\Program Files (x86)\\MEGAcmd\\mega-put.exe"')
@@ -713,6 +848,12 @@ def main():
     PORT = args.port
     TOKEN = args.token if args.token else load_or_make_token()
     MEGACMD = args.megacmd
+    BIND_HOST = "0.0.0.0" if args.lan else args.host
+    # Answer for loopback always, and for this machine's LAN addresses when we
+    # are reachable on them. The token still gates every data route.
+    ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
+    if BIND_HOST not in ("127.0.0.1", "localhost"):
+        ALLOWED_HOSTS |= set(local_ipv4s())
     url = "http://127.0.0.1:%d/?tk=%s" % (PORT, TOKEN)
     # Probe BEFORE binding. On Windows SO_REUSEADDR lets a second bind to the
     # same port succeed, which would silently start a rival server instead of
@@ -731,11 +872,16 @@ def main():
         _t.daemon = True
         _t.start()
     try:
-        httpd = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+        httpd = ThreadingHTTPServer((BIND_HOST, PORT), Handler)
     except OSError as exc:
-        print("Could not bind 127.0.0.1:%d: %s" % (PORT, exc))
+        print("Could not bind %s:%d: %s" % (BIND_HOST, PORT, exc))
         sys.exit(1)
     print("Coach Dashboard local server: %s" % url)
+    if BIND_HOST not in ("127.0.0.1", "localhost"):
+        for ip in local_ipv4s():
+            print("Coach Dashboard on the network (phone): "
+                  "http://%s:%d/?tk=%s" % (ip, PORT, TOKEN))
+        print("(reachable from the same WiFi only; keep the token URL private.)")
     threading.Thread(target=idle_watchdog, args=(httpd,), daemon=True).start()
     try:
         httpd.serve_forever()

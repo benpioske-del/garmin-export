@@ -18,7 +18,8 @@ import pytest
 
 import brief_consistency as B
 
-# As of commit 09b5a1a (2026-10-05). Eleven ranked backlog rows, two task files.
+# Eleven ranked backlog rows, two task files. Unchanged through the fifth brief;
+# only its numeric claims drifted and were corrected in place (2026-10-13).
 KNOWN_UNBACKED = {
     "complete-athlete-profile-and-timezone-provenance",
     "formalize-continuity-review-without-synthetic-activities",
@@ -33,14 +34,10 @@ KNOWN_UNBACKED = {
     "establish-authenticated-athlete-ownership",
 }
 
-# (label, stated) pairs the fourth brief got wrong. Kept so that a brief which
-# stops making them is a visible change rather than a silent improvement.
-KNOWN_CONFLICTS = {
-    ("FIT files", 57),
-    ("activities", 57),
-    ("open reviews", 58),
-    ("tests passed", 207),
-}
+# (label, stated) pairs the brief gets wrong. The fifth brief's stale numbers
+# were corrected in place (docs/SUPERVISOR_BRIEF_ERRORS.md), so it now makes
+# none. Kept as a set so a NEW fabricated number is a visible failure.
+KNOWN_CONFLICTS = set()
 # The per-reason breakdown is checked separately by reason_conflicts().
 
 
@@ -86,17 +83,17 @@ def test_measured_facts_are_available():
 
 
 def test_conflicting_claims_are_pinned():
-    """Every number the writer could not read, and its correct value."""
+    """The corrected brief must state no wrong number; a new one fails here."""
     found = {(label, stated) for label, stated, _, _ in B.claim_conflicts()}
-    for label, stated in KNOWN_CONFLICTS:
-        assert (label, stated) in found, (
-            "the brief no longer states %s = %d; if that is deliberate, drop it "
-            "from KNOWN_CONFLICTS and say why" % (label, stated))
+    assert found == KNOWN_CONFLICTS, (
+        "the brief's claimed numbers changed: %s" % (found ^ KNOWN_CONFLICTS))
 
 
 def test_reason_breakdown_conflicts_are_pinned():
+    """The corrected brief's review breakdown must match; a new one fails."""
     found = {(label, stated) for label, stated, _, _ in B.reason_conflicts()}
-    assert ("timezone_uncertain", 57) in found
+    assert found == set(), (
+        "the brief's review breakdown changed: %s" % (found,))
 
 
 def test_a_brief_matching_reality_reports_no_conflicts(tmp_path, monkeypatch):

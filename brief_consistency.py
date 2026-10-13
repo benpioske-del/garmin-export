@@ -336,8 +336,10 @@ def dashboard_conflict(text=None):
         text = _read(BRIEF)
     connected = len(wiring["dashboard_calls"]) == 3
     claims_disconnected = re.search(
-        r"dashboard[^\n.]{0,80}?(not\s+connected|disconnected|has\s+no\s+"
-        r"references|not\s+been\s+connected|no\s+data-layer)", text, re.I)
+        r"dashboard[^\n]{0,200}?(not\s+connected|disconnected|has\s+no\s+"
+        r"references|not\s+been\s+connected|no\s+data-layer)"
+        r"|(not\s+connected|disconnected)\s+to\s+the\s+dashboard",
+        text, re.I)
     if connected and claims_disconnected:
         m = claims_disconnected
         return ("dashboard", "disconnected/not integrated",

@@ -204,3 +204,71 @@ def test_raw_fit_route_still_rejects_a_path_traversal(server):
 def test_unknown_non_api_route_is_still_plain_text_404(server):
     status, _, _ = _get(server, "/not-a-thing")
     assert status == 404
+
+
+# ------------------------------------------------------- mobile (PWA) extras
+
+def test_manifest_is_served_without_a_token(server):
+    """The browser fetches the manifest itself; it never carries our header."""
+    status, ctype, body = _get(server, "/manifest.webmanifest", token=None)
+    assert status == 200
+    assert ctype == "application/manifest+json; charset=utf-8"
+    m = json.loads(body.decode("utf-8"))
+    assert m["short_name"]
+    assert m["start_url"] == "/"
+    assert m["display"] == "standalone"
+
+
+def test_service_worker_is_served_without_a_token(server):
+    status, ctype, body = _get(server, "/sw.js", token=None)
+    assert status == 200
+    assert ctype == "text/javascript; charset=utf-8"
+    assert b"service worker" in body.lower()
+
+
+def test_dashboard_html_receives_the_pwa_tags(server, monkeypatch, tmp_path):
+    html = tmp_path / "index.html"
+    html.write_text("<!doctype html><html><head><title>x</title></head>"
+                    "<body>hi</body></html>", encoding="utf-8")
+    monkeypatch.setattr(G, "resolve_dashboard_html", lambda: str(html))
+    status, _, body = _get(server, "/")
+    text = body.decode("utf-8")
+    assert status == 200
+    assert '<link rel="manifest" href="/manifest.webmanifest">' in text
+    assert "serviceWorker.register('/sw.js')" in text
+    assert 'name="apple-mobile-web-app-capable"' in text
+    # injected once, not once per request
+    assert text.count(G.PWA_MARK) == 1
+
+
+def test_pwa_injection_is_idempotent_and_never_corrupts_non_html():
+    page = b"<!doctype html><html><head></head><body></body></html>"
+    once = G.inject_pwa(page)
+    assert once.count(G.PWA_MARK.encode("utf-8")) == 1
+    assert G.inject_pwa(once) == once
+    raw = b"\xff\xfe\x00\x01"
+    assert G.inject_pwa(raw) == raw
+
+
+# --------------------------------------------------- network (LAN) exposure
+
+def test_a_lan_host_is_answered_only_when_it_is_allowed(server, monkeypatch):
+    port = int(server.rsplit(":", 1)[1])
+    lan = "192.168.1.50"
+
+    monkeypatch.setattr(G, "ALLOWED_HOSTS", {"127.0.0.1", "localhost"})
+    status, _, _ = _get(server, "/api/load", host="%s:%d" % (lan, port))
+    assert status == 403, "an unlisted LAN host must be refused"
+
+    monkeypatch.setattr(G, "ALLOWED_HOSTS",
+                        {"127.0.0.1", "localhost", lan})
+    status, _, payload = _json(server, "/api/load", host="%s:%d" % (lan, port))
+    assert status == 200
+    assert isinstance(payload, dict)
+
+
+def test_host_must_carry_our_port_even_for_a_known_name(server, monkeypatch):
+    """A right name on the wrong port is still a rebinding attempt."""
+    monkeypatch.setattr(G, "PORT", 1)  # no real server has this
+    status, _, _ = _get(server, "/api/load", host="127.0.0.1:9")
+    assert status == 403

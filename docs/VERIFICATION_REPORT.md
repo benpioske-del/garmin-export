@@ -16,18 +16,18 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-471 passed, 1 skipped (472 collected)
+477 passed, 1 skipped (478 collected)
 ```
 
 | File | Tests |
 | --- | --- |
 | `tests/test_dashboard_contract.py` | 36 |
-| `tests/test_recommend_snapshots.py` | 23 |
+| `tests/test_recommend_snapshots.py` | 25 |
 | `tests/test_training_data.py` | 59 |
 | `tests/test_brief_bridge.py` | 62 |
 | `tests/test_dashboard_api.py` | 38 |
 | `tests/test_trainloop_cli.py` | 22 |
-| `tests/test_dashboard_api_http.py` | 22 |
+| `tests/test_dashboard_api_http.py` | 28 |
 | `tests/test_fit_reader_elevation.py` | 21 |
 | `tests/test_splits.py` | 10 |
 | `tests/test_provenance.py` | 18 |
@@ -39,7 +39,7 @@ $ python -m pytest
 | `tests/test_publish_scope.py` | 17 |
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_brief_consistency.py` | 36 |
-| **Total** | **472** (471 pass, 1 skip) |
+| **Total** | **478** (477 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -76,17 +76,17 @@ $ python fit_audit.py
 FIT data audit
 parser: fitparse=1.2.0 reader=1.1.0
 
-files inspected           : 60
+files inspected           : 61
 parse failures            : 0
-files readable            : 60
-files with GPS            : 60
+files readable            : 61
+files with GPS            : 61
 files without GPS         : 0
-files with usable timestamp: 60
+files with usable timestamp: 61
 files without timestamp   : 0
-session messages          : 60
-lap messages              : 544
-record messages           : 56791
-position points (counted) : 56775
+session messages          : 61
+lap messages              : 550
+record messages           : 57335
+position points (counted) : 57319
 files missing fields      : 0
 
 warnings:
@@ -238,6 +238,37 @@ Pinned by `test_facts_digest_ignores_the_timestamp`,
 `test_two_generations_of_the_same_state_agree` in
 `tests/test_brief_consistency.py`.
 
+## Dashboard server and mobile copy
+
+`garmin_server.py` serves the gitignored `dashboard/index.html` and the
+read-only JSON API (`/api/activities`, `/api/load`, `/api/coaching`) on the same
+origin. It defaults to loopback and a per-launch token. The athlete decided the
+dashboard should also be reachable from a phone on the home WiFi, so the server
+gained a deliberate, opt-in exposure path rather than an always-on one:
+
+- `--lan` (equivalently `--host 0.0.0.0`) binds all interfaces; the bound LAN
+  IPv4 addresses are added to the Host allowlist and the startup message prints
+  the LAN URL with the token. The default binding is still `127.0.0.1`.
+- `_host_ok()` requires the `Host` header to name a bound address **and** carry
+  the served port, so a DNS-rebinding host or a wrong port is refused (`403`).
+- Every data route stays behind the per-launch token (`X-Dash-Token` or
+  `?tk=`).
+- **No CORS headers are sent.** The page and the API share one origin, so CORS
+  is unnecessary; `test_no_cors_headers_are_ever_sent` asserts
+  `Access-Control-Allow-Origin` never appears.
+- The dashboard file is generated outside this repository, so it cannot be
+  relied on to carry PWA tags. As the HTML is served, the server injects the
+  manifest link, mobile `theme-color`/viewport meta and the service-worker
+  registration (`inject_pwa()`), and serves a real `/manifest.webmanifest` and
+  `/sw.js`. Both are served above the token gate because the browser fetches
+  them itself. The service worker is network-only; it caches nothing.
+
+`tests/test_dashboard_api_http.py` (28 tests) covers the manifest and worker
+routes, the injected tags, injection idempotence, and host/port allowlisting.
+**Caveat:** service workers require a secure context, so over plain
+`http://<lan-ip>` the "Add to Home Screen" action produces a live shortcut with
+no offline worker; the worker activates only under https or on localhost.
+
 ## Privacy checks
 
 - Raw FIT files are gitignored; the local `trainloop.db` is gitignored.
@@ -251,6 +282,11 @@ Pinned by `test_facts_digest_ignores_the_timestamp`,
   test both hardcoded a location into a tracked file and depended on the leak.
   It has been inverted into a regression guard.
 - Current `main` is clean through the authoritative GitHub API.
+- The dashboard server binds loopback and requires a per-launch token by
+  default; the explicit `--lan` path widens the Host allowlist to the bound
+  addresses and still requires the token, sends no CORS headers, and serves the
+  PWA files above the gate only because the browser needs them. See
+  [Dashboard server and mobile copy](#dashboard-server-and-mobile-copy).
 
 **Unresolved:** GitHub still retains unreachable historical commits by SHA.
 Deleting and recreating the repository is the only guaranteed purge. This has

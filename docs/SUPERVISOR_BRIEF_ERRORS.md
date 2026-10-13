@@ -403,3 +403,33 @@ leaving its decisions and task list intact, and the checker was re-run to confir
 no figure remains that the live repository contradicts. None of the brief's
 observability problems are fixed by that edit; only the fourth run's two options
 change that, and both are still the athlete's to choose.
+
+## Follow-up: the exposure decision, and the rest of the brief corrected
+
+The exposure question above was put to the athlete and answered: **bind on the
+LAN, keep the token over HTTP**. That is now implemented in `garmin_server.py`
+(details in `docs/VERIFICATION_REPORT.md`), so the brief's PWA goal is kept
+without opening the JSON API to anything but a token-bearing same-origin page.
+
+With that decision made, the remaining contradictions in the fifth brief were
+corrected in place, and the guard was taught the writer's new phrasing:
+
+- The `## PWA / MOBILE SETUP` section and the acceptance criteria were rewritten
+  to match what was built: `--lan` (default stays loopback), **no** CORS headers
+  (a guard test asserts this), and a real server-served `/manifest.webmanifest`
+  and `/sw.js` with the tags injected as the HTML is served. The "blob URLs"
+  premise is false — a service worker cannot register from a blob URL at all.
+- The backlog rows were restored to the `rank: N | slug | prose` shape the
+  checker parses; the fifth brief had reverted them to `N. slug | prose`, which
+  is why the checker reported `NO TASK ROWS PARSED`.
+- The false dashboard claim ("has no references to the canonical data layer") is
+  **left as written on purpose**: it is the pinned canary. `dashboard_conflict()`
+  now allows a sentence break and up to 200 characters between "dashboard" and
+  the claim, and also catches the reverse order ("not connected to the
+  dashboard"), so the writer's rephrasing of the same false claim is still
+  flagged.
+
+Because the brief's numbers now agree with the repository, `KNOWN_CONFLICTS` in
+`tests/test_brief_consistency.py` is empty: the pinned-conflict test now asserts
+the brief states **no** wrong number, so a *new* fabrication fails the suite,
+which is the drift worth catching.
