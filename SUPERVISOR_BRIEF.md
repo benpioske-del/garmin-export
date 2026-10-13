@@ -7,7 +7,7 @@ UNVERIFIED LLM OUTPUT
 > FACT-GATE NOTE: as written, this brief again quoted corpus, activity, review
 > and test counts from a snapshot that predates the last publishes. They have
 > been corrected in place to the measured values (61 FIT files / 58 activities /
-> 59 open reviews / 477 passed), and the corrections are logged in
+> 59 open reviews / 489 passed), and the corrections are logged in
 > docs/SUPERVISOR_BRIEF_ERRORS.md (sixth run). Two implementation premises that
 > contradict the checked-in code were also corrected in place: no CORS headers
 > are sent (same origin), and the server injects a real manifest and service
@@ -15,6 +15,13 @@ UNVERIFIED LLM OUTPUT
 > that the dashboard does not use the canonical data layer is left as written so
 > the consistency checker keeps flagging it (the pinned canary). Apart from these
 > corrections, the decisions, task list and backlog are the writer's.
+>
+> ADDED SINCE: at the athlete's explicit request the server gained an optional
+> password login (`--password` / `GARMIN_DASH_PASSWORD`, `GET/POST /login`,
+> `GET /logout`, signed session cookie) so the dashboard can be reached from
+> outside the home WiFi through a tunnel whose URL is not secret. This
+> supersedes the "authentication is not a current delivery priority" decision
+> below for the remote-access path only; the local token path is unchanged.
 
 ---
 ## CLOSED TASKS
@@ -44,7 +51,7 @@ NO-INDEPENDENTLY-VERIFIED-OPEN-SLUGS | UNVERIFIED | GitHub API retrieval failed 
 - No CORS headers are needed or sent. The dashboard and the JSON API share one origin, and a guard test asserts `Access-Control-Allow-Origin` never appears.
 - The dashboard file is generated outside this repository, so the server injects a real manifest and service-worker registration as it serves the HTML and serves `/manifest.webmanifest` and `/sw.js`. A blob-URL service worker cannot register at all.
 - The accepted corpus is 61 FIT files and 58 activities. There are 59 open reviews: 58 `timezone_uncertain` and 1 `activity_gap`.
-- The accepted verification total is 477 passed / 1 skipped. The accepted profile value is `hr_max=198`.
+- The accepted verification total is 489 passed / 1 skipped. The accepted profile value is `hr_max=198`.
 - The rejected premises remain excluded: 55/56/59 activity reconciliation, HR-zone distributions, `OPENCODE_INSTRUCTIONS.md`, and a 56-activity corpus.
 - Authentication is not a current delivery priority for a local, single-athlete deployment. `establish-authenticated-athlete-ownership` is parked last in the backlog.
 - No athlete-only decision is required for the primary task. Preserve the current port and existing data-layer interfaces unless code inspection identifies a concrete incompatibility.

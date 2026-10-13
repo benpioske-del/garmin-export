@@ -242,7 +242,7 @@ source. Re-derive it if you can.
 | FIT files with lap records | 61 of 61 | `python brief_consistency.py` |
 | Splits published | yes (`Best 5K Time`, `Lap Splits`) | header of `garmin_export.csv` |
 | Fastest measured 5 km crossing | 24:42 on 2026-06-16, measured | `brief_facts.json` → `best_5k` |
-| Tests | 477 passed, 1 skipped (478 collected) | `python -m pytest` |
+| Tests | 489 passed, 1 skipped (490 collected) | `python -m pytest` |
 | Dashboard API routes | 3, implemented and tested | `python dashboard_contract.py` |
 | Dashboard consumes the API | yes, all three | `python dashboard_contract.py` |
 
@@ -253,7 +253,7 @@ recalling a count.
 
 **`connect-dashboard-to-data-layer` is complete.** `garmin_server.py` serves
 `/api/activities`, `/api/load` and `/api/coaching` from the canonical data layer,
-`dashboard/index.html` consumes all three, and 66 tests cover it including 28
+`dashboard/index.html` consumes all three, and 78 tests cover it including 40
 against a real bound HTTP server. Four briefs have asked for this work. Do not
 rebuild it. Verify with `python dashboard_contract.py`, which prints `PASS`.
 
@@ -267,6 +267,14 @@ the HTML and serves a real `/manifest.webmanifest` and `/sw.js`. A service worke
 only runs in a secure context, so over plain `http://<lan-ip>` the home-screen
 shortcut is live but offline caching is not. Do not ask for CORS or `0.0.0.0` by
 default; both were decided against.
+
+**A password login now exists (added at the athlete's request).** For access
+from outside the home WiFi, `--password`/`GARMIN_DASH_PASSWORD` enables a login:
+`GET /login` serves a form, a correct `POST /login` sets a signed `HttpOnly`
+session cookie, and `GET /logout` clears it. The password is stored only as a
+salted PBKDF2 hash. When set, the page redirects to `/login` unless authed and
+every data route accepts either the token or the cookie. `--clear-password`
+removes it and `--idle-timeout 0` keeps the server alive for a long-lived tunnel.
 
 The task queue is `tasks/`, which holds two files: `001-example-task.md` (a
 placeholder) and `002-log-a-5k-pr.md` (**done** - the measured 5 km crossing is

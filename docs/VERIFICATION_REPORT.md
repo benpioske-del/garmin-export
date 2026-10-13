@@ -16,7 +16,7 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-477 passed, 1 skipped (478 collected)
+489 passed, 1 skipped (490 collected)
 ```
 
 | File | Tests |
@@ -27,7 +27,7 @@ $ python -m pytest
 | `tests/test_brief_bridge.py` | 62 |
 | `tests/test_dashboard_api.py` | 38 |
 | `tests/test_trainloop_cli.py` | 22 |
-| `tests/test_dashboard_api_http.py` | 28 |
+| `tests/test_dashboard_api_http.py` | 40 |
 | `tests/test_fit_reader_elevation.py` | 21 |
 | `tests/test_splits.py` | 10 |
 | `tests/test_provenance.py` | 18 |
@@ -39,7 +39,7 @@ $ python -m pytest
 | `tests/test_publish_scope.py` | 17 |
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_brief_consistency.py` | 36 |
-| **Total** | **478** (477 pass, 1 skip) |
+| **Total** | **490** (489 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -263,11 +263,35 @@ gained a deliberate, opt-in exposure path rather than an always-on one:
   `/sw.js`. Both are served above the token gate because the browser fetches
   them itself. The service worker is network-only; it caches nothing.
 
-`tests/test_dashboard_api_http.py` (28 tests) covers the manifest and worker
-routes, the injected tags, injection idempotence, and host/port allowlisting.
-**Caveat:** service workers require a secure context, so over plain
-`http://<lan-ip>` the "Add to Home Screen" action produces a live shortcut with
-no offline worker; the worker activates only under https or on localhost.
+### Password login
+
+Reaching the dashboard from outside the LAN (a tunnel whose URL is not secret)
+needs more than the token, so the server gained an additive password gate:
+
+- `--password` (or `GARMIN_DASH_PASSWORD`) enables it; the password is stored
+  only as a salted PBKDF2-SHA256 hash (`hash_password`) in the local data dir,
+  never in the repo and never echoed to a response. `--clear-password` removes
+  it.
+- `GET /login` renders a self-contained sign-in form; `POST /login` verifies
+  with a constant-time compare and sets a signed, `HttpOnly`, `SameSite=Lax`
+  session cookie (`make_session`/`session_valid`, an HMAC over the cookie's own
+  expiry). `GET /logout` clears it. Repeated failures are throttled.
+- When a password is set, the dashboard page redirects to `/login` unless the
+  request is authed; **both the page and every data route accept either the
+  local token or a valid session cookie**. The token path is unchanged, so local
+  `?tk=` use and every pre-existing test still work.
+- The cookie is marked `Secure` only when the request arrives over TLS
+  (`X-Forwarded-Proto: https`), so it still works over plain LAN http.
+- `--idle-timeout 0` disables the idle shutdown, which is needed for a
+  long-lived tunnel.
+
+`tests/test_dashboard_api_http.py` (40 tests) covers the manifest and worker
+routes, the injected tags, injection idempotence, host/port allowlisting, and
+the login gate (redirect, form, wrong password, cookie unlock, forged cookie,
+token back-compat, logout, `Secure` flag, session expiry). **Caveat:** service
+workers require a secure context, so over plain `http://<lan-ip>` the "Add to
+Home Screen" action produces a live shortcut with no offline worker; the worker
+activates only under https or on localhost.
 
 ## Privacy checks
 

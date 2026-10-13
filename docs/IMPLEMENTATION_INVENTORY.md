@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 477 passed, 1 skipped (Windows symlink case) |
+| Tests | 489 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -89,7 +89,7 @@ an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 477 passed, 1 skipped. |
+| `python -m pytest` | Works. 489 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -272,11 +272,19 @@ service-worker registration as it serves the HTML, and serves a real
 `/manifest.webmanifest` and `/sw.js` above the token gate; the worker caches
 nothing and only activates in a secure context (https or localhost).
 
+For exposure beyond the LAN (a tunnel whose URL is not secret) the server adds an
+optional **password login**: `--password`/`GARMIN_DASH_PASSWORD` stores a salted
+PBKDF2 hash locally, `GET /login` serves a form, a correct `POST /login` sets a
+signed `HttpOnly` session cookie, and `GET /logout` clears it. When a password is
+set the page redirects to `/login` unless authed, and every data route accepts
+either the token or the cookie. `--clear-password` removes it and
+`--idle-timeout 0` keeps the server up for a long-lived tunnel.
+
 The pre-existing `fit-list`, `fit/<name>`, `ping`, `sync` and cloud routes are
 unchanged, covered by regression tests in `tests/test_dashboard_api_http.py`.
 
 Tests: `tests/test_dashboard_api.py` (38) and `tests/test_dashboard_api_http.py`
-(28). `smoke_dashboard_api.py` runs the same paths against the live database and
+(40). `smoke_dashboard_api.py` runs the same paths against the live database and
 is deliberately not part of pytest.
 
 `dashboard/index.html` is untracked and gitignored because it contains
@@ -326,7 +334,7 @@ The supervisor reads this file and `VERIFICATION_REPORT.md` as its evidence
 base, so a stale number here becomes a wrong instruction in the next brief.
 Two things were corrected on 2026-10-01 after a run acted on them:
 
-- The **152-test** count was stale; it is now 477.
+- The **152-test** count was stale; it is now 489.
 - **`profile.json` was described as empty**; it carries `hr_max` and field
   notes, and only the remaining fields are `null`.
 

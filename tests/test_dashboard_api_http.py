@@ -12,6 +12,7 @@ so the test sets it before serving.
 import json
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import ThreadingHTTPServer
 
@@ -272,3 +273,153 @@ def test_host_must_carry_our_port_even_for_a_known_name(server, monkeypatch):
     monkeypatch.setattr(G, "PORT", 1)  # no real server has this
     status, _, _ = _get(server, "/api/load", host="127.0.0.1:9")
     assert status == 403
+
+
+# ------------------------------------------------------- password (login) gate
+
+PASSWORD = "s3cret-pass"
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Surface 3xx as an HTTPError so a test can inspect Location/Set-Cookie."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+_NO_REDIRECT = urllib.request.build_opener(_NoRedirect)
+
+
+def _call(opener, base, path, data=None, headers=None):
+    req = urllib.request.Request(base + path)
+    if data is not None:
+        req.data = urllib.parse.urlencode(data).encode("utf-8")
+        req.add_header("Content-Type", "application/x-www-form-urlencoded")
+    for key, val in (headers or {}).items():
+        req.add_header(key, val)
+    try:
+        with opener.open(req, timeout=10) as r:
+            return r.status, dict(r.headers), r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers), e.read()
+
+
+@pytest.fixture
+def secured_server(monkeypatch):
+    monkeypatch.setattr(G, "TOKEN", TOKEN)
+    monkeypatch.setattr(G, "FIT_DIR", "")
+    monkeypatch.setattr(G, "fit_names", lambda: ["2026-10-01_111.fit"])
+    monkeypatch.setattr(G, "SESSION_KEY", "unit-test-session-key")
+    monkeypatch.setattr(G, "PASSWORD_HASH", G.hash_password(PASSWORD))
+    monkeypatch.setattr(G, "REQUIRE_LOGIN", True)
+    monkeypatch.setattr(G, "_login_failures", 0)
+    monkeypatch.setattr(G, "_login_lock_until", 0.0)
+
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), G.Handler)
+    port = httpd.server_address[1]
+    monkeypatch.setattr(G, "PORT", port)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    try:
+        yield "http://127.0.0.1:%d" % port
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
+def test_page_redirects_to_login_without_a_session(secured_server):
+    status, headers, _ = _call(_NO_REDIRECT, secured_server, "/")
+    assert status == 303
+    assert headers.get("Location") == "/login"
+
+
+def test_login_page_renders_a_form(secured_server):
+    status, _, body = _call(_NO_REDIRECT, secured_server, "/login")
+    assert status == 200
+    assert b"Sign in" in body
+    assert b'name="password"' in body
+
+
+def test_wrong_password_is_rejected(secured_server):
+    status, headers, body = _call(_NO_REDIRECT, secured_server, "/login",
+                                  data={"password": "nope"})
+    assert status == 401
+    assert b"Wrong password" in body
+    assert "dash_session" not in headers.get("Set-Cookie", "")
+
+
+def test_correct_password_sets_a_cookie_and_unlocks_the_page(secured_server):
+    status, headers, _ = _call(_NO_REDIRECT, secured_server, "/login",
+                               data={"password": PASSWORD})
+    assert status == 303
+    assert headers.get("Location") == "/"
+    cookie = headers.get("Set-Cookie", "")
+    assert cookie.startswith("dash_session=")
+    assert "HttpOnly" in cookie and "SameSite=Lax" in cookie
+
+    sid = cookie.split(";", 1)[0]
+    status, _, body = _call(_NO_REDIRECT, secured_server, "/",
+                            headers={"Cookie": sid})
+    assert status == 200
+    assert G.PWA_MARK.encode("utf-8") in body
+
+
+def test_cookie_alone_authorises_a_data_route(secured_server):
+    _, headers, _ = _call(_NO_REDIRECT, secured_server, "/login",
+                          data={"password": PASSWORD})
+    sid = headers["Set-Cookie"].split(";", 1)[0]
+    status, _, payload = _call(urllib.request.build_opener(), secured_server,
+                               "/api/load", headers={"Cookie": sid})
+    assert status == 200
+    assert isinstance(json.loads(payload.decode("utf-8")), dict)
+
+
+def test_data_route_needs_a_session_when_login_is_on(secured_server):
+    status, _, _ = _call(_NO_REDIRECT, secured_server, "/api/load")
+    assert status == 403
+
+
+def test_a_forged_cookie_is_refused(secured_server):
+    status, _, _ = _call(_NO_REDIRECT, secured_server, "/api/load",
+                         headers={"Cookie": "dash_session=9999999999.deadbeef"})
+    assert status == 403
+
+
+def test_the_local_token_still_works_when_login_is_on(secured_server):
+    """Desktop keeps using ?tk= / the header; the login is additive."""
+    status, _, _ = _call(_NO_REDIRECT, secured_server, "/api/load",
+                         headers={"X-Dash-Token": TOKEN})
+    assert status == 200
+
+
+def test_logout_clears_the_cookie(secured_server):
+    status, headers, _ = _call(_NO_REDIRECT, secured_server, "/logout")
+    assert status == 303
+    assert headers.get("Location") == "/login"
+    assert headers.get("Set-Cookie", "").endswith("Max-Age=0")
+
+
+def test_secure_flag_is_set_only_behind_https(secured_server):
+    _, plain, _ = _call(_NO_REDIRECT, secured_server, "/login",
+                        data={"password": PASSWORD})
+    assert "Secure" not in plain.get("Set-Cookie", "")
+    _, tls, _ = _call(_NO_REDIRECT, secured_server, "/login",
+                      data={"password": PASSWORD},
+                      headers={"X-Forwarded-Proto": "https"})
+    assert "Secure" in tls.get("Set-Cookie", "")
+
+
+def test_session_cookie_is_signed_and_expires(monkeypatch):
+    monkeypatch.setattr(G, "SESSION_KEY", "k")
+    good = G.make_session(now=1000.0)
+    assert G.session_valid(good, now=1000.0)
+    assert not G.session_valid(good, now=1000.0 + G.SESSION_TTL + 1)
+    assert not G.session_valid(good[:-1] + ("0" if good[-1] != "0" else "1"),
+                               now=1000.0)
+    assert not G.session_valid("not-a-token", now=1000.0)
+
+
+def test_login_is_skipped_when_no_password_is_set(server):
+    """The default (unsecured) server must behave exactly as before."""
+    status, _, body = _call(_NO_REDIRECT, server, "/")
+    assert status == 200
+    assert b"Sign in" not in body

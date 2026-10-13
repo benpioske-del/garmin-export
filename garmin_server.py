@@ -28,6 +28,8 @@ Usage:
 
 import argparse
 import datetime
+import hashlib
+import hmac
 import io
 import json
 import os
@@ -90,6 +92,9 @@ IDLE_TIMEOUT = 1200
 
 TOKEN = ""
 PORT = 0
+PASSWORD_HASH = ""      # non-empty enables the login gate (see hash_password)
+REQUIRE_LOGIN = False
+SESSION_KEY = ""        # HMAC key for login cookies; set in main()
 
 # ---------------------------------------------------------------------------
 # JSON API over the existing data layer.
@@ -535,9 +540,204 @@ def inject_pwa(html):
     return text.encode("utf-8")
 
 
+# ---------------------------------------------------------------------------
+# Password login.
+#
+# The dashboard can be reached from outside the LAN through a tunnel, where the
+# URL is not a secret. A shared password then gates the page and every data
+# route; a correct login sets a signed session cookie. The local ?tk= URL and
+# the X-Dash-Token header keep working, so desktop use is unchanged.
+#
+# The password is stored only as a salted PBKDF2 hash, the cookie is an HMAC
+# over its own expiry, and neither the password nor a filesystem path is ever
+# written to a response.
+# ---------------------------------------------------------------------------
+
+AUTH_FILE = os.path.join(DATA_DIR, ".coach_dash_auth")
+SESSION_KEY_FILE = os.path.join(DATA_DIR, ".coach_dash_sessionkey")
+SESSION_COOKIE = "dash_session"
+SESSION_TTL = 30 * 24 * 3600
+PBKDF2_ROUNDS = 200000
+LOGIN_THROTTLE_AFTER = 10
+LOGIN_THROTTLE_SECONDS = 30
+_login_failures = 0
+_login_lock_until = 0.0
+
+
+def hash_password(password, salt=None):
+    """Salted PBKDF2-SHA256 digest, stored as "<salt-hex>$<digest-hex>"."""
+    if salt is None:
+        salt = secrets.token_bytes(16)
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt,
+                             PBKDF2_ROUNDS)
+    return salt.hex() + "$" + dk.hex()
+
+
+def verify_password(password, stored):
+    try:
+        salt_hex, digest_hex = stored.split("$", 1)
+        salt = bytes.fromhex(salt_hex)
+    except (ValueError, AttributeError):
+        return False
+    dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt,
+                             PBKDF2_ROUNDS)
+    return hmac.compare_digest(dk.hex(), digest_hex)
+
+
+def set_password(password):
+    try:
+        with open(AUTH_FILE, "w", encoding="utf-8") as fh:
+            fh.write(hash_password(password))
+        return True
+    except OSError:
+        return False
+
+
+def load_password_hash():
+    try:
+        with open(AUTH_FILE, "r", encoding="utf-8") as fh:
+            return fh.read().strip()
+    except OSError:
+        return ""
+
+
+def load_or_make_session_key():
+    try:
+        with open(SESSION_KEY_FILE, "r", encoding="utf-8") as fh:
+            key = fh.read().strip()
+            if key:
+                return key
+    except OSError:
+        pass
+    key = secrets.token_hex(32)
+    try:
+        with open(SESSION_KEY_FILE, "w", encoding="utf-8") as fh:
+            fh.write(key)
+    except OSError:
+        pass
+    return key
+
+
+def make_session(now=None):
+    exp = int((time.time() if now is None else now) + SESSION_TTL)
+    msg = str(exp)
+    sig = hmac.new(SESSION_KEY.encode("utf-8"), msg.encode("utf-8"),
+                   hashlib.sha256).hexdigest()
+    return msg + "." + sig
+
+
+def session_valid(value, now=None):
+    try:
+        msg, sig = value.split(".", 1)
+        exp = int(msg)
+    except (ValueError, AttributeError):
+        return False
+    if exp < (time.time() if now is None else now):
+        return False
+    expected = hmac.new(SESSION_KEY.encode("utf-8"), msg.encode("utf-8"),
+                        hashlib.sha256).hexdigest()
+    return hmac.compare_digest(sig, expected)
+
+
+LOGIN_PAGE = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coach Dashboard - sign in</title>
+<style>
+body{font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+background:#111418;color:#e7eaee;margin:0;display:flex;min-height:100vh;
+align-items:center;justify-content:center}
+form{background:#1a1f26;padding:28px 26px;border-radius:14px;width:min(90vw,320px);
+box-shadow:0 8px 30px rgba(0,0,0,.45)}
+h1{font-size:18px;margin:0 0 14px}
+input{width:100%;box-sizing:border-box;padding:12px;border-radius:8px;
+border:1px solid #333c47;background:#0e1116;color:#e7eaee;font-size:16px}
+button{margin-top:14px;width:100%;padding:12px;border:0;border-radius:8px;
+background:#3b82f6;color:#fff;font-size:16px;font-weight:600}
+.err{color:#f87171;font-size:14px;margin:0 0 10px}
+</style></head><body>
+<form method="post" action="/login">
+<h1>Coach Dashboard</h1>
+{error}<input name="password" type="password" placeholder="Password"
+ autocomplete="current-password" autofocus required>
+<button type="submit">Sign in</button>
+</form></body></html>"""
+
+
+def login_page(error=""):
+    err = '<p class="err">%s</p>' % error if error else ""
+    return LOGIN_PAGE.replace("{error}", err).encode("utf-8")
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = ""
     sys_version = ""
+
+    def _cookie_value(self, name):
+        for piece in self.headers.get("Cookie", "").split(";"):
+            key, _, value = piece.strip().partition("=")
+            if key == name:
+                return value
+        return None
+
+    def _is_authed(self, query=None):
+        """True for the local token (header or ?tk=) or a valid login cookie."""
+        if TOKEN and self.headers.get("X-Dash-Token", None) == TOKEN:
+            return True
+        if TOKEN and query and query.get("tk") == TOKEN:
+            return True
+        if REQUIRE_LOGIN:
+            value = self._cookie_value(SESSION_COOKIE)
+            if value and session_valid(value):
+                return True
+        return False
+
+    def _cookie_attrs(self, max_age):
+        attrs = "Path=/; HttpOnly; SameSite=Lax; Max-Age=%d" % max_age
+        # Behind a TLS-terminating tunnel the cookie must be Secure; over plain
+        # LAN http, marking it Secure would stop the browser storing it at all.
+        if self.headers.get("X-Forwarded-Proto", "").lower() == "https":
+            attrs += "; Secure"
+        return attrs
+
+    def _redirect(self, location, set_cookie=None):
+        try:
+            self.send_response(303)
+            self.send_header("Location", location)
+            if set_cookie is not None:
+                self.send_header("Set-Cookie", set_cookie)
+            self.send_header("Content-Length", "0")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+        except Exception:
+            pass
+
+    def _handle_login(self):
+        global _login_failures, _login_lock_until
+        if not REQUIRE_LOGIN:
+            return self._redirect("/")
+        now = time.time()
+        if now < _login_lock_until:
+            return self._deny(429, "too many attempts; wait a moment")
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+        except ValueError:
+            length = 0
+        if length < 0 or length > 8192:
+            return self._deny(413, "payload too large")
+        body = self.rfile.read(length).decode("utf-8", "replace")
+        fields = {k: v[0] for k, v in urllib.parse.parse_qs(body).items() if v}
+        if verify_password(fields.get("password", ""), PASSWORD_HASH):
+            _login_failures = 0
+            cookie = "%s=%s; %s" % (SESSION_COOKIE, make_session(now),
+                                    self._cookie_attrs(SESSION_TTL))
+            return self._redirect("/", set_cookie=cookie)
+        _login_failures += 1
+        if _login_failures >= LOGIN_THROTTLE_AFTER:
+            _login_lock_until = now + LOGIN_THROTTLE_SECONDS
+            _login_failures = 0
+        return self._send(401, login_page("Wrong password."),
+                          "text/html; charset=utf-8")
 
     def _deny(self, code, reason):
         try:
@@ -665,14 +865,31 @@ class Handler(BaseHTTPRequestHandler):
             # Also browser-initiated and token-free. Network-only, stores
             # nothing; see SW_JS.
             return self._send(200, SW_JS, "text/javascript; charset=utf-8")
+        if path == "/login":
+            if not REQUIRE_LOGIN:
+                return self._redirect("/")
+            query = {k: v[0] for k, v in
+                     urllib.parse.parse_qs(parts.query).items() if v}
+            if self._is_authed(query):
+                return self._redirect("/")
+            return self._send(200, login_page(), "text/html; charset=utf-8")
+        if path == "/logout":
+            return self._redirect(
+                "/login",
+                set_cookie="%s=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+                           % SESSION_COOKIE)
         if path in ("/", "/index.html", "/favicon.ico"):
+            query = {k: v[0] for k, v in
+                     urllib.parse.parse_qs(parts.query).items() if v}
+            if REQUIRE_LOGIN and not self._is_authed(query):
+                return self._redirect("/login")
             try:
                 with open(resolve_dashboard_html(), "rb") as fh:
                     return self._send(200, inject_pwa(fh.read()),
                                       "text/html; charset=utf-8")
             except OSError:
                 return self._deny(404, "dashboard html not found")
-        if self.headers.get("X-Dash-Token", None) != TOKEN:
+        if not self._is_authed():
             return self._deny(403, "missing or wrong token")
         if path == "/garmin_sleep.csv":
             try:
@@ -716,10 +933,12 @@ class Handler(BaseHTTPRequestHandler):
         last_request = time.time()
         if not _host_ok(self.headers.get("Host", "")):
             return self._deny(403, "forbidden host")
-        if self.headers.get("X-Dash-Token", None) != TOKEN:
-            return self._deny(403, "missing or wrong token")
         parts = urllib.parse.urlsplit(self.path)
         path = urllib.parse.unquote(parts.path)
+        if path == "/login":
+            return self._handle_login()
+        if not self._is_authed():
+            return self._deny(403, "missing or wrong token")
         if path == "/sync":
             if not _sync_lock.acquire(False):
                 body = json.dumps({"ok": False, "busy": True,
@@ -781,6 +1000,8 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def idle_watchdog(server):
+    if IDLE_TIMEOUT <= 0:
+        return
     while True:
         time.sleep(15)
         if time.time() - last_request > IDLE_TIMEOUT:
@@ -832,6 +1053,7 @@ def probe_existing_instance(port):
 
 def main():
     global TOKEN, PORT, MEGACMD, BIND_HOST, ALLOWED_HOSTS
+    global PASSWORD_HASH, REQUIRE_LOGIN, SESSION_KEY, IDLE_TIMEOUT
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=FIXED_PORT)
     ap.add_argument("--token", default="")
@@ -840,6 +1062,15 @@ def main():
                          "or --lan to reach the dashboard from a phone)")
     ap.add_argument("--lan", action="store_true",
                     help="bind all interfaces (same as --host 0.0.0.0)")
+    ap.add_argument("--password", default=os.environ.get("GARMIN_DASH_PASSWORD", ""),
+                    help="require this password to open the dashboard; stored "
+                         "only as a salted hash. Also read from the "
+                         "GARMIN_DASH_PASSWORD environment variable")
+    ap.add_argument("--clear-password", action="store_true",
+                    help="remove the saved password so no login is required")
+    ap.add_argument("--idle-timeout", type=int, default=IDLE_TIMEOUT,
+                    help="shut down after this many idle seconds (0 disables; "
+                         "use 0 when exposing through a tunnel)")
     ap.add_argument("--megacmd", default="",
                     help="optional path (or command) for mega-put, e.g. "
                          '"C:\\Program Files (x86)\\MEGAcmd\\mega-put.exe"')
@@ -849,6 +1080,23 @@ def main():
     TOKEN = args.token if args.token else load_or_make_token()
     MEGACMD = args.megacmd
     BIND_HOST = "0.0.0.0" if args.lan else args.host
+    if args.clear_password:
+        try:
+            os.remove(AUTH_FILE)
+        except OSError:
+            pass
+    if args.password:
+        if set_password(args.password):
+            PASSWORD_HASH = load_password_hash()
+        else:
+            print("Could not save the password; it applies to this run only.")
+            PASSWORD_HASH = hash_password(args.password)
+    else:
+        PASSWORD_HASH = load_password_hash()
+    REQUIRE_LOGIN = bool(PASSWORD_HASH)
+    if REQUIRE_LOGIN:
+        SESSION_KEY = load_or_make_session_key()
+    IDLE_TIMEOUT = max(0, args.idle_timeout)
     # Answer for loopback always, and for this machine's LAN addresses when we
     # are reachable on them. The token still gates every data route.
     ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
@@ -877,6 +1125,10 @@ def main():
         print("Could not bind %s:%d: %s" % (BIND_HOST, PORT, exc))
         sys.exit(1)
     print("Coach Dashboard local server: %s" % url)
+    if REQUIRE_LOGIN:
+        print("Password required: sign in at http://127.0.0.1:%d/ "
+              "(the ?tk= URL above still opens it directly on this machine)."
+              % PORT)
     if BIND_HOST not in ("127.0.0.1", "localhost"):
         for ip in local_ipv4s():
             print("Coach Dashboard on the network (phone): "
