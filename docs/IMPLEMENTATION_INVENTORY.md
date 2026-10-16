@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 489 passed, 1 skipped (Windows symlink case) |
+| Tests | 491 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -72,7 +72,7 @@ Docs: [`DATA_QUALITY.md`](DATA_QUALITY.md),
 | Component | Path | Notes |
 | --- | --- | --- |
 | FIT reader | `garmin_fit_reader.py` | `__version__ = 1.1.0`; asserts no GPS field escapes; attaches internal elevation diagnostics (`_ascent_smoothed_ft`, `_elev_range_ft`) that are excluded from the published CSV |
-| CSV export | `garmin_export.csv` | 58 activities, 29 columns |
+| CSV export | `garmin_export.csv` | 61 activities, 29 columns |
 | Publisher | `export_publish.py` | guard, remote sync, history-safety enforcement |
 | Sync | `garmin_sync.py` | OAuth, local only |
 | Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching` |
@@ -89,7 +89,7 @@ an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 489 passed, 1 skipped. |
+| `python -m pytest` | Works. 491 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -99,7 +99,7 @@ an out-of-date copy of this document.
 | CI | **None** â€” no workflow, no pre-commit |
 | Dependency lockfile | **None** (`pyproject.toml` only) |
 | `python -m build` | Not verified; the `build` package is not a declared dependency |
-| Database vs export parity | **Verified 2026-10-04.** FIT directory, `garmin_export.csv` and `trainloop.db` all hold 58. Note `load` computes only; `bootstrap` is what imports. |
+| Database vs export parity | **Verified 2026-10-15.** FIT directory, `garmin_export.csv` and `trainloop.db` all hold 61. Note `load` computes only; `bootstrap` is what imports. (The table had drifted back to 58 - the runs of 2026-10-06/08/10 were published to the CSV but never imported - and `bootstrap` was re-run on 2026-10-15 to catch up.) |
 | `garmin_export.csv` provenance | Rebuilt in-process with `export_publish.build_csv()` on 2026-10-03, not committed. It picks up `2026-10-01` from the FIT directory. |
 
 Style is followed by convention rather than enforced by a tool. The 21 Python
@@ -110,22 +110,23 @@ regression in it.
 
 - 61 FIT files on disk, all parse, all with GPS and a usable timestamp
 - 61 rows in `garmin_export.csv`
-- 58 activities imported into `trainloop.db`, newest `2026-10-10`
+- 61 activities imported into `trainloop.db`, newest `2026-10-10`
 - 550 laps, 57,335 records, 57,319 position points
-- Re-import of identical files: 58 `unchanged`, 0 audit rows written
+- Re-import of identical files: 61 `unchanged`, 0 audit rows written
 - **1 open date gap**: 2026-06-26 to 2026-07-05
-- **58 open `timezone_uncertain` reviews**, expected until an offset is confirmed
+- **61 open `timezone_uncertain` reviews**, expected until an offset is confirmed
 - **1 open `activity_gap` review** for the 2026-06-26 to 2026-07-05 gap
 - 1 activity where the local date and UTC date differ
     (`garmin:23745136848`, local 2026-07-26T01:10:15, UTC 2026-07-27T01:10:15Z)
 - 0 strength sessions. `strength_load` is `null` while this is true, which is
   not the same as zero.
 
-All three sources now agree at **58**: FIT directory, CSV, and database. An
+All three sources now agree at **61**: FIT directory, CSV, and database. An
 earlier brief asserted a 55/56/59 discrepancy; that premise was checked against
 the live corpus and is not supported â€” there was nothing to reconcile. The
-database was one run behind until `trainloop bootstrap` was re-run on
-2026-10-04; it is the import step that closes this, not `load`, which only
+database fell behind twice: by one run until `trainloop bootstrap` was re-run on
+2026-10-04, and by three runs (2026-10-06/08/10) until `bootstrap` was re-run on
+2026-10-15; it is the import step that closes this, not `load`, which only
 computes.
 
 ## Publish lock and repo visibility
@@ -269,8 +270,10 @@ the Host allowlist, and prints the phone URL with the token. `_host_ok()` still
 requires a bound name **and** the served port. Because the dashboard file is
 generated outside the repo, the server injects the manifest link, mobile meta and
 service-worker registration as it serves the HTML, and serves a real
-`/manifest.webmanifest` and `/sw.js` above the token gate; the worker caches
-nothing and only activates in a secure context (https or localhost).
+`/manifest.webmanifest` and `/sw.js` above the token gate; the worker is
+network-first with an offline fallback (it keeps the last page and its API data
+on the device and uses them when the tunnel returns `5xx`) and only activates in
+a secure context (https or localhost).
 
 For exposure beyond the LAN (a tunnel whose URL is not secret) the server adds an
 optional **password login**: `--password`/`GARMIN_DASH_PASSWORD` stores a salted
@@ -311,7 +314,7 @@ exposes `window.refreshApiPanel()`.
    `resting_hr`, `weight_lb` and `height_in` are still `null`. The missing
    values block confirmed local dates, cohort percentiles and the weather
    location policy. The athlete's UTC offset is the single highest-value
-   missing field, because 58 reviews are waiting on it.
+   missing field, because 61 reviews are waiting on it.
 2. No authentication and no multi-athlete separation. The health boundary is
    single-subject and described that way, not dressed up as a permission system.
 3. ~~The transport is not live.~~ **Resolved.** The CrewAI flow pushes
@@ -334,7 +337,7 @@ The supervisor reads this file and `VERIFICATION_REPORT.md` as its evidence
 base, so a stale number here becomes a wrong instruction in the next brief.
 Two things were corrected on 2026-10-01 after a run acted on them:
 
-- The **152-test** count was stale; it is now 489.
+- The **152-test** count was stale; it is now 491.
 - **`profile.json` was described as empty**; it carries `hr_max` and field
   notes, and only the remaining fields are `null`.
 

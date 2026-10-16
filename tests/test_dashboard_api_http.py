@@ -227,6 +227,28 @@ def test_service_worker_is_served_without_a_token(server):
     assert b"service worker" in body.lower()
 
 
+def test_service_worker_caches_the_page_and_data_for_offline(server):
+    """Offline fallback: the worker keeps the shell + API data on the device."""
+    _, _, body = _get(server, "/sw.js", token=None)
+    text = body.decode("utf-8")
+    assert "caches.open" in text
+    assert G.SW_CACHE in text
+    # Only the real dashboard is cached as the shell, never the login page.
+    assert G.PWA_MARK in text
+    assert "'/api/'" in text
+
+
+def test_service_worker_falls_back_to_the_cache_on_an_origin_outage(server):
+    """A dead tunnel returns 5xx, which is not a network error - use the cache."""
+    _, _, body = _get(server, "/sw.js", token=None)
+    text = body.decode("utf-8")
+    assert "502" in text and "503" in text and "504" in text
+    assert "cache.match(req)" in text
+    assert "cache.match(SHELL)" in text
+    # POSTs (e.g. /login, /sync) are never touched.
+    assert "req.method !== 'GET'" in text
+
+
 def test_dashboard_html_receives_the_pwa_tags(server, monkeypatch, tmp_path):
     html = tmp_path / "index.html"
     html.write_text("<!doctype html><html><head><title>x</title></head>"

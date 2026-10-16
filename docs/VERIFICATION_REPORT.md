@@ -16,7 +16,7 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-489 passed, 1 skipped (490 collected)
+491 passed, 1 skipped (492 collected)
 ```
 
 | File | Tests |
@@ -27,7 +27,7 @@ $ python -m pytest
 | `tests/test_brief_bridge.py` | 62 |
 | `tests/test_dashboard_api.py` | 38 |
 | `tests/test_trainloop_cli.py` | 22 |
-| `tests/test_dashboard_api_http.py` | 40 |
+| `tests/test_dashboard_api_http.py` | 42 |
 | `tests/test_fit_reader_elevation.py` | 21 |
 | `tests/test_splits.py` | 10 |
 | `tests/test_provenance.py` | 18 |
@@ -39,7 +39,7 @@ $ python -m pytest
 | `tests/test_publish_scope.py` | 17 |
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_brief_consistency.py` | 36 |
-| **Total** | **490** (489 pass, 1 skip) |
+| **Total** | **492** (491 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -117,13 +117,13 @@ Re-running is a no-op. Editing an applied migration raises
 
 ## Import against the real corpus
 
-On a fresh database with the current corpus of 58 files, the first import
-inserts all 58. Re-running against a database that already holds them reports
+On a fresh database with the current corpus of 61 files, the first import
+inserts all 61. Re-running against a database that already holds them reports
 every file `unchanged`:
 
 ```
 $ python activities.py import
-{"inserted": 0, "updated": 0, "unchanged": 58, "unreadable": 0}
+{"inserted": 0, "updated": 0, "unchanged": 61, "unreadable": 0}
 ```
 
 **Idempotency verified on the real data**: no rows updated, and no new audit
@@ -131,24 +131,28 @@ rows written on the second pass.
 
 ```
 $ python activities.py summary
-{"activities": 58, "open_reviews": 59}
+{"activities": 61, "open_reviews": 62}
 ```
 
-- 58 activities
-- 58 open `timezone_uncertain` reviews (one per activity, expected)
+- 61 activities
+- 61 open `timezone_uncertain` reviews (one per activity, expected)
 - 1 open `activity_gap`: `no activity 2026-06-26..2026-07-05 (8 days)`
 - 0 duplicates detected
-- 58 SHA-256 raw references stored
+- 61 SHA-256 raw references stored
 
 The FIT-file inventory, the canonical table and the published CSV all agree at
-**58**. An earlier brief described a 55/56/59 discrepancy; that premise was
+**61**. An earlier brief described a 55/56/59 discrepancy; that premise was
 checked against the live corpus and is unsupported, so there is no
 reconciliation to perform.
 
 Note for anyone re-running this: `trainloop.py load` only *computes* load. The
-command that imports new FIT files is `trainloop.py bootstrap`. Until bootstrap
-was re-run on 2026-10-04 the database held 57 while the FIT directory and CSV
-held 58, so every load figure silently excluded the most recent run.
+command that imports new FIT files is `trainloop.py bootstrap`. This trap has now
+recurred twice. On 2026-10-04 the database held 57 while the FIT directory and CSV
+held 58; and on 2026-10-15 it held 58 while they held 61 (the runs of 2026-10-06,
+2026-10-08 and 2026-10-10 had been published to the CSV but never imported), so
+every load figure and the dashboard silently excluded the three most recent runs.
+Re-running `trainloop.py bootstrap` on 2026-10-15 imported the three
+(`{"inserted": 3, "unchanged": 58}`) and brought the table to 61.
 
 ## Training load and recommendation
 
@@ -261,7 +265,16 @@ gained a deliberate, opt-in exposure path rather than an always-on one:
   manifest link, mobile `theme-color`/viewport meta and the service-worker
   registration (`inject_pwa()`), and serves a real `/manifest.webmanifest` and
   `/sw.js`. Both are served above the token gate because the browser fetches
-  them itself. The service worker is network-only; it caches nothing.
+  them itself.
+- The service worker is **network-first with an offline fallback** (`SW_JS`). It
+  keeps the last dashboard page and its API responses in the device's Cache
+  Storage so the app still opens when the laptop - and therefore the tunnel - is
+  off. It only caches GET responses already served to a signed-in browser on
+  that device; it never caches `POST`s, the login page, or a non-2xx
+  origin-outage page. A dead tunnel answers `502`/`503`/`504` (not a network
+  error), so the worker treats those as "use the cache" rather than showing the
+  error. It also adds the `ngrok-skip-browser-warning` header to its data
+  requests so the free-tier interstitial cannot corrupt a JSON response.
 
 ### Password login
 
@@ -285,13 +298,15 @@ needs more than the token, so the server gained an additive password gate:
 - `--idle-timeout 0` disables the idle shutdown, which is needed for a
   long-lived tunnel.
 
-`tests/test_dashboard_api_http.py` (40 tests) covers the manifest and worker
-routes, the injected tags, injection idempotence, host/port allowlisting, and
-the login gate (redirect, form, wrong password, cookie unlock, forged cookie,
-token back-compat, logout, `Secure` flag, session expiry). **Caveat:** service
-workers require a secure context, so over plain `http://<lan-ip>` the "Add to
-Home Screen" action produces a live shortcut with no offline worker; the worker
-activates only under https or on localhost.
+`tests/test_dashboard_api_http.py` (42 tests) covers the manifest and worker
+routes, the injected tags, injection idempotence, host/port allowlisting, the
+offline fallback (the worker keeps the shell and API data, and falls back to the
+cache on a `5xx` origin outage), and the login gate (redirect, form, wrong
+password, cookie unlock, forged cookie, token back-compat, logout, `Secure`
+flag, session expiry). **Caveat:** service workers require a secure context, so
+over plain `http://<lan-ip>` the "Add to Home Screen" action produces a live
+shortcut with no offline worker; the worker - and therefore the offline copy -
+activates only under https (the tunnel) or on localhost.
 
 ## Privacy checks
 
@@ -332,7 +347,7 @@ Stated rather than implied:
 | Strength data | Schema and service verified by tests; no real strength sessions recorded yet. |
 | `profile.json` | Partially populated. `hr_max=198`; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` null. The missing UTC offset blocks confirmed local dates and weather location. |
 | Brief bridge idempotency | **Now verified.** `3054d6a` gave the file a content-derived `brief_id`; `captured_utc` is metadata only. Tests advance a frozen clock 90s to prove an unchanged brief is a no-op. |
-| Athlete UTC offset | Not supplied by the athlete. This is what 58 open `timezone_uncertain` reviews are waiting on. |
+| Athlete UTC offset | Not supplied by the athlete. This is what 61 open `timezone_uncertain` reviews are waiting on. |
 | Elevation accuracy | **Derived, not measured.** These FIT files carry no `barometer_pressure`, so altitude is GPS-derived and noisy. The device figure and a smoothed recomputation differ by up to ~25% on real runs. See [ELEVATION.md](ELEVATION.md). |
 
 ## Withdrawn claims
@@ -366,7 +381,7 @@ Recorded so they are not reintroduced by a later brief:
   prevents the error from reaching the UI. The API queries every count; none is
   written down. See [SUPERVISOR_BRIEF_ERRORS.md](SUPERVISOR_BRIEF_ERRORS.md).
 - **"55 audit records and a historical 59-record source."** Both counts are
-  unsupported. The live corpus is 58 across every source.
+  unsupported. The live corpus is 61 across every source.
 
 ## Reproducing this report
 

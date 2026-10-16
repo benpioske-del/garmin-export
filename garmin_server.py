@@ -506,19 +506,72 @@ MANIFEST_JSON = {
     "theme_color": "#111418",
 }
 
-# Network-only, caches nothing. The served HTML can contain private entries, so
-# it must not sit in a device cache; every request goes to the server. This
-# worker exists so the app is installable where a secure context allows it
-# (https or localhost). On plain http over the LAN the browser will refuse to
-# register it, and the page still works as a live home-screen shortcut.
+# Network-first with an offline fallback. The worker keeps the last dashboard
+# page and its API data on the device so the app still opens when the laptop (and
+# therefore the tunnel) is off. It only ever caches GET responses that were
+# already served to a signed-in browser on this device; it never caches POSTs,
+# the login page, or a non-2xx origin-outage page. Requires a secure context
+# (https via the tunnel, or localhost); over plain http on the LAN the browser
+# refuses to register it and the page still works as a live shortcut.
+SW_CACHE = "coach-dashboard-v1"
 SW_JS = (
-    b"// Coach Dashboard service worker: network-only.\n"
-    b"self.addEventListener('install', function () { self.skipWaiting(); });\n"
-    b"self.addEventListener('activate', function (e) {\n"
-    b"  e.waitUntil(self.clients.claim());\n"
-    b"});\n"
-    b"self.addEventListener('fetch', function () {});\n"
-)
+    "// Coach Dashboard service worker: network-first with an offline fallback.\n"
+    "// It keeps the last dashboard page and its API data on this device so the\n"
+    "// app opens when the laptop is off. It only caches GET responses already\n"
+    "// served to a signed-in browser here; never POSTs, the login page, or a\n"
+    "// non-2xx origin-outage page.\n"
+    "const CACHE = '__CACHE__';\n"
+    "const SHELL = '/';\n"
+    "const MARK = '__MARK__';\n"
+    "const SKIP = 'ngrok-skip-browser-warning';\n"
+    "self.addEventListener('install', function () { self.skipWaiting(); });\n"
+    "self.addEventListener('activate', function (e) {\n"
+    "  e.waitUntil((async function () {\n"
+    "    const keys = await caches.keys();\n"
+    "    await Promise.all(keys.filter(function (k) { return k !== CACHE; })\n"
+    "      .map(function (k) { return caches.delete(k); }));\n"
+    "    await self.clients.claim();\n"
+    "  })());\n"
+    "});\n"
+    "function withSkip(req) {\n"
+    "  try {\n"
+    "    const h = new Headers(req.headers); h.set(SKIP, 'true');\n"
+    "    return new Request(req, { headers: h });\n"
+    "  } catch (e) { return req; }\n"
+    "}\n"
+    "self.addEventListener('fetch', function (event) {\n"
+    "  const req = event.request;\n"
+    "  if (req.method !== 'GET') return;\n"
+    "  const url = new URL(req.url);\n"
+    "  if (url.origin !== self.location.origin) return;\n"
+    "  const nav = req.mode === 'navigate' || url.pathname === '/';\n"
+    "  const isData = url.pathname.indexOf('/api/') === 0\n"
+    "    || url.pathname === '/fit-list';\n"
+    "  event.respondWith((async function () {\n"
+    "    const cache = await caches.open(CACHE);\n"
+    "    let fresh = null;\n"
+    "    try { fresh = await fetch(nav ? req : withSkip(req)); }\n"
+    "    catch (e) { fresh = null; }\n"
+    "    if (fresh && (fresh.status === 502 || fresh.status === 503\n"
+    "                  || fresh.status === 504)) { fresh = null; }\n"
+    "    if (fresh) {\n"
+    "      if (nav) {\n"
+    "        const text = await fresh.clone().text();\n"
+    "        if (text.indexOf(MARK) !== -1) { await cache.put(SHELL, fresh.clone()); }\n"
+    "      } else if (isData && fresh.ok) {\n"
+    "        await cache.put(req, fresh.clone());\n"
+    "      }\n"
+    "      return fresh;\n"
+    "    }\n"
+    "    let cached = await cache.match(req);\n"
+    "    if (!cached && nav) { cached = await cache.match(SHELL); }\n"
+    "    if (cached) return cached;\n"
+    "    return new Response(\n"
+    "      'Offline and nothing cached yet - open the dashboard once while online.',\n"
+    "      { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });\n"
+    "  })());\n"
+    "});\n"
+).replace("__CACHE__", SW_CACHE).replace("__MARK__", PWA_MARK).encode("utf-8")
 
 
 def inject_pwa(html):
@@ -862,8 +915,8 @@ class Handler(BaseHTTPRequestHandler):
             body = json.dumps(MANIFEST_JSON).encode("utf-8")
             return self._send(200, body, "application/manifest+json; charset=utf-8")
         if path == "/sw.js":
-            # Also browser-initiated and token-free. Network-only, stores
-            # nothing; see SW_JS.
+            # Also browser-initiated and token-free. Network-first with an
+            # offline fallback; see SW_JS.
             return self._send(200, SW_JS, "text/javascript; charset=utf-8")
         if path == "/login":
             if not REQUIRE_LOGIN:

@@ -6,8 +6,8 @@ UNVERIFIED LLM OUTPUT
 
 > FACT-GATE NOTE: as written, this brief again quoted corpus, activity, review
 > and test counts from a snapshot that predates the last publishes. They have
-> been corrected in place to the measured values (61 FIT files / 58 activities /
-> 59 open reviews / 489 passed), and the corrections are logged in
+> been corrected in place to the measured values (61 FIT files / 61 activities /
+> 62 open reviews / 491 passed), and the corrections are logged in
 > docs/SUPERVISOR_BRIEF_ERRORS.md (sixth run). Two implementation premises that
 > contradict the checked-in code were also corrected in place: no CORS headers
 > are sent (same origin), and the server injects a real manifest and service
@@ -22,6 +22,14 @@ UNVERIFIED LLM OUTPUT
 > outside the home WiFi through a tunnel whose URL is not secret. This
 > supersedes the "authentication is not a current delivery priority" decision
 > below for the remote-access path only; the local token path is unchanged.
+>
+> ADDED SINCE: also at the athlete's request the service worker is no longer
+> network-only. It is network-first with an **offline fallback**, keeping the last
+> dashboard page and its API data on the device so the app opens when the laptop
+> (and so the tunnel) is off. It caches only GET responses already served to a
+> signed-in browser, never POSTs or the login page, and treats a `5xx` tunnel
+> outage as "use the cache". The offline copy therefore activates only under the
+> https tunnel (or localhost), not over plain LAN `http://`.
 
 ---
 ## CLOSED TASKS
@@ -50,8 +58,8 @@ NO-INDEPENDENTLY-VERIFIED-OPEN-SLUGS | UNVERIFIED | GitHub API retrieval failed 
 - The server must be reachable from a phone. This is done with `--lan` (or `--host 0.0.0.0`), which is opt-in; the default binding stays loopback so the dashboard is not exposed unless asked for.
 - No CORS headers are needed or sent. The dashboard and the JSON API share one origin, and a guard test asserts `Access-Control-Allow-Origin` never appears.
 - The dashboard file is generated outside this repository, so the server injects a real manifest and service-worker registration as it serves the HTML and serves `/manifest.webmanifest` and `/sw.js`. A blob-URL service worker cannot register at all.
-- The accepted corpus is 61 FIT files and 58 activities. There are 59 open reviews: 58 `timezone_uncertain` and 1 `activity_gap`.
-- The accepted verification total is 489 passed / 1 skipped. The accepted profile value is `hr_max=198`.
+- The accepted corpus is 61 FIT files and 61 activities. There are 62 open reviews: 61 `timezone_uncertain` and 1 `activity_gap`.
+- The accepted verification total is 491 passed / 1 skipped. The accepted profile value is `hr_max=198`.
 - The rejected premises remain excluded: 55/56/59 activity reconciliation, HR-zone distributions, `OPENCODE_INSTRUCTIONS.md`, and a 56-activity corpus.
 - Authentication is not a current delivery priority for a local, single-athlete deployment. `establish-authenticated-athlete-ownership` is parked last in the backlog.
 - No athlete-only decision is required for the primary task. Preserve the current port and existing data-layer interfaces unless code inspection identifies a concrete incompatibility.
@@ -231,7 +239,7 @@ Replace `<port>` and `<token>` with the values `garmin_server.py` prints. The to
 - Confirm that malformed or incomplete API JSON produces an invalid-response state.
 - Confirm that the server injects the manifest link and service-worker registration as it serves the HTML, and serves a real `/manifest.webmanifest` and `/sw.js`.
 - Confirm that Add to Home Screen or Install app works with the server-served PWA assets.
-- Over plain `http://` the added shortcut is live but not offline-capable; a service worker needs a secure context (https or localhost).
+- Over plain `http://` the added shortcut is live but not offline-capable; a service worker needs a secure context (https or localhost). Under the https tunnel the worker is now network-first with an offline fallback, so the phone keeps an openable last-known copy when the laptop is off.
 - Verify firewall guidance and same-network access using a phone, not only a localhost browser.
 
 ---
