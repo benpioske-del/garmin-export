@@ -236,10 +236,10 @@ source. Re-derive it if you can.
 | Fact | Value | How to re-derive |
 |---|---|---|
 | Repository visibility | **private** | anonymous raw URL returns 404 |
-| FIT files | 61 | count in the local export |
-| Activities | 61 | `SELECT COUNT(*) FROM activities` |
-| Open reviews | 62 | 61 `timezone_uncertain` + 1 `activity_gap` |
-| FIT files with lap records | 61 of 61 | `python brief_consistency.py` |
+| FIT files | 69 | count in the local export |
+| Activities | 69 | `SELECT COUNT(*) FROM activities` |
+| Open reviews | 70 | 69 `timezone_uncertain` + 1 `activity_gap` |
+| FIT files with lap records | 69 of 69 | `python brief_consistency.py` |
 | Splits published | yes (`Best 5K Time`, `Lap Splits`) | header of `garmin_export.csv` |
 | Fastest measured 5 km crossing | 24:42 on 2026-06-16, measured | `brief_facts.json` → `best_5k` |
 | Tests | 491 passed, 1 skipped (492 collected) | `python -m pytest` |
@@ -295,7 +295,7 @@ file in `tasks/` is not a task.
   trend, not a confident percentile.
 
 ### Splits: measured 5 km crossing, now published
-**Do not claim per-mile splits are unavailable.** They are not. Every one of the 61
+**Do not claim per-mile splits are unavailable.** They are not. Every one of the 69
 FIT files carries lap records, and since this publish `garmin_export.csv` has two
 new columns:
 
