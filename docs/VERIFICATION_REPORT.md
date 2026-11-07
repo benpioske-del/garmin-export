@@ -76,17 +76,17 @@ $ python fit_audit.py
 FIT data audit
 parser: fitparse=1.2.0 reader=1.1.0
 
-files inspected           : 61
+files inspected           : 69
 parse failures            : 0
-files readable            : 61
-files with GPS            : 61
+files readable            : 69
+files with GPS            : 69
 files without GPS         : 0
-files with usable timestamp: 61
+files with usable timestamp: 69
 files without timestamp   : 0
-session messages          : 61
-lap messages              : 550
-record messages           : 57335
-position points (counted) : 57319
+session messages          : 69
+lap messages              : 626
+record messages           : 65032
+position points (counted) : 65011
 files missing fields      : 0
 
 warnings:
@@ -117,13 +117,13 @@ Re-running is a no-op. Editing an applied migration raises
 
 ## Import against the real corpus
 
-On a fresh database with the current corpus of 61 files, the first import
-inserts all 61. Re-running against a database that already holds them reports
+On a fresh database with the current corpus of 69 files, the first import
+inserts all 69. Re-running against a database that already holds them reports
 every file `unchanged`:
 
 ```
 $ python activities.py import
-{"inserted": 0, "updated": 0, "unchanged": 61, "unreadable": 0}
+{"inserted": 0, "updated": 0, "unchanged": 69, "unreadable": 0}
 ```
 
 **Idempotency verified on the real data**: no rows updated, and no new audit
@@ -131,28 +131,30 @@ rows written on the second pass.
 
 ```
 $ python activities.py summary
-{"activities": 61, "open_reviews": 62}
+{"activities": 69, "open_reviews": 70}
 ```
 
-- 61 activities
-- 61 open `timezone_uncertain` reviews (one per activity, expected)
+- 69 activities
+- 69 open `timezone_uncertain` reviews (one per activity, expected)
 - 1 open `activity_gap`: `no activity 2026-06-26..2026-07-05 (8 days)`
 - 0 duplicates detected
-- 61 SHA-256 raw references stored
+- 69 SHA-256 raw references stored
 
 The FIT-file inventory, the canonical table and the published CSV all agree at
-**61**. An earlier brief described a 55/56/59 discrepancy; that premise was
+**69**. An earlier brief described a 55/56/59 discrepancy; that premise was
 checked against the live corpus and is unsupported, so there is no
 reconciliation to perform.
 
 Note for anyone re-running this: `trainloop.py load` only *computes* load. The
 command that imports new FIT files is `trainloop.py bootstrap`. This trap has now
-recurred twice. On 2026-10-04 the database held 57 while the FIT directory and CSV
-held 58; and on 2026-10-15 it held 58 while they held 61 (the runs of 2026-10-06,
-2026-10-08 and 2026-10-10 had been published to the CSV but never imported), so
-every load figure and the dashboard silently excluded the three most recent runs.
-Re-running `trainloop.py bootstrap` on 2026-10-15 imported the three
-(`{"inserted": 3, "unchanged": 58}`) and brought the table to 61.
+recurred three times. On 2026-10-04 the database held 57 while the FIT directory
+and CSV held 58; on 2026-10-15 it held 58 while they held 61; and on 2026-11-06 it
+held 61 while the FIT directory held 69 (and the published CSV 68) - the eight
+runs from 2026-10-13 to 2026-11-06 had been downloaded but never imported, so
+every load figure and the dashboard silently excluded them. Re-running
+`trainloop.py bootstrap` on 2026-10-15 imported three
+(`{"inserted": 3, "unchanged": 58}`), and again on 2026-11-06 imported eight
+(`{"inserted": 8, "unchanged": 61}`), bringing the table to 69.
 
 ## Training load and recommendation
 
@@ -347,7 +349,7 @@ Stated rather than implied:
 | Strength data | Schema and service verified by tests; no real strength sessions recorded yet. |
 | `profile.json` | Partially populated. `hr_max=198`; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` null. The missing UTC offset blocks confirmed local dates and weather location. |
 | Brief bridge idempotency | **Now verified.** `3054d6a` gave the file a content-derived `brief_id`; `captured_utc` is metadata only. Tests advance a frozen clock 90s to prove an unchanged brief is a no-op. |
-| Athlete UTC offset | Not supplied by the athlete. This is what 61 open `timezone_uncertain` reviews are waiting on. |
+| Athlete UTC offset | Not supplied by the athlete. This is what 69 open `timezone_uncertain` reviews are waiting on. |
 | Elevation accuracy | **Derived, not measured.** These FIT files carry no `barometer_pressure`, so altitude is GPS-derived and noisy. The device figure and a smoothed recomputation differ by up to ~25% on real runs. See [ELEVATION.md](ELEVATION.md). |
 
 ## Withdrawn claims
@@ -381,7 +383,7 @@ Recorded so they are not reintroduced by a later brief:
   prevents the error from reaching the UI. The API queries every count; none is
   written down. See [SUPERVISOR_BRIEF_ERRORS.md](SUPERVISOR_BRIEF_ERRORS.md).
 - **"55 audit records and a historical 59-record source."** Both counts are
-  unsupported. The live corpus is 61 across every source.
+  unsupported. The live corpus is 69 across every source.
 
 ## Reproducing this report
 

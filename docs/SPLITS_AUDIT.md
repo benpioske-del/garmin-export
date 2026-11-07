@@ -35,8 +35,8 @@ that crossing was a genuine all-out attempt with no interruptions.
 
 | | |
 | --- | --- |
-| Activities with a measured 5 km crossing | 61 / 61 |
-| Activities with lap splits | 61 / 61 |
+| Activities with a measured 5 km crossing | 69 / 69 |
+| Activities with lap splits | 69 / 69 |
 | Fastest measured crossing (from local FIT read, before the export refresh) | 24:42 on 2026-06-16 |
 
 The `2026-06-16` figure matches the shape of the run the task already suspected

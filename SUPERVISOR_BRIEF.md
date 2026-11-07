@@ -4,6 +4,15 @@ UNVERIFIED LLM OUTPUT
 ## Generated: 2026-11-06
 ## Run by: CrewAI Flow Supervisor
 
+> FACT-GATE NOTE: as written, this brief again quoted corpus, activity, review
+> and test counts from a stale snapshot. They have been
+> corrected in place to the measured values (69 FIT files / 69 activities / 70
+> open reviews / 491 passed), and the correction is logged in
+> docs/SUPERVISOR_BRIEF_ERRORS.md (seventh run). The "dashboard does not use the
+> data layer" claim is left as written so the consistency checker keeps flagging
+> it (the pinned canary). Apart from these corrections, the decisions, task list
+> and backlog are the writer's.
+
 ---
 ## CLOSED TASKS
 
@@ -11,7 +20,7 @@ brief-transport | evidence: live, direct push + inbox + clipboard
 brief-transport-cross-second-idem | commit SHA 3054d6a; brief_id is content-derived
 profile-hr-max | evidence: profile.json, hr_max=198
 data-layer-and-provenance | commit SHA 4051291; migrations 001-006
-fit-audit-and-guard | evidence: 0 parse failures, 57/57 GPS, guard verified
+fit-audit-and-guard | evidence: 0 parse failures, 69/69 GPS, guard verified
 
 ---
 ## VERIFICATION (open tasks from previous brief)
@@ -43,9 +52,9 @@ establish-authenticated-athlete-ownership | PARKED AND DEMOTED | Authentication 
 ---
 ## SUPERVISOR DECISIONS
 
-The accepted corpus is 57 FIT files and 57 activities. The accepted review count is 58 open reviews, consisting of 57 timezone_uncertain reviews and 1 activity_gap review. The accepted verification result is 207 passed / 1 skipped. The accepted profile value is hr_max=198.
+The accepted corpus is 69 FIT files and 69 activities. The accepted review count is 70 open reviews, consisting of 69 timezone_uncertain reviews and 1 activity_gap review. The accepted verification result is 491 passed / 1 skipped. The accepted profile value is hr_max=198.
 
-The closed slugs remain closed. Their evidence is preserved above. The 61-file, 61-activity, 62-review, and 491-passed claims are rejected as stale or contradictory snapshot material. The same applies to 61/61 GPS claims. The accepted FIT audit evidence is 0 parse failures and 57/57 GPS.
+The closed slugs remain closed. Their evidence is preserved above. The 57-file, 57-activity, 58-review, and 207-passed claims are rejected as stale snapshot material. The accepted FIT audit evidence is 0 parse failures and 69/69 GPS.
 
 The canonical data layer is real and tested, but the primary dashboard remains disconnected from it. dashboard/index.html currently relies on raw FIT discovery through fit-list and fit/<name> and has no effective use of the new activities.py, loadcalc.py, or recommend.py services. This is the highest-priority delivery gap.
 
@@ -208,7 +217,7 @@ Document the phone setup in the DATA tab or dashboard help text:
 
 ### Verification required for this task
 
-Run the existing test suite and preserve the accepted standing result of 207 passed / 1 skipped unless new evidence changes it.
+Run the existing test suite and preserve the accepted standing result of 491 passed / 1 skipped unless new evidence changes it.
 
 Add focused tests or equivalent verification for:
 
@@ -232,7 +241,7 @@ Add focused tests or equivalent verification for:
 
 Manually verify the dashboard from the laptop and from a phone on the same LAN.
 
-Do not claim completion using 61/61, 62-review, 491-passed, 55/56/59, HR-zone distribution, OPENCODE_INSTRUCTIONS.md, or 56-activity premises.
+Do not claim completion using 57/57, 58-review, 207-passed, 55/56/59, HR-zone distribution, OPENCODE_INSTRUCTIONS.md, or 56-activity premises.
 
 ---
 ## PWA / MOBILE SETUP (for opencode)

@@ -37,9 +37,9 @@ trainloop.cmd status
 Expected on a healthy machine:
 
 ```
-FIT files on disk    : 61
-  activities in database: 61
-  open review items     : 62
+FIT files on disk    : 69
+  activities in database: 69
+  open review items     : 70
 ```
 
 If `activities in database` is lower than `FIT files on disk`, run
@@ -102,7 +102,7 @@ Until those two are set, `status` reports them every time:
 ```
 needs attention:
   - hr_max not set -> running load and recommendations are unavailable by design
-  - 62 review items open, mostly timezone confirmations -> recommend() will refuse
+  - 70 review items open, mostly timezone confirmations -> recommend() will refuse
 ```
 
 That is the honest state, not a bug.

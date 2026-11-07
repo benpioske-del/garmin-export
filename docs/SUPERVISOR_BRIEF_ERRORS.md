@@ -467,3 +467,30 @@ restated every run. Correcting them in place is a holding action. The only thing
 that stops it is the authenticated fetch channel (`GITHUB_TOKEN`) from the fourth
 run's Option 1, which is still unset. Until then the writer is blind and the
 guard is the only defence.
+
+---
+
+# Seventh run: 2026-11-06, the blind writer repeats the pre-`b2201c7` snapshot
+
+Commit `483b2a9`, "chore: update SUPERVISOR_BRIEF.md via CrewAI flow". The brief
+reissued the same frozen numbers again:
+
+| Brief claim | Actual | Source of truth |
+| --- | --- | --- |
+| "57 FIT files and 57 activities" | **69** FIT files, **69** CSV rows, **69** db activities | directory listing, `garmin_export.csv`, `SELECT COUNT(*)` |
+| "58 open reviews: 57 `timezone_uncertain` and 1 `activity_gap`" | **70**: 69 and 1 | `review_items` |
+| "207 passed / 1 skipped" | **491 passed / 1 skipped** (492 collected) | `python -m pytest` |
+| "0 parse failures and 57/57 FIT files with GPS" | **69/69** | `python fit_audit.py` |
+
+The brief also insisted the correct 61-era figures were "rejected as stale or
+contradictory snapshot material". The measured corpus is now 69/69/70, so those
+instructions were inverted along with the counts. The numbers were corrected in
+place and the "dashboard does not use the data layer" premise was left as the
+pinned canary.
+
+## Publish hazard found on this run
+
+`export_publish.py` folds remote commits in with `reset --hard origin/main`. Any
+uncommitted hand-edits to `docs/` or `SUPERVISOR_BRIEF.md` are discarded by that
+reset; only `CREW_BRIEF.md` is restored automatically. Commit doc and brief
+corrections *before* publishing, or the publish silently reverts them.
