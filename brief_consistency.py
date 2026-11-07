@@ -478,9 +478,13 @@ def _coaching_facts():
     try:
         import trainingdb
         import recommend
+        import trainloop
+        # Resolve hr_max exactly the way the dashboard does, or the recorded
+        # reason describes a missing input that is not actually missing.
+        hr_max = trainloop._hr_max()
         conn = trainingdb.connect()
         try:
-            r = recommend.recommend(conn)
+            r = recommend.recommend(conn, hr_max=hr_max)
         finally:
             conn.close()
         return {"state": r.get("state"), "advisory": r.get("advisory"),

@@ -65,7 +65,7 @@ rather than measured. The export says so instead of implying certainty.
 
 | Value | Rows | Meaning |
 | --- | --- | --- |
-| `assumed_utc; local date from filename` | 56 | `start_time` treated as UTC per the FIT spec; local date reconstructed from the filename. The UTC offset is **not** known. |
+| `assumed_utc; local date from filename` | 69 | `start_time` treated as UTC per the FIT spec; local date reconstructed from the filename. The UTC offset is **not** known in the CSV row. |
 | `unknown; athlete-supplied date` | 0 | Would apply to a row read from a Garmin CSV, where the date is already local and no UTC instant exists. |
 
 The label is deliberately awkward. `assumed_utc` is true and incomplete at the
@@ -74,11 +74,20 @@ resolved timezone.
 
 ## What would close the remaining gap
 
-Filling in `profile.json` with a home timezone offset, plus whether the athlete
-is affected by daylight saving, would let the local time be computed from the
-UTC instant instead of reconstructed from a filename. Until then the
-reconstruction is the best available source, and it is documented rather than
-assumed away.
+The local database has already closed the per-activity part: on 2026-11-07 the
+athlete confirmed US Central, and `activities.confirm_timezone()` wrote a
+confirmed offset for all 69 activities (`timezone_source=confirmed_offset`,
+DST applied per run). The dashboard reads those confirmed local times.
+
+The published CSV is built directly from the FIT files, so its `Timezone Status`
+column still carries the FIT-derived `assumed_utc` label. That label describes
+the row's source, not the database state. If the CSV should carry the confirmed
+local times too, the export needs to overlay the database values; until then,
+treat the CSV's `Date` as filename-derived and the dashboard's as confirmed.
+
+Filling in `profile.json` with the remaining fields (age, sex, resting heart
+rate, weight, height) would unlock cohort percentiles and the weather location
+policy. The UTC offset itself is no longer outstanding.
 
 A second, independent improvement would be to record a real UTC offset per
 activity. Garmin's CSV export already does this; the FIT files do not.

@@ -238,7 +238,7 @@ source. Re-derive it if you can.
 | Repository visibility | **private** | anonymous raw URL returns 404 |
 | FIT files | 69 | count in the local export |
 | Activities | 69 | `SELECT COUNT(*) FROM activities` |
-| Open reviews | 70 | 69 `timezone_uncertain` + 1 `activity_gap` |
+| Open reviews | 1 | 1 `activity_gap` (2026-06-26..2026-07-05); timezone reviews resolved 2026-11-07 |
 | FIT files with lap records | 69 of 69 | `python brief_consistency.py` |
 | Splits published | yes (`Best 5K Time`, `Lap Splits`) | header of `garmin_export.csv` |
 | Fastest measured 5 km crossing | 24:42 on 2026-06-16, measured | `brief_facts.json` → `best_5k` |

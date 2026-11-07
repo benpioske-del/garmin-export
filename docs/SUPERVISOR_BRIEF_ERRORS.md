@@ -510,3 +510,33 @@ table). The guard stayed at one conflict: the pinned dashboard canary.
 uncommitted hand-edits to `docs/` or `SUPERVISOR_BRIEF.md` are discarded by that
 reset; only `CREW_BRIEF.md` is restored automatically. Commit doc and brief
 corrections *before* publishing, or the publish silently reverts them.
+
+---
+
+# Eighth correction: 2026-11-07, the review count moved because the data moved
+
+This one is not a writer error. On 2026-11-07 the athlete confirmed the local UTC
+offset as US Central (UTC-5/-6, DST applied per run). ctivities.confirm_timezone()
+then resolved all 69 `timezone_uncertain` reviews and stamped every activity
+`timezone_source=confirmed_offset`. The open review count fell from 70 to **1**,
+the calendar-gap review for 2026-06-26..2026-07-05.
+
+| Before | After | Source of truth |
+| --- | --- | --- |
+| 69 `timezone_uncertain` + 1 `activity_gap` = 70 open | 1 `activity_gap` only | `review_items` |
+| `confirmation_required`, "9 recent activities are awaiting confirmation" | `data_insufficient`, "only 1 training days with runs in 7 days, need 3" | `trainloop.py recommend` |
+
+The briefs and docs were reconciled to the new state, and
+`docs/PROVENANCE.md` now records that the published CSV still carries the
+FIT-derived `assumed_utc` label while the database and dashboard carry confirmed
+local times. `trainloop.py status` was also corrected: it no longer says an open
+review blocks a recommendation when none of the open reviews fall inside the
+28-day window.
+
+## Second fix on this run: the facts file recorded a false reason
+
+`brief_consistency.py::_coaching_facts()` called `recommend.recommend(conn)`
+without `hr_max`, so it recorded "running load unavailable: no hr_max supplied"
+even though `profile.json` supplies 198 and the dashboard passes it. It now
+resolves `hr_max` through `trainloop._hr_max()`, the same path the server uses,
+so `brief_facts.json` quotes the real reason.

@@ -131,11 +131,12 @@ rows written on the second pass.
 
 ```
 $ python activities.py summary
-{"activities": 69, "open_reviews": 70}
+{"activities": 69, "open_reviews": 1}
 ```
 
 - 69 activities
-- 69 open `timezone_uncertain` reviews (one per activity, expected)
+- 0 open `timezone_uncertain` reviews: all 69 local dates were confirmed by
+  the athlete on 2026-11-07 (US Central, UTC-5/-6 with DST applied per run)
 - 1 open `activity_gap`: `no activity 2026-06-26..2026-07-05 (8 days)`
 - 0 duplicates detected
 - 69 SHA-256 raw references stored
@@ -165,19 +166,21 @@ not change it):
 
 ```
 $ python trainloop.py load
-7d    run 780.8   strength n/a  combined 780.8   run_conf medium
-14d   run 1798.1  strength n/a  combined 1798.1  run_conf medium
-28d   run 3364.4  strength n/a  combined 3364.4  run_conf medium
+7d    run 149.3   strength n/a  combined 149.3   run_conf medium
+14d   run 780.8   strength n/a  combined 780.8   run_conf medium
+28d   run 2592.3  strength n/a  combined 2592.3  run_conf medium
 
 $ python trainloop.py recommend
-state: confirmation_required
+state: data_insufficient
+advisory: no
 reasons:
-  - 11 recent activities are awaiting confirmation
+  - only 1 training days with runs in 7 days, need 3
 evidence:
-  run_load_28d         3364.4
-  runs_28d             11
-  runs_7d              2
-  strength_28d         0
+  days_since_last_run  1
+  run_days_28d         8
+  run_days_7d          1
+  run_load_28d         2592.3
+  strength_days_28d    0
   strength_load_28d    None
 ```
 
@@ -185,14 +188,16 @@ Two things worth stating plainly:
 
 - `strength_load` is `null`, not `0`. No strength sessions exist yet, and an
   absent component is not a zero component.
-- The recommendation is a **refusal**, and it is the correct one: 11 activities
-  in the window still carry unresolved timezone reviews, so
-  `recommend.recommend()` declines to issue a control state. This is the
-  designed behaviour, not a failure.
+- The recommendation is a **refusal**, and it is the correct one: the acute
+  window holds only one run day (2026-11-06), below the three the method needs
+  to compare against the chronic window. This is the designed behaviour, not a
+  failure. The earlier `confirmation_required` refusal was cleared on
+  2026-11-07 when the athlete confirmed the local UTC offset; it is no longer
+  blocking.
 
-The 7-day figure moved from 180.7 to 780.8 when `2026-10-01` was finally
-imported. That is the practical cost of the database being a run behind: the
-load looked like a light week when the corpus said otherwise.
+The 7-day figure is 149.3 because only one run falls inside the acute window.
+When the database was a run behind, that figure was understated; the import step
+is what keeps it honest.
 
 ## Publisher and privacy guard
 
@@ -347,9 +352,9 @@ Stated rather than implied:
 | Multi-athlete isolation | Does not exist. The database is local and single-subject. |
 | Weather provider | None. The gate returns `unavailable` past consent and location. |
 | Strength data | Schema and service verified by tests; no real strength sessions recorded yet. |
-| `profile.json` | Partially populated. `hr_max=198`; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` null. The missing UTC offset blocks confirmed local dates and weather location. |
+| `profile.json` | Partially populated. `hr_max=198`; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` null. The UTC offset is now confirmed (US Central), so local dates are settled; the remaining fields block cohort percentiles and the weather location policy. |
 | Brief bridge idempotency | **Now verified.** `3054d6a` gave the file a content-derived `brief_id`; `captured_utc` is metadata only. Tests advance a frozen clock 90s to prove an unchanged brief is a no-op. |
-| Athlete UTC offset | Not supplied by the athlete. This is what 69 open `timezone_uncertain` reviews are waiting on. |
+| Athlete UTC offset | **Confirmed 2026-11-07**: US Central (UTC-5/-6, DST applied per activity). All 69 `timezone_uncertain` reviews resolved; only the calendar-gap review remains. |
 | Elevation accuracy | **Derived, not measured.** These FIT files carry no `barometer_pressure`, so altitude is GPS-derived and noisy. The device figure and a smoothed recomputation differ by up to ~25% on real runs. See [ELEVATION.md](ELEVATION.md). |
 
 ## Withdrawn claims

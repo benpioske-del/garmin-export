@@ -261,6 +261,9 @@ def cmd_status(args):
         "SELECT COUNT(*) c FROM strength_sessions").fetchone()["c"]
     open_reviews = conn.execute(
         "SELECT COUNT(*) c FROM review_items WHERE state = 'open'").fetchone()["c"]
+    recent_open = conn.execute(
+        "SELECT COUNT(*) c FROM activities WHERE review_state = 'open' "
+        "AND substr(start_utc, 1, 10) >= date('now', '-28 days')").fetchone()["c"]
     info = trainingdb.status(conn)
     conn.close()
 
@@ -305,9 +308,13 @@ def cmd_status(args):
     if hr_max is None:
         gaps.append("hr_max not set -> running load and recommendations are "
                     "unavailable by design (see docs/TRAINING_LOAD_METHODOLOGY.md)")
-    if open_reviews:
-        gaps.append("%s open, mostly timezone confirmations -> recommend() will "
-                    "refuse until these are resolved" % plural(open_reviews, "review item"))
+    if recent_open:
+        gaps.append("%s awaiting confirmation -> recommend() will refuse "
+                    "until these are resolved"
+                    % plural(recent_open, "recent activity", "recent activities"))
+    elif open_reviews:
+        gaps.append("%s open, none in the last 28 days -> does not block a "
+                    "recommendation" % plural(open_reviews, "review item"))
 
     if gaps:
         print("needs attention:")

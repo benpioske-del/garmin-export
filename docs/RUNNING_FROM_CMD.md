@@ -39,7 +39,7 @@ Expected on a healthy machine:
 ```
 FIT files on disk    : 69
   activities in database: 69
-  open review items     : 70
+  open review items     : 1
 ```
 
 If `activities in database` is lower than `FIT files on disk`, run
@@ -82,27 +82,28 @@ Or add it once to `profile.json`:
 
 It is never estimated from your age.
 
-**UTC offset.** Your recorded start times are in UTC. Until they are
-converted to your local zone, recent activities are held as
-`timezone_uncertain` review items and `recommend` refuses to act:
+**UTC offset.** Your recorded start times are in UTC. The athlete confirmed US
+Central on 2026-11-07, so every activity now has a confirmed local date
+(`timezone_source=confirmed_offset`) and the `timezone_uncertain` reviews are
+closed. The remaining open review is the calendar gap (2026-06-26 to
+2026-07-05), which does not block recent-state advice.
+
+The current refusal is a different one, and an honest one:
 
 ```
-state: confirmation_required
+state: data_insufficient
 reasons:
-  - 11 recent activities are awaiting confirmation
+  - only 1 training days with runs in 7 days, need 3
 ```
 
-This is deliberate. Resolving those reviews needs a decision about your
-offset, which is yours to make, not something to infer.
+The acute window holds one run day (2026-11-06); the method needs three to
+compare against the chronic window. That clears as more runs are recorded.
 
 ## What `status` will keep telling you
 
-Until those two are set, `status` reports them every time:
-
-```
+```text
 needs attention:
-  - hr_max not set -> running load and recommendations are unavailable by design
-  - 70 review items open, mostly timezone confirmations -> recommend() will refuse
+  - 1 review item open, none in the last 28 days -> does not block a recommendation
 ```
 
 That is the honest state, not a bug.

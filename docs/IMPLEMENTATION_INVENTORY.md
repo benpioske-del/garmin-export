@@ -80,10 +80,12 @@ Docs: [`DATA_QUALITY.md`](DATA_QUALITY.md),
 | Brief bridge | `brief_bridge.py` | `post` / `ingest` / `paste` / `serve` / `capture` |
 | Profile | `profile.json` | `hr_max` set to 198; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` still `null` |
 
-The profile's empty fields are a live blocker, not a cosmetic gap: the timezone
-offset and a weather location policy would live there, and neither exists yet.
-`hr_max` is populated, so any brief describing the profile as empty is reading
-an out-of-date copy of this document.
+The profile's empty fields are still a live blocker, not a cosmetic gap: age,
+sex, resting heart rate, weight and height block cohort percentiles, and a
+weather location policy does not exist yet. The UTC offset is no longer part of
+that gap: the athlete confirmed US Central on 2026-11-07, so every activity now
+has a confirmed local date. `hr_max` is populated, so any brief describing the
+profile as empty is reading an out-of-date copy of this document.
 
 ## Tooling
 
@@ -114,10 +116,10 @@ regression in it.
 - 626 laps, 65,032 records, 65,011 position points
 - Re-import of identical files: 69 `unchanged`, 0 audit rows written
 - **1 open date gap**: 2026-06-26 to 2026-07-05
-- **69 open `timezone_uncertain` reviews**, expected until an offset is confirmed
+- **0 open `timezone_uncertain` reviews**: all 69 local dates were confirmed by the athlete on 2026-11-07 (US Central, UTC-5/-6 with DST applied per run)
 - **1 open `activity_gap` review** for the 2026-06-26 to 2026-07-05 gap
 - 1 activity where the local date and UTC date differ
-    (`garmin:23745136848`, local 2026-07-26T01:10:15, UTC 2026-07-27T01:10:15Z)
+    (`garmin:23745136848`, local 2026-07-26T20:10:15, UTC 2026-07-27T01:10:15Z)
 - 0 strength sessions. `strength_load` is `null` while this is true, which is
   not the same as zero.
 
@@ -313,9 +315,9 @@ exposes `window.refreshApiPanel()`.
 1. `profile.json` is **partially** populated, not empty. `hr_max` is set to
    198 (a deliberate choice above the observed 195 peak); `age`, `sex`,
    `resting_hr`, `weight_lb` and `height_in` are still `null`. The missing
-   values block confirmed local dates, cohort percentiles and the weather
-   location policy. The athlete's UTC offset is the single highest-value
-   missing field, because 69 reviews are waiting on it.
+   values block cohort percentiles and the weather location policy. The
+   athlete's UTC offset is no longer missing: it was confirmed as US Central on
+   2026-11-07, resolving all 69 timezone reviews.
 2. No authentication and no multi-athlete separation. The health boundary is
    single-subject and described that way, not dressed up as a permission system.
 3. ~~The transport is not live.~~ **Resolved.** The CrewAI flow pushes
