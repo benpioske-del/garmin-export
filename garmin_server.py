@@ -1164,9 +1164,14 @@ def main():
         print("Coach Dashboard is already running: %s" % existing)
         print("(reused - saved runs, notes and imports stay intact.)")
         if args.open:
-            _t2 = threading.Timer(0.3, lambda: webbrowser.open(existing))
-            _t2.daemon = True
-            _t2.start()
+            # Open synchronously. A daemon Timer here never fires: main()
+            # returns and the interpreter exits before it runs, so double-
+            # clicking the .cmd while a server is up looked like "nothing
+            # happened".
+            try:
+                webbrowser.open(existing)
+            except Exception:
+                pass
         return
     if args.open:
         _t = threading.Timer(0.6, lambda: webbrowser.open(url))
