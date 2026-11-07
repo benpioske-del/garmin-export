@@ -20,7 +20,11 @@ import brief_consistency as B
 
 # Eleven ranked backlog rows, two task files. Unchanged through the fifth brief;
 # only its numeric claims drifted and were corrected in place (2026-10-13).
+# The seventh brief (2026-11-06) also listed its primary task as a row in
+# "VERIFICATION (open tasks from previous brief)". That slug also has no task
+# file of its own, so it joins the pinned set rather than failing as a phantom.
 KNOWN_UNBACKED = {
+    "connect-dashboard-to-data-layer",
     "complete-athlete-profile-and-timezone-provenance",
     "formalize-continuity-review-without-synthetic-activities",
     "capture-confirmed-strength-history",

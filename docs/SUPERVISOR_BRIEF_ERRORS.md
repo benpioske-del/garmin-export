@@ -488,6 +488,22 @@ instructions were inverted along with the counts. The numbers were corrected in
 place and the "dashboard does not use the data layer" premise was left as the
 pinned canary.
 
+## Structural change: the backlog is no longer `rank: N`
+
+The seventh brief also changed the backlog's shape. Previous briefs wrote
+`rank: N | slug | prose`; this one writes `Priority: high - slug | prose`. It
+also promoted the primary task, `connect-dashboard-to-data-layer`, into a row of
+"VERIFICATION (open tasks from previous brief)". Two consistency tests failed on
+that alone: no `RANKED` rows were parsed, and the primary task appeared as a new
+unbacked row.
+
+Neither is a fabrication, so neither was "corrected" in the brief. The writer
+owns its task list and wording. Instead `brief_consistency.py` now parses the
+`Priority: ... - slug | prose` shape as `RANKED`, and
+`tests/test_brief_consistency.py` pins `connect-dashboard-to-data-layer` in
+`KNOWN_UNBACKED` (it has no task file under `tasks/`, like the rest of the
+table). The guard stayed at one conflict: the pinned dashboard canary.
+
 ## Publish hazard found on this run
 
 `export_publish.py` folds remote commits in with `reset --hard origin/main`. Any
