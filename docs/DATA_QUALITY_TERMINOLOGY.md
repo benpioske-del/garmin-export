@@ -108,6 +108,24 @@ invented activity.** No code path creates a placeholder session, and none
 synthesises a workout for a day with no file. `test_date_gap_is_reported_and_nothing_is_invented`
 enforces that the activity count is unchanged after gap detection.
 
+`detect_date_gaps()` holds four invariants, each pinned by a test:
+
+- **A gap longer than `gap_days` opens exactly one `activity_gap` review.**
+  The comparison is strict (`gap > gap_days`), so a stretch of exactly
+  `gap_days` is tolerated and the next day is the first reported one.
+- **The review has `activity_id = NULL`.** There is no activity to attach it
+  to; that is the point. `detail` names both boundary dates and the number of
+  missing days (`gap - 1`).
+- **Detection is idempotent.** `open_review()` returns the existing open review
+  for the same `(NULL, activity_gap)` pair, so re-importing the same corpus
+  does not stack duplicate questions.
+- **The activity table is never written.** Gap detection only reads dates and
+  writes `review_items`.
+
+Resolving the review does not backfill the gap. A confirmed absence is recorded
+as `resolved_no_change`; a genuine import failure is re-imported from the FIT
+file, which is the only source allowed to create a row.
+
 ## Where each label appears
 
 | Surface | Source |

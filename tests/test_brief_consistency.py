@@ -17,6 +17,7 @@ import re
 import pytest
 
 import brief_consistency as B
+from conftest import requires_live_corpus
 
 # Eleven ranked backlog rows, two task files. Unchanged through the fifth brief;
 # only its numeric claims drifted and were corrected in place (2026-10-13).
@@ -78,6 +79,7 @@ def test_unbacked_rows_are_pinned_so_new_phantoms_fail():
 
 # --- facts -------------------------------------------------------------------
 
+@requires_live_corpus
 def test_measured_facts_are_available():
     facts = B.measured_facts()
     for key in ("fit_files", "activities", "open_reviews"):
@@ -86,6 +88,7 @@ def test_measured_facts_are_available():
         (facts.get("review_breakdown") or {}).values())
 
 
+@requires_live_corpus
 def test_conflicting_claims_are_pinned():
     """The corrected brief must state no wrong number; a new one fails here."""
     found = {(label, stated) for label, stated, _, _ in B.claim_conflicts()}
@@ -93,6 +96,7 @@ def test_conflicting_claims_are_pinned():
         "the brief's claimed numbers changed: %s" % (found ^ KNOWN_CONFLICTS))
 
 
+@requires_live_corpus
 def test_reason_breakdown_conflicts_are_pinned():
     """The corrected brief's review breakdown must match; a new one fails."""
     found = {(label, stated) for label, stated, _, _ in B.reason_conflicts()}
@@ -100,6 +104,7 @@ def test_reason_breakdown_conflicts_are_pinned():
         "the brief's review breakdown changed: %s" % (found,))
 
 
+@requires_live_corpus
 def test_a_brief_matching_reality_reports_no_conflicts(tmp_path, monkeypatch):
     """The checker must not cry wolf. Feed it a brief that agrees with the data."""
     facts = B.measured_facts()
@@ -117,6 +122,7 @@ def test_a_brief_matching_reality_reports_no_conflicts(tmp_path, monkeypatch):
     assert B.reason_conflicts(facts) == []
 
 
+@requires_live_corpus
 def test_conflict_checkers_check_text_as_well_as_the_file(tmp_path, monkeypatch):
     """The merge gate passes an incoming brief; the file-based calls stay whole."""
     facts = B.measured_facts()
@@ -132,6 +138,7 @@ def test_conflict_checkers_check_text_as_well_as_the_file(tmp_path, monkeypatch)
     assert found[0][2] == facts["activities"]
 
 
+@requires_live_corpus
 def test_numeric_conflicts_aggregates_and_dedupes(tmp_path, monkeypatch):
     facts = B.measured_facts()
     monkeypatch.setattr(B, "BRIEF", str(tmp_path / "b.md"))
@@ -244,6 +251,7 @@ def test_write_facts_produces_a_readable_document(tmp_path, fast_facts):
     assert json.loads(out.read_text(encoding="utf-8"))["corpus"] == doc["corpus"]
 
 
+@requires_live_corpus
 def test_facts_document_carries_the_numbers_a_brief_gets_wrong(tmp_path, fast_facts):
     doc = B.write_facts(path=str(tmp_path / "f.json"))
     facts = B.measured_facts()

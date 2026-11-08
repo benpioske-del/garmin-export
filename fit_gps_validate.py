@@ -1,7 +1,6 @@
 """Validate the GPS claim: coordinate ranges, validity, and time fields."""
 import glob
 import os
-import stat
 import sys
 from collections import Counter
 

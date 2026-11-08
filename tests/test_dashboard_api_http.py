@@ -24,7 +24,7 @@ TOKEN = "test-token-abc123"
 
 
 @pytest.fixture
-def server(monkeypatch):
+def server(monkeypatch, migrated_db):
     monkeypatch.setattr(G, "TOKEN", TOKEN)
     # An empty fit dir keeps these tests off the athlete's real files.
     monkeypatch.setattr(G, "FIT_DIR", "")
@@ -327,7 +327,7 @@ def _call(opener, base, path, data=None, headers=None):
 
 
 @pytest.fixture
-def secured_server(monkeypatch):
+def secured_server(monkeypatch, migrated_db):
     monkeypatch.setattr(G, "TOKEN", TOKEN)
     monkeypatch.setattr(G, "FIT_DIR", "")
     monkeypatch.setattr(G, "fit_names", lambda: ["2026-10-01_111.fit"])

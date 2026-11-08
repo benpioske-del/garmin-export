@@ -240,9 +240,15 @@ def _read(path):
 
 
 def dashboard_wiring():
-    """What the dashboard actually consumes. A brief cannot see this file."""
+    """What the dashboard actually consumes. A brief cannot see this file.
+
+    Returns None unless BOTH halves are readable. dashboard/index.html is
+    gitignored and absent from a clean checkout; measuring only the server would
+    report a half-wired dashboard and turn an unmeasurable claim into a false
+    conflict.
+    """
     server, dash = _read(SERVER), _read(DASHBOARD)
-    if not server and not dash:
+    if not server or not dash:
         return None
     return {
         "server_routes": [e for e in ("/api/activities", "/api/load",

@@ -47,6 +47,7 @@ import terms
 import trainingdb
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from conftest import requires_real_db  # noqa: E402
 from recommend_scenarios import (  # noqa: E402
     SCENARIOS, SCENARIOS_BY_NAME, FIXED_AS_OF, HR_MAX,
 )
@@ -434,6 +435,7 @@ class TestFixedDefectsStayFixed:
             assert snap["windows"]["28"]["run_confidence"] is not None
 
 
+@requires_real_db
 def test_no_scenario_can_reach_the_live_database(tmp_path):
     """Guard against the mistake that started this work.
 

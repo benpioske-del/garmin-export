@@ -306,7 +306,6 @@ MEGACMD_REMOTE = "/CoachDashboard"
 # Imported for the JSON API. These are the canonical implementations; the
 # server must not grow a second parser, a second load formula or a second
 # coaching rule, or the dashboard and the CLI would drift apart.
-import activities          # noqa: E402
 import loadcalc            # noqa: E402
 import recommend           # noqa: E402
 import trainingdb          # noqa: E402

@@ -5,6 +5,7 @@ real FIT files, and no test writes to the working tree.
 """
 
 import datetime
+import json
 import os
 import sqlite3
 import sys
@@ -275,6 +276,76 @@ def test_no_gap_opened_when_days_are_contiguous(db):
     activities.upsert_activity(db, row("2026-01-01", source="2026-01-01_1.fit"))
     activities.upsert_activity(db, row("2026-01-03", source="2026-01-03_2.fit"))
     assert activities.detect_date_gaps(db, gap_days=7) == []
+
+
+def test_gap_detection_is_idempotent(db):
+    """Re-running import must not stack a second question on the same gap."""
+    activities.upsert_activity(db, row("2026-01-01", source="2026-01-01_1.fit"))
+    activities.upsert_activity(db, row("2026-01-20", source="2026-01-20_2.fit"))
+    first = activities.detect_date_gaps(db, gap_days=7)
+    second = activities.detect_date_gaps(db, gap_days=7)
+    assert first == second
+    count = db.execute(
+        "SELECT COUNT(*) c FROM review_items WHERE reason = ?",
+        (terms.REVIEW_DATE_GAP,)).fetchone()["c"]
+    assert count == 1
+
+
+def test_gap_equal_to_the_threshold_is_not_a_gap(db):
+    """gap_days is the longest tolerated stretch, not the first reported one."""
+    activities.upsert_activity(db, row("2026-01-01", source="2026-01-01_1.fit"))
+    activities.upsert_activity(db, row("2026-01-08", source="2026-01-08_2.fit"))
+    assert activities.detect_date_gaps(db, gap_days=7) == []
+
+
+def test_one_day_over_the_threshold_opens_a_gap(db):
+    activities.upsert_activity(db, row("2026-01-01", source="2026-01-01_1.fit"))
+    activities.upsert_activity(db, row("2026-01-09", source="2026-01-09_2.fit"))
+    opened = activities.detect_date_gaps(db, gap_days=7)
+    assert len(opened) == 1
+    detail = db.execute(
+        "SELECT detail FROM review_items WHERE review_id = ?",
+        (opened[0],)).fetchone()["detail"]
+    assert "(7 days)" in detail, detail
+
+
+def test_a_gap_review_has_no_activity_and_names_the_missing_days(db):
+    activities.upsert_activity(db, row("2026-01-01", source="2026-01-01_1.fit"))
+    activities.upsert_activity(db, row("2026-01-10", source="2026-01-10_2.fit"))
+    opened = activities.detect_date_gaps(db, gap_days=7)
+    assert len(opened) == 1
+
+    review = db.execute(
+        "SELECT activity_id, reason, detail FROM review_items WHERE review_id = ?",
+        (opened[0],)).fetchone()
+    assert review["activity_id"] is None, "a gap is not an activity"
+    assert review["reason"] == terms.REVIEW_DATE_GAP
+    assert "2026-01-01..2026-01-10" in review["detail"]
+    assert "(8 days)" in review["detail"], review["detail"]
+
+
+def test_gaps_cli_reports_without_inventing_activity(tmp_path, monkeypatch, capsys):
+    path = tmp_path / "cli.db"
+    seed = trainingdb.connect(path)
+    trainingdb.migrate(seed, verbose=False)
+    activities.upsert_activity(seed, row("2026-01-01", source="2026-01-01_1.fit"))
+    activities.upsert_activity(seed, row("2026-01-20", source="2026-01-20_2.fit"))
+    seed.commit()
+    seed.close()
+
+    real_connect = trainingdb.connect
+    monkeypatch.setattr(activities.trainingdb, "connect",
+                        lambda *a, **k: real_connect(path))
+    assert activities._main(["gaps"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert len(out) == 1
+
+    check = real_connect(path)
+    try:
+        assert check.execute(
+            "SELECT COUNT(*) c FROM activities").fetchone()["c"] == 2
+    finally:
+        check.close()
 
 
 # -------------------------------------------------------------- strength

@@ -40,7 +40,6 @@ an instruction to be followed, and the header written into the file says so.
 
 import argparse
 import hashlib
-import http.server
 import json
 import os
 import re

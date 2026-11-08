@@ -69,7 +69,6 @@ def run_session_load(row, hr_max):
     if start is None:
         return None, terms.UNVERIFIED, "unparseable start_utc"
 
-    days = (start - datetime.datetime(1970, 1, 1, tzinfo=datetime.timezone.utc)).days
     if row["avg_hr"] is None:
         return None, terms.UNVERIFIED, "no avg_hr in source"
     mult = _intensity_multiplier(row["avg_hr"], hr_max)

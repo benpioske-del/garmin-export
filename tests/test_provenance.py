@@ -120,10 +120,10 @@ def test_provenance_survives_the_public_csv_header():
 
 def test_every_provenance_column_carries_a_value(real_rows):
     """Blank provenance is worse than none: it looks like a device gave no data."""
-    for r in real_rows:
+    for row in real_rows:
         for col in ("Date (UTC)", "Timezone Status", "Source", "Source File"):
-            assert r.get(col, "").strip(), \
-                "%s blank for %s" % (col, r.get("Source File"))
+            assert row.get(col, "").strip(), \
+                "%s blank for %s" % (col, row.get("Source File"))
 
 
 def test_published_header_uses_the_public_column_name(real_rows):
@@ -140,10 +140,11 @@ def test_internal_diagnostics_never_reach_the_published_csv(real_rows):
     changes the shape of the export for every downstream consumer. Only
     _source_file is published, and only under its public name.
     """
-    leaked = [c for r in real_rows for c in r if c.startswith("_")]
+    leaked = [c for row in real_rows for c in row if c.startswith("_")]
     assert not leaked, "internal keys leaked into the export: %s" % sorted(set(leaked))
 
 
+@requires_real_fit
 def test_the_elevation_diagnostics_are_actually_present_in_the_reader():
     """If the reader stopped attaching them, the guard above would pass for the
     wrong reason. Assert they exist and that they are underscore-prefixed."""
@@ -159,12 +160,13 @@ def test_published_ascent_is_unchanged_by_the_diagnostics(real_rows):
 
     Values arrive as strings because these rows come back out of the CSV.
     """
-    for r in real_rows:
-        v = r.get("Total Ascent", "").strip()
+    for row in real_rows:
+        v = row.get("Total Ascent", "").strip()
         if v:
             assert v.isdigit(), "Total Ascent is not a whole number: %r" % v
 
 
+@requires_real_fit
 def test_no_two_rows_are_the_same_activity(real_rows):
     """The corrected date must not have collapsed two genuinely different runs.
 
