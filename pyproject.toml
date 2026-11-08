@@ -13,12 +13,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
 
 [tool.setuptools]
 py-modules = ["export_publish", "garmin_fit_reader", "garmin_sync",
               "capture_supervisor_brief", "fit_audit", "fit_gps_validate",
               "garmin_server", "paths"]
+
+[tool.ruff]
+# Catch real defects, not style. E9 is syntax/runtime errors; F is pyflakes:
+# unused names, undefined names, shadowed imports, duplicate dict keys. These
+# are the rules that find bugs, and every one of them is fixable in this repo.
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E9", "F"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

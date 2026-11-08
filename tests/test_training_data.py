@@ -7,7 +7,6 @@ real FIT files, and no test writes to the working tree.
 import datetime
 import json
 import os
-import sqlite3
 import sys
 import tempfile
 

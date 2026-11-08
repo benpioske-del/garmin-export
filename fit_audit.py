@@ -84,7 +84,6 @@ def _blank(path):
         "fields_present": [],
         "fields_missing": [],
         "warnings": [],
-        "out_of_range": 0,
         "error": None,
     }
 

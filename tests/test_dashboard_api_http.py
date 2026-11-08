@@ -24,7 +24,19 @@ TOKEN = "test-token-abc123"
 
 
 @pytest.fixture
-def server(monkeypatch, migrated_db):
+def dashboard_html(monkeypatch, tmp_path):
+    """A minimal page, so these wire tests do not depend on the gitignored
+    dashboard/index.html being present (it never is on a clean checkout)."""
+    html = tmp_path / "index.html"
+    html.write_text(
+        "<!doctype html><html><head><title>x</title></head>"
+        "<body>hi</body></html>", encoding="utf-8")
+    monkeypatch.setattr(G, "resolve_dashboard_html", lambda: str(html))
+    return html
+
+
+@pytest.fixture
+def server(monkeypatch, migrated_db, dashboard_html):
     monkeypatch.setattr(G, "TOKEN", TOKEN)
     # An empty fit dir keeps these tests off the athlete's real files.
     monkeypatch.setattr(G, "FIT_DIR", "")
@@ -327,7 +339,7 @@ def _call(opener, base, path, data=None, headers=None):
 
 
 @pytest.fixture
-def secured_server(monkeypatch, migrated_db):
+def secured_server(monkeypatch, migrated_db, dashboard_html):
     monkeypatch.setattr(G, "TOKEN", TOKEN)
     monkeypatch.setattr(G, "FIT_DIR", "")
     monkeypatch.setattr(G, "fit_names", lambda: ["2026-10-01_111.fit"])

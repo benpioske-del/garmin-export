@@ -7,7 +7,7 @@ UNVERIFIED LLM OUTPUT
 > FACT-GATE NOTE: as written, this brief again quoted corpus, activity, review
 > and test counts from a stale snapshot. They have been
 > corrected in place to the measured values (69 FIT files / 69 activities / 1
-> open review / 491 passed), and the correction is logged in
+> open review / 496 passed), and the correction is logged in
 > docs/SUPERVISOR_BRIEF_ERRORS.md (seventh run, plus the eighth correction that
 > records the 2026-11-07 timezone confirmation). The review count is 1 because
 > the athlete confirmed local dates on 2026-11-07 (US Central, UTC-5/-6); only
@@ -55,7 +55,7 @@ establish-authenticated-athlete-ownership | PARKED AND DEMOTED | Authentication 
 ---
 ## SUPERVISOR DECISIONS
 
-The accepted corpus is 69 FIT files and 69 activities. The accepted review count is 1 open review: the activity_gap review for 2026-06-26..2026-07-05. All 69 activities carry athlete-confirmed local dates (US Central, UTC-5/-6 with DST applied per run). The accepted verification result is 491 passed / 1 skipped. The accepted profile value is hr_max=198.
+The accepted corpus is 69 FIT files and 69 activities. The accepted review count is 1 open review: the activity_gap review for 2026-06-26..2026-07-05. All 69 activities carry athlete-confirmed local dates (US Central, UTC-5/-6 with DST applied per run). The accepted verification result is 496 passed / 1 skipped. The accepted profile value is hr_max=198.
 
 The closed slugs remain closed. Their evidence is preserved above. The 57-file, 57-activity, 58-review, and 207-passed claims are rejected as stale snapshot material. The accepted FIT audit evidence is 0 parse failures and 69/69 GPS.
 
@@ -220,7 +220,7 @@ Document the phone setup in the DATA tab or dashboard help text:
 
 ### Verification required for this task
 
-Run the existing test suite and preserve the accepted standing result of 491 passed / 1 skipped unless new evidence changes it.
+Run the existing test suite and preserve the accepted standing result of 496 passed / 1 skipped unless new evidence changes it.
 
 Add focused tests or equivalent verification for:
 

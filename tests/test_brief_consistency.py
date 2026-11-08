@@ -11,7 +11,6 @@ KNOWN_UNBACKED and KNOWN_CONFLICTS and say why in the commit.
 """
 
 import json
-import os
 import re
 
 import pytest

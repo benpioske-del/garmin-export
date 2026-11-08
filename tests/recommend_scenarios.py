@@ -38,7 +38,6 @@ ever changes in either direction.
 
 import datetime
 import os
-import tempfile
 
 import recommend
 import terms

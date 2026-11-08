@@ -18,7 +18,6 @@ import json
 
 import pytest
 
-import activities
 import garmin_server as G
 import loadcalc
 import recommend

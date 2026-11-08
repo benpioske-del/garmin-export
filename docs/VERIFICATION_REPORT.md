@@ -1,7 +1,7 @@
 # Verification report
 
 Supervisor brief Task 10. Everything below was run in the working tree on
-2026-10-01. Commands and results are reproduced as observed.
+2026-11-07. Commands and results are reproduced as observed.
 
 ## Environment
 
@@ -16,14 +16,19 @@ Supervisor brief Task 10. Everything below was run in the working tree on
 
 ```
 $ python -m pytest
-491 passed, 1 skipped (492 collected)
+496 passed, 1 skipped (497 collected)
 ```
+
+The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
+and no `dashboard/index.html`: `467 passed, 30 skipped`. The live-corpus tests
+skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
+`tests/conftest.py`, so CI fails only on a real defect. `ruff check .` is clean.
 
 | File | Tests |
 | --- | --- |
 | `tests/test_dashboard_contract.py` | 36 |
 | `tests/test_recommend_snapshots.py` | 25 |
-| `tests/test_training_data.py` | 59 |
+| `tests/test_training_data.py` | 64 |
 | `tests/test_brief_bridge.py` | 62 |
 | `tests/test_dashboard_api.py` | 38 |
 | `tests/test_trainloop_cli.py` | 22 |
@@ -39,7 +44,7 @@ $ python -m pytest
 | `tests/test_publish_scope.py` | 17 |
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_brief_consistency.py` | 36 |
-| **Total** | **492** (491 pass, 1 skip) |
+| **Total** | **497** (496 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
