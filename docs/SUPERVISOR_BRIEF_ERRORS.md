@@ -600,3 +600,13 @@ snapshot material, without restating a number the checker would measure.
 The pinned `connect-dashboard-to-data-layer` claim remains untouched, so
 `brief_consistency.py` still exits 1 on the dashboard canary and zero on every
 numeric claim.
+
+## State found at publish time: visibility
+
+The publish that followed this correction probed the repository as **public**
+(an anonymous `api.github.com` request returned 200, `private=false`), not
+private. `CREW_BRIEF.md` still said "private" in its READ THIS FIRST block and
+its fact table. Both now say visibility is probed on every publish and is
+currently public, with `publish_state.json` as the source of truth. This is a
+measured state change, not a writer error: the same probe reported private on
+earlier runs.

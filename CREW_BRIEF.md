@@ -5,11 +5,13 @@
 A sanitized export of one runner's Garmin activity log, published so an AI crew can
 analyse training without access to the original device or the owner's machine.
 
-> ### READ THIS FIRST: the repository is PRIVATE
+> ### READ THIS FIRST: check visibility before you fetch
 >
-> It is private as of 2026-10-05. Every anonymous fetch returns **404**, including
-> `raw.githubusercontent.com` and `api.github.com`. A 404 here does not mean a file
-> is missing; it means you are unauthenticated.
+> The repository was private from 2026-10-05. The 2026-11-10 publish probed it as
+> **public**, so anonymous fetches currently succeed. Do not assume either state:
+> `publish_state.json` and `brief_facts.json` carry `repo_visibility`, probed on
+> every publish. A 404 while private does not mean a file is missing; it means
+> you are unauthenticated.
 >
 > **If you cannot fetch this file, you cannot fetch anything here, and you must not
 > write a brief from memory.** Four briefs have been written that way and all four
@@ -235,7 +237,7 @@ source. Re-derive it if you can.
 
 | Fact | Value | How to re-derive |
 |---|---|---|
-| Repository visibility | **private** | anonymous raw URL returns 404 |
+| Repository visibility | **public** (probed 2026-11-10) | `publish_state.json` → `repo_visibility` |
 | FIT files | 70 | count in the local export |
 | Activities | 70 | `SELECT COUNT(*) FROM activities` |
 | Open reviews | 1 | 1 `activity_gap` (2026-06-26..2026-07-05); timezone reviews resolved (2026-11-07, and the 2026-11-08 run on 2026-11-10) |
