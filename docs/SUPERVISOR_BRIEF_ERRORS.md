@@ -540,3 +540,22 @@ without `hr_max`, so it recorded "running load unavailable: no hr_max supplied"
 even though `profile.json` supplies 198 and the dashboard passes it. It now
 resolves `hr_max` through `trainloop._hr_max()`, the same path the server uses,
 so `brief_facts.json` quotes the real reason.
+
+---
+
+# Ninth correction: 2026-11-09, three completed rows still read "not evidenced"
+
+The 2026-11-06 brief still carried three verification rows whose prose described
+work that had already landed. Each was corrected in place to `DONE` with the
+evidence attached:
+
+| Brief claim | Measured state | Evidence |
+| --- | --- | --- |
+| The continuity review "has not been evidenced as complete" | Implemented from observed records only and pinned | five tests in `tests/test_training_data.py`; invariant in `docs/DATA_QUALITY_TERMINOLOGY.md` |
+| "unresolved policy defects include an unreachable deload state" | `deload` and `recover` are reachable | `tests/test_recommend_snapshots.py` sweep; `tests/fixtures/recommend/deload-band-concentration.json` (ACWR 1.54); `docs/COACHING_POLICY_AUDIT.md` |
+| "Quality gates and CI are not started, and no linter is configured" | CI and lint exist and pass | `.github/workflows/ci.yml`; ruff `E9,F` in `pyproject.toml`; clean-checkout suite passes with no FIT files, database, or dashboard |
+
+Rows 35, 41 and 43 were the only changes. Row 31's "dashboard/index.html does
+not use the data layer" premise was deliberately left untouched: it is the pinned
+canary that keeps the consistency checker honest. No task was removed, added, or
+reprioritised, and no number in the brief changed on this pass.

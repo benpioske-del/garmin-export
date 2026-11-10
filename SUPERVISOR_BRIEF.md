@@ -32,15 +32,15 @@ connect-dashboard-to-data-layer | IN PROGRESS | The tested data layer exists in 
 
 complete-athlete-profile-and-timezone-provenance | IN PROGRESS | The profile has empty fields that remain a live blocker; timezone assignments must remain auditable and must not be invented.
 
-formalize-continuity-review-without-synthetic-activities | IN PROGRESS | A repeatable continuity review using observed records only has not been evidenced as complete.
+formalize-continuity-review-without-synthetic-activities | DONE | The repeatable continuity review uses observed records only; its invariants are pinned by five tests in tests/test_training_data.py and documented in docs/DATA_QUALITY_TERMINOLOGY.md.
 
 capture-confirmed-strength-history | IN PROGRESS | The inventory reports 0 strength sessions and no confirmed strength history has been captured.
 
 implement-gated-weather-enrichment | IN PROGRESS | weather.py has a gate, but no coordinates are stored and completed enrichment is not evidenced.
 
-make-coaching-rationales-deterministic-and-auditable | IN PROGRESS | recommend.py has six control states and refusal-first behavior, but unresolved policy defects include an unreachable deload state.
+make-coaching-rationales-deterministic-and-auditable | DONE | recommend.py has six control states and refusal-first behavior; deload and recover are reachable, pinned by the snapshot sweep and the deload-band-concentration fixture. All four defects in docs/COACHING_POLICY_AUDIT.md are fixed.
 
-harden-bridge-and-release-quality-gates | IN PROGRESS | Quality gates and CI are not started, and no linter is configured.
+harden-bridge-and-release-quality-gates | DONE | .github/workflows/ci.yml runs ruff and pytest on Python 3.10 and 3.12; ruff E9,F is configured in pyproject.toml, and the suite passes on a clean checkout with no FIT files, database, or dashboard.
 
 document-conservative-training-signals | IN PROGRESS | No direct evidence establishes completion of documentation for the interpretation and limits of conservative signals.
 
