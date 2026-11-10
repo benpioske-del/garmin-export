@@ -1,7 +1,8 @@
 # Verification report
 
 Supervisor brief Task 10. Everything below was run in the working tree on
-2026-11-07. Commands and results are reproduced as observed.
+2026-11-07 and refreshed on 2026-11-10 after the 2026-11-08 run was imported.
+Commands and results are reproduced as observed.
 
 ## Environment
 
@@ -81,17 +82,17 @@ $ python fit_audit.py
 FIT data audit
 parser: fitparse=1.2.0 reader=1.1.0
 
-files inspected           : 69
+files inspected           : 70
 parse failures            : 0
-files readable            : 69
-files with GPS            : 69
+files readable            : 70
+files with GPS            : 70
 files without GPS         : 0
-files with usable timestamp: 69
+files with usable timestamp: 70
 files without timestamp   : 0
-session messages          : 69
-lap messages              : 626
-record messages           : 65032
-position points (counted) : 65011
+session messages          : 70
+lap messages              : 632
+record messages           : 65598
+position points (counted) : 65577
 files missing fields      : 0
 
 warnings:
@@ -122,13 +123,13 @@ Re-running is a no-op. Editing an applied migration raises
 
 ## Import against the real corpus
 
-On a fresh database with the current corpus of 69 files, the first import
-inserts all 69. Re-running against a database that already holds them reports
+On a fresh database with the current corpus of 70 files, the first import
+inserts all 70. Re-running against a database that already holds them reports
 every file `unchanged`:
 
 ```
 $ python activities.py import
-{"inserted": 0, "updated": 0, "unchanged": 69, "unreadable": 0}
+{"inserted": 0, "updated": 0, "unchanged": 70, "unreadable": 0}
 ```
 
 **Idempotency verified on the real data**: no rows updated, and no new audit
@@ -136,18 +137,19 @@ rows written on the second pass.
 
 ```
 $ python activities.py summary
-{"activities": 69, "open_reviews": 1}
+{"activities": 70, "open_reviews": 1}
 ```
 
-- 69 activities
-- 0 open `timezone_uncertain` reviews: all 69 local dates were confirmed by
-  the athlete on 2026-11-07 (US Central, UTC-5/-6 with DST applied per run)
+- 70 activities
+- 0 open `timezone_uncertain` reviews: all 70 local dates were confirmed by
+  the athlete (US Central, UTC-5/-6 with DST applied per run; the 2026-11-08
+  run was confirmed at UTC-6 on 2026-11-10)
 - 1 open `activity_gap`: `no activity 2026-06-26..2026-07-05 (8 days)`
 - 0 duplicates detected
-- 69 SHA-256 raw references stored
+- 70 SHA-256 raw references stored
 
 The FIT-file inventory, the canonical table and the published CSV all agree at
-**69**. An earlier brief described a 55/56/59 discrepancy; that premise was
+**70**. An earlier brief described a 55/56/59 discrepancy; that premise was
 checked against the live corpus and is unsupported, so there is no
 reconciliation to perform.
 
@@ -160,7 +162,9 @@ runs from 2026-10-13 to 2026-11-06 had been downloaded but never imported, so
 every load figure and the dashboard silently excluded them. Re-running
 `trainloop.py bootstrap` on 2026-10-15 imported three
 (`{"inserted": 3, "unchanged": 58}`), and again on 2026-11-06 imported eight
-(`{"inserted": 8, "unchanged": 61}`), bringing the table to 69.
+(`{"inserted": 8, "unchanged": 61}`), bringing the table to 69. On 2026-11-09
+the 2026-11-08 run was imported (`{"inserted": 1, "unchanged": 69}`), bringing
+the table to 70.
 
 ## Training load and recommendation
 
@@ -359,7 +363,7 @@ Stated rather than implied:
 | Strength data | Schema and service verified by tests; no real strength sessions recorded yet. |
 | `profile.json` | Partially populated. `hr_max=198`; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` null. The UTC offset is now confirmed (US Central), so local dates are settled; the remaining fields block cohort percentiles and the weather location policy. |
 | Brief bridge idempotency | **Now verified.** `3054d6a` gave the file a content-derived `brief_id`; `captured_utc` is metadata only. Tests advance a frozen clock 90s to prove an unchanged brief is a no-op. |
-| Athlete UTC offset | **Confirmed 2026-11-07**: US Central (UTC-5/-6, DST applied per activity). All 69 `timezone_uncertain` reviews resolved; only the calendar-gap review remains. |
+| Athlete UTC offset | **Confirmed**: US Central (UTC-5/-6, DST applied per activity). All 70 `timezone_uncertain` reviews resolved (69 on 2026-11-07, the 2026-11-08 run on 2026-11-10); only the calendar-gap review remains. |
 | Elevation accuracy | **Derived, not measured.** These FIT files carry no `barometer_pressure`, so altitude is GPS-derived and noisy. The device figure and a smoothed recomputation differ by up to ~25% on real runs. See [ELEVATION.md](ELEVATION.md). |
 
 ## Withdrawn claims
@@ -393,7 +397,7 @@ Recorded so they are not reintroduced by a later brief:
   prevents the error from reaching the UI. The API queries every count; none is
   written down. See [SUPERVISOR_BRIEF_ERRORS.md](SUPERVISOR_BRIEF_ERRORS.md).
 - **"55 audit records and a historical 59-record source."** Both counts are
-  unsupported. The live corpus is 69 across every source.
+  unsupported. The live corpus is 70 across every source.
 
 ## Reproducing this report
 

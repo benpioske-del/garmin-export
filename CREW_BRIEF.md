@@ -141,7 +141,7 @@ If you ever read a raw Garmin export, expect that mangled name.
 
 Rows come from the watch's own `.FIT` files, which are the source of truth, with the
 manually exported `Activities.csv` files as a fallback for any run the `.FIT` set is
-missing. 56 of 57 rows come from `.FIT`.
+missing. Every published row currently comes from a `.FIT` file.
 
 This runs on a schedule twice daily, so **the data self-updates as long as the watch
 has synced**. It is not a frozen snapshot. Check `latest_run` in the meta file before
@@ -236,10 +236,10 @@ source. Re-derive it if you can.
 | Fact | Value | How to re-derive |
 |---|---|---|
 | Repository visibility | **private** | anonymous raw URL returns 404 |
-| FIT files | 69 | count in the local export |
-| Activities | 69 | `SELECT COUNT(*) FROM activities` |
-| Open reviews | 1 | 1 `activity_gap` (2026-06-26..2026-07-05); timezone reviews resolved 2026-11-07 |
-| FIT files with lap records | 69 of 69 | `python brief_consistency.py` |
+| FIT files | 70 | count in the local export |
+| Activities | 70 | `SELECT COUNT(*) FROM activities` |
+| Open reviews | 1 | 1 `activity_gap` (2026-06-26..2026-07-05); timezone reviews resolved (2026-11-07, and the 2026-11-08 run on 2026-11-10) |
+| FIT files with lap records | 70 of 70 | `python brief_consistency.py` |
 | Splits published | yes (`Best 5K Time`, `Lap Splits`) | header of `garmin_export.csv` |
 | Fastest measured 5 km crossing | 24:42 on 2026-06-16, measured | `brief_facts.json` → `best_5k` |
 | Tests | 496 passed, 1 skipped (497 collected) | `python -m pytest` |
@@ -295,7 +295,7 @@ file in `tasks/` is not a task.
   trend, not a confident percentile.
 
 ### Splits: measured 5 km crossing, now published
-**Do not claim per-mile splits are unavailable.** They are not. Every one of the 69
+**Do not claim per-mile splits are unavailable.** They are not. Every one of the 70
 FIT files carries lap records, and since this publish `garmin_export.csv` has two
 new columns:
 

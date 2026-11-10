@@ -559,3 +559,44 @@ Rows 35, 41 and 43 were the only changes. Row 31's "dashboard/index.html does
 not use the data layer" premise was deliberately left untouched: it is the pinned
 canary that keeps the consistency checker honest. No task was removed, added, or
 reprioritised, and no number in the brief changed on this pass.
+
+---
+
+# Tenth correction: 2026-11-10, the brief reverted to the pre-data snapshot
+
+The 2026-11-10 brief (`60a95ad`) arrived with the same stale figures as the
+2026-10-04 brief: **57 FIT files, 57 activities, 58 open reviews, 207 passed**.
+The measured state at correction time was **70 FIT files, 70 activities, 1 open
+review, 496 passed**, because two things had moved since the previous brief:
+
+- The athlete's US Central confirmation (2026-11-07) had already resolved every
+  `timezone_uncertain` review, leaving only the calendar-gap review.
+- The 2026-11-08 run (`garmin:25013986837`, `2026-11-08T20:57:40Z`) had been
+  downloaded on 2026-11-09 but never imported, because the scheduled publish was
+  still failing. It was imported with `trainloop.py bootstrap`
+  (`{"inserted": 1, "unchanged": 69}`) and its local date confirmed at **UTC-6**
+  (CST) under the athlete's standing US Central confirmation, taking the corpus
+  to 70.
+
+| Brief claim | Measured state | Source of truth |
+| --- | --- | --- |
+| 57 FIT files, 57 activities | 70 / 70 | FIT directory; `SELECT COUNT(*) FROM activities` |
+| 58 open reviews | 1 (`activity_gap`, 2026-06-26..2026-07-05) | `review_items` |
+| 207 passed / 1 skipped | 496 passed / 1 skipped (497 collected) | `python -m pytest` |
+| 69/69 GPS | 70/70 GPS | `python fit_audit.py` |
+
+Eight passages were corrected in place: the closed-task evidence row, the
+accepted-state block, the endpoint corpus sentence, the "do not change" line,
+the test-constraint sentence, and backlog item 12. A `FACT-GATE NOTE` at the top
+records the correction.
+
+One wording change is worth recording. The brief's line rejecting the "other"
+numbers was rewritten without numerals. `claim_conflicts()` checks every numeric
+claim in the file, including numbers inside a sentence that calls them stale, so
+a rejection list written as "57 FIT files, 58 reviews, 207 passed are rejected"
+is itself five conflicts. The note now says that any conflicting count is stale
+snapshot material, without restating a number the checker would measure.
+
+The pinned `connect-dashboard-to-data-layer` claim remains untouched, so
+`brief_consistency.py` still exits 1 on the dashboard canary and zero on every
+numeric claim.

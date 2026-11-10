@@ -18,19 +18,17 @@ import pytest
 import brief_consistency as B
 from conftest import requires_live_corpus
 
-# Eleven ranked backlog rows, two task files. Unchanged through the fifth brief;
-# only its numeric claims drifted and were corrected in place (2026-10-13).
-# The seventh brief (2026-11-06) also listed its primary task as a row in
-# "VERIFICATION (open tasks from previous brief)". That slug also has no task
-# file of its own, so it joins the pinned set rather than failing as a phantom.
+# Nine ranked backlog rows, two task files. The 2026-11-10 brief (60a95ad)
+# dropped the three slugs completed in the ninth correction
+# (formalize-continuity-review..., make-coaching-rationales...,
+# harden-bridge-and-release-quality-gates), so the pinned set shrank to nine.
+# The primary task, connect-dashboard-to-data-layer, still appears both as a
+# verification row and as a backlog row; neither has a task file of its own.
 KNOWN_UNBACKED = {
     "connect-dashboard-to-data-layer",
     "complete-athlete-profile-and-timezone-provenance",
-    "formalize-continuity-review-without-synthetic-activities",
     "capture-confirmed-strength-history",
     "implement-gated-weather-enrichment",
-    "make-coaching-rationales-deterministic-and-auditable",
-    "harden-bridge-and-release-quality-gates",
     "document-conservative-training-signals",
     "stabilize-running-load-before-progression",
     "build-long-run-pace-durability",
