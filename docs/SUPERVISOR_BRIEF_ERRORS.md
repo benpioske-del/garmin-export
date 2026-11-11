@@ -610,3 +610,38 @@ its fact table. Both now say visibility is probed on every publish and is
 currently public, with `publish_state.json` as the source of truth. This is a
 measured state change, not a writer error: the same probe reported private on
 earlier runs.
+
+---
+
+# Eleventh correction: 2026-11-11, two runs arrived after the brief
+
+This is not a writer error. The corpus moved from 70 to **72** because two runs
+were downloaded on 2026-11-11 at 17:40 and imported the same day:
+
+| Run | Distance | UTC start | Local (CST) |
+| --- | --- | --- | --- |
+| 2026-11-10 (`garmin:25035907052`) | 10.25 mi | 2026-11-10T19:04:39Z | 2026-11-10T13:04:39 |
+| 2026-11-11 (`garmin:25047812302`) | 6.48 mi | 2026-11-11T19:31:07Z | 2026-11-11T13:31:07 |
+
+Both were confirmed at **UTC-6** under the athlete's standing US Central
+confirmation. `trainloop.py bootstrap` reported
+`{"inserted": 2, "unchanged": 70}`, taking the corpus to 72 activities with one
+open review (the calendar gap). `fit_audit.py` is clean at 72 files, and the
+coaching state left `data_insufficient` for **`build`** (ACWR 1.19,
+`run_days_7d=4`).
+
+The brief's corpus numbers were corrected in place from 70 to 72 and the
+FACT-GATE NOTE now cites this correction as well. `CREW_BRIEF.md`,
+`docs/VERIFICATION_REPORT.md` and `docs/IMPLEMENTATION_INVENTORY.md` were
+reconciled to 72.
+
+## Why the run was late
+
+Downloading and importing are separate steps. `garmin_sync.py` (the
+`Garmin Daily Sync` task / `Refresh Garmin Data.cmd`) writes FIT files to disk.
+`trainloop.py bootstrap` is what inserts them into `trainloop.db`, and the
+dashboard reads the database. The twice-daily `export_publish.py` task rebuilds
+the CSV from the FIT directory but does **not** import into the database, so the
+dashboard can lag the CSV until someone runs `bootstrap`. That is what happened
+here: the 11/10 run was on disk and absent from the dashboard until the import
+was run manually.

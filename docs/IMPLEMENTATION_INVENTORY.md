@@ -72,7 +72,7 @@ Docs: [`DATA_QUALITY.md`](DATA_QUALITY.md),
 | Component | Path | Notes |
 | --- | --- | --- |
 | FIT reader | `garmin_fit_reader.py` | `__version__ = 1.1.0`; asserts no GPS field escapes; attaches internal elevation diagnostics (`_ascent_smoothed_ft`, `_elev_range_ft`) that are excluded from the published CSV |
-| CSV export | `garmin_export.csv` | 70 activities, 31 columns |
+| CSV export | `garmin_export.csv` | 72 activities, 31 columns |
 | Publisher | `export_publish.py` | guard, remote sync, history-safety enforcement |
 | Sync | `garmin_sync.py` | OAuth, local only |
 | Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching` |
@@ -101,7 +101,7 @@ profile as empty is reading an out-of-date copy of this document.
 | CI | **None** â€” no workflow, no pre-commit |
 | Dependency lockfile | **None** (`pyproject.toml` only) |
 | `python -m build` | Not verified; the `build` package is not a declared dependency |
-| Database vs export parity | **Verified 2026-11-10.** FIT directory, `garmin_export.csv` and `trainloop.db` all hold 70. Note `load` computes only; `bootstrap` is what imports. (The table drifted twice: to 58 by 2026-10-15, and to 61 by 2026-11-06 - the runs of 2026-10-13..2026-11-06 were downloaded but never imported. `bootstrap` was re-run on 2026-11-06 and imported all eight, then again on 2026-11-09 to import the 2026-11-08 run.) |
+| Database vs export parity | **Verified 2026-11-11.** FIT directory, `garmin_export.csv` and `trainloop.db` all hold 72. Note `load` computes only; `bootstrap` is what imports. (The table drifted twice: to 58 by 2026-10-15, and to 61 by 2026-11-06 - the runs of 2026-10-13..2026-11-06 were downloaded but never imported. `bootstrap` was re-run on 2026-11-06 and imported all eight, on 2026-11-09 to import the 2026-11-08 run, and on 2026-11-11 to import the 2026-11-10 and 2026-11-11 runs.) |
 | `garmin_export.csv` provenance | Rebuilt in-process with `export_publish.build_csv()` on 2026-10-03, not committed. It picks up `2026-10-01` from the FIT directory. |
 
 Style is followed by convention rather than enforced by a tool. The 21 Python
@@ -110,20 +110,20 @@ regression in it.
 
 ## Data state
 
-- 70 FIT files on disk, all parse, all with GPS and a usable timestamp
-- 70 rows in `garmin_export.csv`
-- 70 activities imported into `trainloop.db`, newest `2026-11-08`
-- 632 laps, 65,598 records, 65,577 position points
-- Re-import of identical files: 70 `unchanged`, 0 audit rows written
+- 72 FIT files on disk, all parse, all with GPS and a usable timestamp
+- 72 rows in `garmin_export.csv`
+- 72 activities imported into `trainloop.db`, newest `2026-11-11`
+- 650 laps, 67,446 records, 67,425 position points
+- Re-import of identical files: 72 `unchanged`, 0 audit rows written
 - **1 open date gap**: 2026-06-26 to 2026-07-05
-- **0 open `timezone_uncertain` reviews**: all 70 local dates were confirmed by the athlete (US Central, UTC-5/-6 with DST applied per run; the 2026-11-08 run was confirmed at UTC-6 on 2026-11-10)
+- **0 open `timezone_uncertain` reviews**: all 72 local dates were confirmed by the athlete (US Central, UTC-5/-6 with DST applied per run; the 2026-11-08 run was confirmed at UTC-6 on 2026-11-10, and the 2026-11-10 and 2026-11-11 runs on 2026-11-11)
 - **1 open `activity_gap` review** for the 2026-06-26 to 2026-07-05 gap
 - 1 activity where the local date and UTC date differ
     (`garmin:23745136848`, local 2026-07-26T20:10:15, UTC 2026-07-27T01:10:15Z)
 - 0 strength sessions. `strength_load` is `null` while this is true, which is
   not the same as zero.
 
-All three sources now agree at **70**: FIT directory, CSV, and database. An
+All three sources now agree at **72**: FIT directory, CSV, and database. An
 earlier brief asserted a 55/56/59 discrepancy; that premise was checked against
 the live corpus and is not supported â€” there was nothing to reconcile. The
 database fell behind three times: by one run until `trainloop bootstrap` was
