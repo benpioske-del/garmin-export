@@ -511,6 +511,24 @@ def test_inject_aurora_live_is_idempotent():
     assert once.decode("utf-8").count(G.AURORA_LIVE_MARK) == 1
 
 
+def test_launch_url_opens_the_aurora_preview(aurora_html):
+    """--open lands on the preview, which is what the athlete asked for."""
+    assert G.launch_url(8765, "tok") == \
+        "http://127.0.0.1:8765/aurora?tk=tok"
+
+
+def test_launch_url_falls_back_to_the_local_dashboard(monkeypatch):
+    """A clean checkout without the committed app still opens a real page."""
+    monkeypatch.setattr(G, "resolve_aurora_html", lambda: None)
+    assert G.launch_url(8765, "tok") == "http://127.0.0.1:8765/?tk=tok"
+
+
+def test_launch_url_carries_the_run_port_and_token(aurora_html):
+    url = G.launch_url(9999, "abc123")
+    assert ":9999/" in url
+    assert url.endswith("?tk=abc123")
+
+
 # --------------------------------------------------------- nutrition routes
 
 @pytest.fixture

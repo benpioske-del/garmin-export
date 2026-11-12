@@ -1505,6 +1505,19 @@ def probe_existing_instance(port):
     return None
 
 
+def launch_url(port, token):
+    """Return the page `--open` should land on.
+
+    The athlete asked the launcher to open the Aurora preview directly, so it
+    wins whenever the committed file is present. The local dashboard stays the
+    default at `/` and is still the fallback: a clean checkout without
+    `flow_outputs/aurora_dashboard.html` opens `/`, never a 404.
+    """
+    if resolve_aurora_html():
+        return "http://127.0.0.1:%d/aurora?tk=%s" % (port, token)
+    return "http://127.0.0.1:%d/?tk=%s" % (port, token)
+
+
 def main():
     global TOKEN, PORT, MEGACMD, BIND_HOST, ALLOWED_HOSTS
     global PASSWORD_HASH, REQUIRE_LOGIN, SESSION_KEY, IDLE_TIMEOUT
@@ -1557,6 +1570,8 @@ def main():
     if BIND_HOST not in ("127.0.0.1", "localhost"):
         ALLOWED_HOSTS |= set(local_ipv4s())
     url = "http://127.0.0.1:%d/?tk=%s" % (PORT, TOKEN)
+    aurora_url = "http://127.0.0.1:%d/aurora?tk=%s" % (PORT, TOKEN)
+    open_url = launch_url(PORT, TOKEN)
     # Probe BEFORE binding. On Windows SO_REUSEADDR lets a second bind to the
     # same port succeed, which would silently start a rival server instead of
     # reusing this one - and the two would fight over the same origin.
@@ -1570,12 +1585,12 @@ def main():
             # clicking the .cmd while a server is up looked like "nothing
             # happened".
             try:
-                webbrowser.open(existing)
+                webbrowser.open(open_url)
             except Exception:
                 pass
         return
     if args.open:
-        _t = threading.Timer(0.6, lambda: webbrowser.open(url))
+        _t = threading.Timer(0.6, lambda: webbrowser.open(open_url))
         _t.daemon = True
         _t.start()
     try:
@@ -1584,8 +1599,9 @@ def main():
         print("Could not bind %s:%d: %s" % (BIND_HOST, PORT, exc))
         sys.exit(1)
     print("Coach Dashboard local server: %s" % url)
-    print("Aurora preview (read-only, live API data): "
-          "http://127.0.0.1:%d/aurora?tk=%s" % (PORT, TOKEN))
+    print("Aurora preview (read-only, live API data): %s" % aurora_url)
+    if args.open:
+        print("Opening in your browser: %s" % open_url)
     if REQUIRE_LOGIN:
         print("Password required: sign in at http://127.0.0.1:%d/ "
               "(the ?tk= URL above still opens it directly on this machine)."
