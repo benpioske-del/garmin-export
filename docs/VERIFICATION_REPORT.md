@@ -17,11 +17,11 @@ were imported. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-496 passed, 1 skipped (497 collected)
+501 passed, 1 skipped (502 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `467 passed, 30 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `472 passed, 30 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`, so CI fails only on a real defect. `ruff check .` is clean.
 
@@ -45,7 +45,8 @@ skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 | `tests/test_publish_scope.py` | 17 |
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_brief_consistency.py` | 36 |
-| **Total** | **497** (496 pass, 1 skip) |
+| `tests/test_sync_import.py` | 5 |
+| **Total** | **502** (501 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV

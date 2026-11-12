@@ -645,3 +645,41 @@ the CSV from the FIT directory but does **not** import into the database, so the
 dashboard can lag the CSV until someone runs `bootstrap`. That is what happened
 here: the 11/10 run was on disk and absent from the dashboard until the import
 was run manually.
+
+---
+
+# Twelfth correction: 2026-11-11, the sync import gap and the test count
+
+This is a code fix, not a writer error. The 2026-11-10 run exposed a structural
+gap: the dashboard's "Sync Garmin now" action ran only `garmin_sync.py`, which
+writes `.FIT` files to disk, and never ran the importer that fills
+`trainloop.db`. The dashboard reads the database, so a downloaded run could stay
+invisible until someone ran `trainloop.py bootstrap` by hand.
+
+## What changed
+
+- `garmin_server.py::_run_sync()` now runs `trainloop.py bootstrap` after
+  `garmin_sync.py`. The import is attempted even when the download fails, so any
+  file that did arrive is still picked up. The response reports `download_ok`
+  and `import_ok` separately; `ok` is true only when both succeed.
+- `garmin_publish_task.bat` now runs `trainloop.py bootstrap` before
+  `export_publish.py`, so the scheduled publish cannot leave the database behind
+  the CSV. It still publishes the CSV when the import fails, but the task result
+  carries the import failure.
+- `tests/test_sync_import.py` pins the order (download, then bootstrap), the
+  import-after-failed-download behaviour, failure reporting, and the timeout
+  message.
+
+## Verified
+
+- End-to-end `POST /sync` against the live server:
+  `ok=True download_ok=True import_ok=True`, 0 new runs, 72 unchanged,
+  1 open review.
+- Live suite: **501 passed, 1 skipped** (502 collected).
+- Clean checkout with no FIT files, no `trainloop.db` and no
+  `dashboard/index.html`: **472 passed, 30 skipped**.
+- `ruff check .` clean.
+
+The brief and docs were corrected in place from 496 passed to **501 passed**
+(the test count moved because five tests were added), and the clean-checkout
+figure from 467 to **472 passed**.

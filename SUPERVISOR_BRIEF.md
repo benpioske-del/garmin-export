@@ -6,9 +6,9 @@ UNVERIFIED LLM OUTPUT
 
 > FACT-GATE NOTE: as written, this brief again quoted corpus, review and test
 > counts from a stale snapshot. They have been corrected in place to the
-> measured values (72 FIT files / 72 activities / 1 open review / 496 passed),
+> measured values (72 FIT files / 72 activities / 1 open review / 501 passed),
 > and the correction is logged in docs/SUPERVISOR_BRIEF_ERRORS.md (tenth
-> correction, 2026-11-10, and eleventh, 2026-11-11). The review count is 1
+> correction, 2026-11-10; eleventh and twelfth, 2026-11-11). The review count is 1
 > because the athlete confirmed local dates (US Central, UTC-5/-6); the
 > 2026-11-08, 2026-11-10 and 2026-11-11 runs were imported and their local
 > dates confirmed at UTC-6. Only the calendar-gap review remains. The
@@ -55,7 +55,7 @@ establish-authenticated-athlete-ownership | BLOCKED / PARKED AND DEMOTED | Authe
 
 - The authoritative corpus is 72 FIT files and 72 activities.
 - There is 1 open review: the activity_gap review for 2026-06-26..2026-07-05. All 72 activities carry athlete-confirmed local dates (US Central, UTC-5/-6 with DST applied per run).
-- The accepted verification result is 496 passed / 1 skipped.
+- The accepted verification result is 501 passed / 1 skipped.
 - hr_max=198 is authoritative and is already covered by the closed profile-hr-max task.
 - Any conflicting corpus, review or test count elsewhere in this brief is stale snapshot material and is rejected; the measured values stated above are authoritative.
 - The tested canonical data layer is real and includes activities.py, loadcalc.py, recommend.py, and migrations 001-006.
@@ -188,7 +188,7 @@ Do not:
 - Add authentication as a prerequisite.
 - Change the accepted corpus from 72 FIT files and 72 activities.
 
-The implementation and tests must respect 1 open review, hr_max=198, and the accepted verification result of 496 passed / 1 skipped.
+The implementation and tests must respect 1 open review, hr_max=198, and the accepted verification result of 501 passed / 1 skipped.
 
 ### Dashboard failure and loading behavior
 
@@ -271,7 +271,7 @@ The flow-generated dashboard already embeds the manifest and service worker as b
 9. Open the dashboard and verify loading, connected, unavailable, and error states.
 10. Confirm the dashboard polls /api/activities every 30 seconds.
 11. Confirm the embedded manifest and service worker still initialize from blob URLs.
-12. Verify the implementation against 72 FIT files, 72 activities, 1 open review, hr_max=198, and 496 passed / 1 skipped.
+12. Verify the implementation against 72 FIT files, 72 activities, 1 open review, hr_max=198, and 501 passed / 1 skipped.
 13. Confirm no synthetic activities, HR-zone distributions, unsupported metrics, or silent refusal fallbacks were introduced.
 
 ### Athlete phone instructions
