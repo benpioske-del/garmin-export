@@ -17,11 +17,11 @@ were imported. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-552 passed, 1 skipped (553 collected)
+555 passed, 1 skipped (556 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `523 passed, 30 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `526 passed, 30 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`, so CI fails only on a real defect. `ruff check .` is clean.
 
@@ -33,7 +33,7 @@ skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 | `tests/test_brief_bridge.py` | 62 |
 | `tests/test_dashboard_api.py` | 38 |
 | `tests/test_trainloop_cli.py` | 22 |
-| `tests/test_dashboard_api_http.py` | 59 |
+| `tests/test_dashboard_api_http.py` | 62 |
 | `tests/test_nutrition.py` | 33 |
 | `tests/test_fit_reader_elevation.py` | 21 |
 | `tests/test_splits.py` | 10 |
@@ -322,7 +322,7 @@ needs more than the token, so the server gained an additive password gate:
 - `--idle-timeout 0` disables the idle shutdown, which is needed for a
   long-lived tunnel.
 
-`tests/test_dashboard_api_http.py` (59 tests) covers the manifest and worker
+`tests/test_dashboard_api_http.py` (62 tests) covers the manifest and worker
 routes, the injected tags, injection idempotence, host/port allowlisting, the
 offline fallback (the worker keeps the shell and API data, and falls back to the
 cache on a `5xx` origin outage), and the login gate (redirect, form, wrong
@@ -355,6 +355,13 @@ athlete's local dashboard, so this is a preview and not an adoption.
 - Five wire tests cover the route: served with the bootstrap, token required,
   query token accepted, `404` when the file is absent, and injection
   idempotence.
+- `--open` now launches straight into `/aurora`, because the athlete asked the
+  double-click launcher to show the preview. `launch_url()` falls back to `/`
+  whenever `flow_outputs/aurora_dashboard.html` is absent, so a clean checkout
+  still opens a real page instead of a `404`. `/` remains the default route and
+  still serves the local dashboard; this changes what the launcher opens, not
+  what the server considers canonical. Three tests pin both branches and the
+  port/token carried in the URL.
 
 ### Nutrition ingestion (`nutrition.py`, `/api/nutrition`)
 

@@ -294,11 +294,13 @@ download cannot leave the dashboard behind; the order and the failure reporting
 are pinned by `tests/test_sync_import.py`.
 
 Tests: `tests/test_dashboard_api.py` (38), `tests/test_dashboard_api_http.py`
-(59) and `tests/test_nutrition.py` (33). `smoke_dashboard_api.py` runs the same
+(62) and `tests/test_nutrition.py` (33). `smoke_dashboard_api.py` runs the same
 paths against the live database and is deliberately not part of pytest.
 
 `/aurora` serves the committed `flow_outputs/aurora_dashboard.html` as a
 read-only preview behind the same gate; `/` still serves the local dashboard.
+`launch_url()` makes `--open` land on `/aurora` (the double-click launcher the
+athlete uses) and falls back to `/` when the committed app is missing.
 The generated file bakes in its corpus and totals, so `inject_aurora_live()`
 replaces them from the live API routes at serve time and says so in a badge. The
 artifact's `analysis()` view had an unclosed template literal that stopped the

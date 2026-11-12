@@ -888,3 +888,41 @@ The lifting-log importer (`GET`/`POST /api/lifts`, e1RM, bodyweight-adjusted
 pull-ups/dips) is Rank 2 and remains unimplemented. `lifting_log.csv` is still
 headers only. The bodyweight and weekly-summary endpoints, the queue retry
 semantics, and retiring the local dashboard remain open.
+
+# Sixteenth correction: 2026-11-12, what the launcher actually opens
+
+## The gap
+
+The fifteenth correction described `/aurora` and the nutrition work, but it did
+not say how the athlete reaches the preview. The double-click launcher runs
+`garmin_server.py --open`, and `--open` opened `/` - the unchanged local
+dashboard - while the Aurora URL was only printed in the console window. The
+athlete launched the dashboard, saw the old page, and reasonably concluded that
+nothing had shipped. That was a reporting and product gap, not a data error.
+
+## What changed
+
+- `launch_url()` now returns `/aurora?tk=...` when the committed
+  `flow_outputs/aurora_dashboard.html` exists, so `--open` lands on the
+  preview.
+- The fallback is `/`: a clean checkout without the committed app opens the
+  local dashboard rather than a `404`.
+- `/` remains the default route and still serves the local dashboard. Only the
+  launch target changed; the server's canonical page did not.
+- The existing-instance branch uses the same launch target, so double-clicking
+  while a server is already up no longer reopens the old page.
+
+## Verification
+
+- Three wire tests pin the two branches and the port/token carried in the URL.
+- The live suite is **555 passed, 1 skipped** (556 collected) and the clean
+  checkout is **526 passed, 30 skipped**. `docs/VERIFICATION_REPORT.md`,
+  `docs/IMPLEMENTATION_INVENTORY.md`, `SUPERVISOR_BRIEF.md` and
+  `brief_facts.json` carry the new counts.
+
+## Still not done
+
+The full `adopt-flow-generated-dashboard` task remains open: the lifting
+importer, bodyweight and weekly-summary endpoints, queue retry semantics, PWA
+install path, and retiring the local dashboard are all still unimplemented.
+`/aurora` is still a preview.
