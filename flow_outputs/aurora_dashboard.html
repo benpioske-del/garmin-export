@@ -121,7 +121,7 @@ function show(t){let e=document.getElementById("toast");e.textContent=t;e.classL
 function navigate(h){location.hash=h;render()}
 function openSheet(){document.getElementById("sheet").classList.add("open")}function closeSheet(){document.getElementById("sheet").classList.remove("open")}
 function card(x,c="card"){return `<section class="${c}">${x}</section>`}
-function chart(id,type,data,options={}){requestAnimationFrame(()=>{let c=document.getElementById(id);if(c)charts.push(new Chart(c,{type,data,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#aeb7cc",font:{size:10}}}},scales:{x:{ticks:{color:"#8991a8"},grid:{color:"#ffffff0b"}},y:{ticks:{color:"#8991a8"},grid:{color:"#ffffff0b"}}},...options}}))})}
+function chart(id,type,data,options={}){let c=document.getElementById(id);if(!c)return;charts.push(new Chart(c,{type,data,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#aeb7cc",font:{size:10}}}},scales:{x:{ticks:{color:"#8991a8"},grid:{color:"#ffffff0b"}},y:{ticks:{color:"#8991a8"},grid:{color:"#ffffff0b"}}},...options}}))}
 function navActive(){let h=location.hash||"#home";document.querySelectorAll(".nav a").forEach(a=>a.classList.toggle("active",h.startsWith(a.getAttribute("href"))))}
 function header(title,sub=""){return `<div class="detail-head"><div><a class="back" href="#home">← Home</a><h1 class="gradient">${title}</h1><p class="sub">${sub}</p></div></div>`}
 function latest(){return RUNS[RUNS.length-1]}
@@ -145,7 +145,53 @@ function logRun(){return `<div class="view">${header("Log a run","Quick log · p
 function saveRun(){let date=ld.value,d=+lx.value,t=lt.value||"0:00",hr=+lh.value||null,sec=paceSec(t)/(d||1),p=`${Math.floor(sec/60)}:${String(Math.round(sec%60)).padStart(2,"0")}`,r={date,distance:d,time:t,avgHR:hr,maxHR:null,cadence:null,avgPace:p,bestPace:null,best5k:null,splits:null,ascent:null,descent:null,calories:null,laps:null,bestLap:null,source:"Quick log · pending Garmin sync",band:d<5?"SHORT":d<=9?"MEDIUM":"LONG"};RUNS.push(r);RUNS.sort((a,b)=>a.date.localeCompare(b.date));localStorage.setItem("aurora_last_seen_run",date);show("Run saved · pending Garmin sync");navigate("#runs/"+date)}
 function fuel(date){let rows=NUTRITION.filter(x=>!date||x.date===date);return `<div class="view">${header(date||"Fuel","CalTrak nutrition")}<section class="card"><div class="section-title"><h2>${date||"Today"}</h2><label class="btn ghost">Import CSV<input type="file" accept=".csv,text/csv" hidden onchange="importCSV(event)"></label></div>${rows.length?rows.map(x=>`<a class="run-card" href="#fuel/${x.date}"><div><b>${x.date}</b><div class="run-meta">Calories ${x.kcal??"not recorded"} · Protein ${x.protein??"not recorded"}g</div></div><div class="run-distance">${x.carbs??"—"}<small>g carbs</small></div></a>`).join(""):`<div class="empty"><strong>Nutrition unavailable</strong>NO DATA: nutrition_log_url returned nothing. Import a CalTrak CSV to add daily totals.</div>`}</section><section class="card"><div class="eyebrow">How to use CalTrak</div><p class="sub">Export your food log from CalTrak on your phone, then choose the CSV above. Missing columns remain not recorded.</p></section></div>`}
 function importCSV(e){let f=e.target.files[0];if(!f)return;let rd=new FileReader;rd.onload=()=>{let lines=rd.result.trim().split(/\r?\n/),h=lines.shift().split(",").map(x=>x.trim().toLowerCase()),find=(...a)=>h.findIndex(x=>a.some(k=>x===k||x.includes(k))),di=find("date","day"),ki=find("calories","kcal","energy"),pi=find("protein"),ci=find("carbs","carbohydrates"),fi=find("fat"),map={};lines.forEach(l=>{let v=l.split(",");let date=v[di];if(!date)return;let x=map[date]||{date,kcal:0,protein:0,carbs:0,fat:0};if(ki>=0)x.kcal+=+v[ki]||0;if(pi>=0)x.protein+=+v[pi]||0;if(ci>=0)x.carbs+=+v[ci]||0;if(fi>=0)x.fat+=+v[fi]||0;map[date]=x});let imported=Object.values(map);localStorage.setItem("aurora_nutrition",JSON.stringify([...NUTRITION.filter(x=>!map[x.date]),...imported]));show("CalTrak imported");navigate("#fuel/"+(imported.at(-1)?.date||""))};rd.readAsText(f)}
-function analysis(){let labels=RUNS.map(r=>r.date.slice(5)),miles=RUNS.map(r=>r.distance);return `<div class="view">${header("Analysis","Every chart is computed from the embedded activity rows.")}<div class="grid">${card(`<div class="eyebrow">Training load</div><div class="chartbox"><canvas id="load"></canvas></div><p class="sub">Mileage rises and falls across the full retained activity history; official ACWR remains 1.24 from coaching analysis.</p>`,`card`)} ${card(`<div class="eyebrow">Fitness trend</div><div class="chartbox"><canvas id="fit"></canvas></div><p class="sub">Dots show recorded pace against average heart rate, coloured by distance band.</p>`,`card half`)}${card(`<div class="eyebrow">Distance bands</div><div class="stats">${Object.entries(COACH.grades).map(([k,v])=>`<div class="stat"><div class="label">${k}</div><div class="value">${v[0]}</div><p class="sub">${v[1]}</p></div>`).join("")}</div>`,`card half`)}${card(`<div class="eyebrow">Injury risk</div><h2 class="warn">Moderate</h2><p class="sub">The official ACWR is 1.24, below the 1.5 critical threshold. Recent short-term loading still warrants caution.</p>`,`card half`)}${card(`<div class="eyebrow">Four-week plan</div><p class="sub"><b>Week 1:</b> 20–22 mi, recovery and stabilization.<br><b>Week 2:</b> 22–24 mi, controlled tempo.<br><b>Week 3:</b> 24–26 mi, moderate build.<br><b>Week 4:</b> 20–22 mi, deload.</p>`,`card half`)}</div></div>`}
+function weeklyBars(runs){
+  var m = {};
+  runs.forEach(function (r) {
+    var d = new Date(r.date + "T00:00:00");
+    var day = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - day);
+    var k = d.toISOString().slice(0, 10);
+    if (!m[k]) { m[k] = { miles: 0, runs: 0 }; }
+    m[k].miles += r.distance || 0;
+    m[k].runs += 1;
+  });
+  var keys = Object.keys(m).sort();
+  return {
+    labels: keys.map(function (k) { return k.slice(5); }),
+    miles: keys.map(function (k) { return Math.round(m[k].miles * 100) / 100; }),
+    runs: keys.map(function (k) { return m[k].runs; })
+  };
+}
+function bandColor(band){
+  return band === "SHORT" ? "#10ffa0" : band === "LONG" ? "#7c3aed" : "#00f5ff";
+}
+function fadePct(splits){
+  if (!splits || splits.length < 2) { return null; }
+  var half = Math.floor(splits.length / 2);
+  var first = splits.slice(0, half);
+  var second = splits.slice(splits.length - half);
+  var a = first.reduce(function (p, v) { return p + v; }, 0) / first.length;
+  var b = second.reduce(function (p, v) { return p + v; }, 0) / second.length;
+  if (!a) { return null; }
+  return Math.round((b - a) / a * 1000) / 10;
+}
+function analysis(){
+  var tick = { ticks: { color: "#8991a8" }, grid: { color: "#ffffff0b" } };
+  return `<div class="view">${header("Analysis","Every chart is computed from the live activity rows.")}<div class="grid">
+    ${card(`<div class="eyebrow">Training load</div><div class="chartbox"><canvas id="load"></canvas></div><p class="sub">Miles per run across the full retained history.</p>`,`card`)}
+    ${card(`<div class="eyebrow">Weekly mileage</div><div class="chartbox"><canvas id="weekly"></canvas></div><p class="sub">Miles and run count by week.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Distance by run</div><div class="chartbox"><canvas id="dist"></canvas></div><p class="sub">Each bar is a run in chronological order, coloured by distance band.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Pace and heart rate</div><div class="chartbox"><canvas id="pacehr"></canvas></div><p class="sub">Average pace and average heart rate over time.</p>`,`card`)}
+    ${card(`<div class="eyebrow">Fitness trend</div><div class="chartbox"><canvas id="fit"></canvas></div><p class="sub">Recorded pace against average heart rate.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Run bubbles</div><div class="chartbox"><canvas id="bubble"></canvas></div><p class="sub">Sequence, pace and distance at a glance.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Pacing fade</div><div class="chartbox"><canvas id="fade"></canvas></div><p class="sub">Second-half pace vs first-half pace, per run with splits. Below zero is a negative split.</p>`,`card`)}
+    ${card(`<div class="eyebrow">Bodyweight</div><div class="empty"><strong>No bodyweight recorded</strong>Add a weight measurement to plot the trend.</div>`,`card half`)}
+    ${card(`<div class="eyebrow">Strength 1RM</div><div class="empty"><strong>No strength sessions</strong>Log a session in LIFT to plot estimated 1RM.</div>`,`card half`)}
+    ${card(`<div class="eyebrow">Distance bands</div><div class="stats">${Object.entries(COACH.grades).map(function(e){return `<div class="stat"><div class="label">${e[0]}</div><div class="value">${e[1][0]}</div><p class="sub">${e[1][1]}</p></div>`}).join("")}</div>`,`card`)}
+    ${card(`<div class="eyebrow">Injury risk</div><h2 class="warn">Moderate</h2><p class="sub">The official ACWR is ${COACH.acwr != null ? COACH.acwr.toFixed(2) : "unavailable"}, below the 1.5 critical threshold. Recent short-term loading still warrants caution.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Four-week plan</div><p class="sub"><b>Week 1:</b> 20-22 mi, recovery and stabilization.<br><b>Week 2:</b> 22-24 mi, controlled tempo.<br><b>Week 3:</b> 24-26 mi, moderate build.<br><b>Week 4:</b> 20-22 mi, deload.</p>`,`card half`)}
+  </div></div>`}
 function data(){return `<div class="view">${header("Data","Source rows, audit notes and quality status")}<section class="card"><div class="section-title"><h2>Activity log · ${RUNS.length} rows</h2><input id="search" placeholder="Search date or band" oninput="filterRows()"></div><div class="tablewrap"><table><thead><tr><th>Date</th><th>Distance</th><th>Pace</th><th>HR</th><th>Cadence</th><th>Ascent</th><th>Calories</th></tr></thead><tbody id="rows">${RUNS.slice().reverse().map(row).join("")}</tbody></table></div></section><section class="card"><div class="eyebrow">Audit and data quality</div><p class="sub">72/72 records retained. No duplicates or corrections. Title, average stride length, training stress score and steps are blank in every record. No weather fields were present.</p><p class="sub">Review required: 2026-07-26 local activity date and filename versus 2026-07-27 UTC timestamp. Long laps on 2026-06-07, 2026-09-09, 2026-09-24 and 2026-10-01 may indicate slowdowns or stoppages.</p></section><section class="card"><div class="eyebrow">Lifting data</div><div class="empty"><strong>NO DATA: lifting_log_url returned nothing.</strong>Audit returned no lifting sessions. Start a lift session to begin tracking.</div></section></div>`}
 function row(r){return `<tr onclick="navigate('#runs/${r.date}')"><td>${r.date}</td><td>${r.distance}</td><td>${r.avgPace}</td><td>${r.avgHR}</td><td>${r.cadence??"not recorded"}</td><td>${r.ascent??"not recorded"}</td><td>${r.calories??"not recorded"}</td></tr>`}
 function filterRows(){let q=search.value.toLowerCase();rows.innerHTML=RUNS.slice().reverse().filter(r=>(r.date+r.band).toLowerCase().includes(q)).map(row).join("")}
@@ -154,7 +200,42 @@ function startLift(){let id=Date.now();localStorage.setItem("aurora_lift_"+id,JS
 function session(id){return `<div class="view">${header("Lift session","Session logger")}<section class="card form"><label>Bodyweight (lb)<input id="bw" type="number" placeholder="not recorded"></label><label>Exercise<input id="ex" placeholder="e.g. Romanian deadlift"></label><label>Weight (lb)<input id="ww" type="number"></label><label>Reps<input id="rr" type="number"></label><label>RPE<input id="rp" type="range" min="6" max="10" value="7"></label><button class="btn" onclick="endSession('${id}')">END SESSION</button></section></div>`}
 function endSession(id){let s=JSON.parse(localStorage.getItem("aurora_lift_"+id)||"{}");s.bodyweight=+bw.value||null;s.sets=[{exercise:ex.value||"not recorded",weight:+ww.value||null,reps:+rr.value||null,rpe:+rp.value}];localStorage.setItem("aurora_lift_"+id,JSON.stringify(s));show("Lift session saved");navigate("#lift/session/"+id+"/report")}
 function sessionReport(id){let s=JSON.parse(localStorage.getItem("aurora_lift_"+id)||"{}");return `<div class="view">${header("Session report",s.date||"Saved session")}<section class="card"><div class="stats"><div class="stat"><div class="label">Sets</div><div class="value">${s.sets?.length||0}</div></div><div class="stat"><div class="label">Bodyweight</div><div class="value">${s.bodyweight||"—"}</div></div></div><p class="sub">This session is saved locally. e1RM is shown only when load and reps were entered.</p><button class="btn" onclick="navigate('#lift')">Back to lift</button></section></div>`}
-function render(){charts.forEach(c=>c.destroy());charts=[];navActive();let h=location.hash||"#home",v=h.slice(1),html=v==="home"?home():v==="runs"?runs():v.startsWith("runs/")?detail(v.split("/")[1]):v==="log/run"?logRun():v==="fuel"?fuel():v.startsWith("fuel/")?fuel(v.split("/")[1]):v==="analysis"?analysis():v==="data"?data():v==="lift"?lift():v.startsWith("lift/session/")?(v.endsWith("/report")?sessionReport(v.split("/")[2]):session(v.split("/")[2])):home();document.getElementById("app").innerHTML=html;if(v==="analysis"){chart("load","line",{labels:RUNS.map(r=>r.date.slice(5)),datasets:[{label:"Miles",data:RUNS.map(r=>r.distance),borderColor:"#00f5ff",backgroundColor:"#00f5ff22",fill:true,tension:.3}]});chart("fit","scatter",{datasets:[{label:"Runs",data:RUNS.map(r=>({x:paceSec(r.avgPace),y:r.avgHR})),backgroundColor:"#10ffa0"}]},{scales:{x:{title:{display:true,text:"Pace seconds/mi",color:"#8991a8"}},y:{title:{display:true,text:"Average HR",color:"#8991a8"}}}})}}
+function render(){
+  charts.forEach(function (c) { c.destroy(); });
+  charts = [];
+  navActive();
+  var h = location.hash || "#home", v = h.slice(1);
+  var html = v === "home" ? home()
+    : v === "runs" ? runs()
+    : v.startsWith("runs/") ? detail(v.split("/")[1])
+    : v === "log/run" ? logRun()
+    : v === "fuel" ? fuel()
+    : v.startsWith("fuel/") ? fuel(v.split("/")[1])
+    : v === "analysis" ? analysis()
+    : v === "data" ? data()
+    : v === "lift" ? lift()
+    : v.startsWith("lift/session/") ? (v.endsWith("/report") ? sessionReport(v.split("/")[2]) : session(v.split("/")[2]))
+    : home();
+  document.getElementById("app").innerHTML = html;
+  var tick = { ticks: { color: "#8991a8" }, grid: { color: "#ffffff0b" } };
+  if (v === "analysis") {
+    chart("load", "line", {labels: RUNS.map(function (r) { return r.date.slice(5); }), datasets: [{label: "Miles", data: RUNS.map(function (r) { return r.distance; }), borderColor: "#00f5ff", backgroundColor: "#00f5ff22", fill: true, tension: .3}]}, {scales: {x: tick, y: tick}});
+    var w = weeklyBars(RUNS);
+    chart("weekly", "bar", {labels: w.labels, datasets: [{label: "Miles", data: w.miles, backgroundColor: "#7c3aed"}, {label: "Runs", data: w.runs, type: "line", borderColor: "#10ffa0", backgroundColor: "#10ffa0", yAxisID: "y1", tension: .3}]}, {scales: {x: tick, y: {beginAtZero: true, ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Miles", color: "#8991a8"}}, y1: {beginAtZero: true, position: "right", grid: {drawOnChartArea: false}, ticks: {color: "#8991a8"}, title: {display: true, text: "Runs", color: "#8991a8"}}}});
+    chart("dist", "bar", {labels: RUNS.map(function (r) { return r.date.slice(5); }), datasets: [{label: "Distance", data: RUNS.map(function (r) { return r.distance; }), backgroundColor: RUNS.map(function (r) { return bandColor(r.band); })}]}, {scales: {x: tick, y: {beginAtZero: true, ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Miles", color: "#8991a8"}}}});
+    chart("pacehr", "line", {labels: RUNS.map(function (r) { return r.date.slice(5); }), datasets: [{label: "Pace s/mi", data: RUNS.map(function (r) { return paceSec(r.avgPace); }), borderColor: "#00f5ff", backgroundColor: "#00f5ff22", yAxisID: "y", tension: .3}, {label: "Avg HR", data: RUNS.map(function (r) { return r.avgHR; }), borderColor: "#ff3d5a", backgroundColor: "#ff3d5a22", yAxisID: "y1", tension: .3}]}, {scales: {x: tick, y: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Pace s/mi", color: "#8991a8"}}, y1: {position: "right", grid: {drawOnChartArea: false}, ticks: {color: "#8991a8"}, title: {display: true, text: "HR", color: "#8991a8"}}}});
+    chart("fit", "scatter", {datasets: [{label: "Runs", data: RUNS.map(function (r) { return {x: paceSec(r.avgPace), y: r.avgHR}; }), backgroundColor: "#10ffa0"}]}, {scales: {x: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Pace seconds/mi", color: "#8991a8"}}, y: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Average HR", color: "#8991a8"}}}});
+    chart("bubble", "bubble", {datasets: [{label: "Runs", data: RUNS.map(function (r, i) { return {x: i + 1, y: paceSec(r.avgPace), r: Math.max(3, r.distance)}; }), backgroundColor: "#7c3aed99"}]}, {scales: {x: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Run sequence", color: "#8991a8"}}, y: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Pace s/mi", color: "#8991a8"}}}});
+    var fades = RUNS.map(function (r) { return {date: r.date, pct: fadePct(r.splits)}; }).filter(function (x) { return x.pct !== null; });
+    chart("fade", "line", {labels: fades.map(function (x) { return x.date.slice(5); }), datasets: [{label: "Fade %", data: fades.map(function (x) { return x.pct; }), borderColor: "#ffb300", backgroundColor: "#ffb30022", fill: true, tension: .3, pointBackgroundColor: fades.map(function (x) { return x.pct > 0 ? "#ff3d5a" : "#10ffa0"; })}]}, {scales: {x: tick, y: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Second half vs first half %", color: "#8991a8"}}}});
+  }
+  if (v.startsWith("runs/")) {
+    var r = RUNS.find(function (x) { return x.date === v.split("/")[1]; });
+    if (r && r.splits && r.splits.length) {
+      chart("splits", "bar", {labels: r.splits.map(function (_, i) { return "Mile " + (i + 1); }), datasets: [{label: "Seconds", data: r.splits, backgroundColor: "#00f5ff"}]}, {scales: {x: tick, y: {beginAtZero: false, ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Seconds per mile", color: "#8991a8"}}}});
+    }
+  }
+}
 window.addEventListener("hashchange",render);render();
 </script>
 </body>

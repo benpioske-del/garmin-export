@@ -27,6 +27,7 @@ Usage:
 """
 
 import argparse
+import csv
 import datetime
 import hashlib
 import hmac
@@ -59,6 +60,8 @@ import paths  # noqa: E402
 DASH_DIR = os.path.join(ROOT, "dashboard")
 DATA_DIR = paths.data_dir()
 HTML_FILE = os.path.join(DASH_DIR, "index.html")
+# The published export carries the per-mile lap splits the database does not.
+EXPORT_CSV = os.path.join(ROOT, "garmin_export.csv")
 
 def resolve_dashboard_html():
     """Return the dashboard HTML to serve.
@@ -87,16 +90,21 @@ def resolve_dashboard_html():
     return HTML_FILE if os.path.exists(HTML_FILE) else os.path.join(ROOT, "index.html")
 
 
-# The committed Aurora app from the CrewAI flow. It is served read-only as a
-# preview at /aurora; the athlete's local dashboard stays the default at /. The
+# The committed Aurora app from the CrewAI flow. It is the dashboard at /; the
+# pre-Aurora page is served at /classic and /aurora remains an alias. The
 # generated file embeds a snapshot of the corpus, so a small script is injected
 # at serve time to replace that snapshot with live /api/* data.
 AURORA_FILE = os.path.join(ROOT, "flow_outputs", "aurora_dashboard.html")
 AURORA_LIVE_MARK = "aurora-live-v1"
+# Chart.js is vendored into the repo so the charts render with no internet and
+# no third-party CDN. The artifact still carries the CDN URL; the server swaps
+# it at serve time so the committed file stays exactly as the flow produced it.
+CHART_CDN = "https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"
+CHART_FILE = os.path.join(ROOT, "flow_outputs", "vendor", "chart.umd.min.js")
 
 
 def resolve_aurora_html():
-    """Return the committed Aurora preview, or None when it is absent.
+    """Return the committed Aurora dashboard, or None when it is absent.
 
     Resolved per request for the same reason as the dashboard: a long-lived
     server must not keep serving a stale copy after the file changes.
@@ -178,19 +186,80 @@ def _source_files(conn):
     )}
 
 
+def _pace_seconds(text):
+    """Parse Garmin's "m:ss" into seconds; None when absent or malformed."""
+    bits = str(text or "").strip().split(":")
+    if len(bits) != 2:
+        return None
+    try:
+        return int(bits[0]) * 60 + int(bits[1])
+    except ValueError:
+        return None
+
+
+def _split_seconds(text):
+    """Parse Garmin's comma-separated lap-split cell into a list of seconds."""
+    parts = [p.strip() for p in str(text or "").split(",") if p.strip()]
+    if not parts:
+        return None
+    out = []
+    for part in parts:
+        sec = _pace_seconds(part)
+        if sec is None:
+            return None
+        out.append(sec)
+    return out
+
+
+def _int_or_none(value):
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _csv_run_extras():
+    """Lap splits and lap count per source file, from the published CSV.
+
+    The database stores the device summary fields but not per-mile splits. The
+    published export does, keyed by `Source File`, which is exactly what
+    `activity_raw_refs` already gives the API. A missing or unreadable CSV is
+    not an error: every extra stays null rather than inventing a split.
+    """
+    out = {}
+    try:
+        with open(EXPORT_CSV, newline="", encoding="utf-8-sig") as fh:
+            for row in csv.DictReader(fh):
+                src = (row.get("Source File") or "").strip()
+                if not src:
+                    continue
+                out[src] = {
+                    "splits": _split_seconds(row.get("Lap Splits")),
+                    "best_5k_s": _pace_seconds(row.get("Best 5K Time")),
+                    "laps": _int_or_none(row.get("Number of Laps")),
+                }
+    except (OSError, csv.Error):
+        return {}
+    return out
+
+
 def api_activities(conn):
     """GET /api/activities - canonical activities with review state preserved."""
     src = _source_files(conn)
+    extras = _csv_run_extras()
     out = []
     for r in _rows(conn, "SELECT * FROM activities ORDER BY start_utc DESC"):
         aid = r["activity_id"]
         reviews = _open_reviews(conn, aid)
+        source_file = src.get(aid)
+        extra = extras.get(source_file) or {}
         out.append({
             # Stable identity. Never the array index, never the FIT filename.
             "activity_id": aid,
             "source_activity_id": r["source_activity_id"],
-            "source_file": src.get(aid),
+            "source_file": source_file,
             "sport": r["sport"],
+            "title": r["title"],
             "start_utc": r["start_utc"],
             "start_local": r["start_local"],
             # start_local is a filename-derived guess until the offset is
@@ -201,8 +270,18 @@ def api_activities(conn):
             "elapsed_time_s": r["elapsed_time_s"],
             "avg_hr": r["avg_hr"],
             "max_hr": r["max_hr"],
+            "avg_cadence": r["avg_cadence"],
+            "max_cadence": r["max_cadence"],
+            "avg_pace_s_per_mi": r["avg_pace_s_per_mi"],
+            "best_pace_s_per_mi": r["best_pace_s_per_mi"],
+            "calories": r["calories"],
+            "training_stress_score": r["training_stress_score"],
             "total_ascent_ft": r["total_ascent_ft"],
             "total_descent_ft": r["total_descent_ft"],
+            # Splits live only in the published CSV; null when it has none.
+            "splits": extra.get("splits"),
+            "best_5k_s": extra.get("best_5k_s"),
+            "laps": extra.get("laps"),
             "value_state": r["value_state"],
             "confidence": r["confidence"],
             "confirmation": r["confirmation"],
@@ -711,15 +790,17 @@ AURORA_LIVE_SCRIPT = """
       time: hms(sec),
       avgHR: a.avg_hr == null ? null : Number(a.avg_hr),
       maxHR: a.max_hr == null ? null : Number(a.max_hr),
-      cadence: null,
-      avgPace: pace(mi > 0 ? sec / mi : null),
-      bestPace: null,
-      best5k: null,
-      splits: null,
+      cadence: a.avg_cadence == null ? null : Number(a.avg_cadence),
+      avgPace: pace(a.avg_pace_s_per_mi != null ? Number(a.avg_pace_s_per_mi)
+        : (mi > 0 ? sec / mi : null)),
+      bestPace: a.best_pace_s_per_mi == null ? null
+        : pace(Number(a.best_pace_s_per_mi)),
+      best5k: a.best_5k_s == null ? null : pace(Number(a.best_5k_s)),
+      splits: Array.isArray(a.splits) ? a.splits : null,
       ascent: a.total_ascent_ft == null ? null : Math.round(Number(a.total_ascent_ft)),
       descent: a.total_descent_ft == null ? null : Math.round(Number(a.total_descent_ft)),
-      calories: null,
-      laps: null,
+      calories: a.calories == null ? null : Number(a.calories),
+      laps: a.laps == null ? null : Number(a.laps),
       bestLap: null,
       source: a.source_file || "trainloop.db",
       band: band(mi)
@@ -813,9 +894,9 @@ AURORA_LIVE_SCRIPT = """
       document.body.appendChild(el);
     }
     var t = token();
-    var href = "/" + (t ? "?tk=" + encodeURIComponent(t) : "");
-    el.innerHTML = "LIVE PREVIEW \\u00b7 " + esc(text) +
-      ' \\u00b7 <a style="color:#9fe" href="' + esc(href) + '">main dashboard</a>';
+    var href = "/classic" + (t ? "?tk=" + encodeURIComponent(t) : "");
+    el.innerHTML = "LIVE DATA \\u00b7 " + esc(text) +
+      ' \\u00b7 <a style="color:#9fe" href="' + esc(href) + '">classic dashboard</a>';
     if (title) { el.title = title; }
   }
   function refresh() {
@@ -899,7 +980,7 @@ AURORA_LIVE_SCRIPT = """
 
 
 def inject_aurora_live(html):
-    """Add the live-data bootstrap to the Aurora preview.
+    """Add the live-data bootstrap to the Aurora dashboard.
 
     Idempotent (skips work if the marker is already present) and a no-op on
     bytes that are not UTF-8 HTML, so it can never corrupt the served file.
@@ -908,8 +989,10 @@ def inject_aurora_live(html):
         text = html.decode("utf-8")
     except UnicodeDecodeError:
         return html
+    if os.path.exists(CHART_FILE):
+        text = text.replace(CHART_CDN, "/vendor/chart.umd.min.js")
     if AURORA_LIVE_MARK in text:
-        return html
+        return text.encode("utf-8")
     if "</body>" in text:
         text = text.replace("</body>", AURORA_LIVE_SCRIPT + "</body>", 1)
     else:
@@ -1282,6 +1365,15 @@ class Handler(BaseHTTPRequestHandler):
             # Also browser-initiated and token-free. Network-first with an
             # offline fallback; see SW_JS.
             return self._send(200, SW_JS, "text/javascript; charset=utf-8")
+        if path == "/vendor/chart.umd.min.js":
+            # The browser fetches this with no token header, so it lives above
+            # the gate like the manifest and worker. Vendored, not a CDN.
+            try:
+                with open(CHART_FILE, "rb") as fh:
+                    return self._send(200, fh.read(),
+                                      "text/javascript; charset=utf-8")
+            except OSError:
+                return self._deny(404, "chart.js is not vendored")
         if path == "/login":
             if not REQUIRE_LOGIN:
                 return self._redirect("/")
@@ -1300,6 +1392,31 @@ class Handler(BaseHTTPRequestHandler):
                      urllib.parse.parse_qs(parts.query).items() if v}
             if REQUIRE_LOGIN and not self._is_authed(query):
                 return self._redirect("/login")
+            # Aurora is the dashboard now. The local page is only a fallback
+            # for a clean checkout without the committed app, so `/` never
+            # 404s; the old page keeps its own address at /classic.
+            src = resolve_aurora_html()
+            if src:
+                try:
+                    with open(src, "rb") as fh:
+                        return self._send(
+                            200,
+                            inject_pwa(inject_aurora_live(fh.read())),
+                            "text/html; charset=utf-8")
+                except OSError:
+                    pass
+            try:
+                with open(resolve_dashboard_html(), "rb") as fh:
+                    return self._send(200, inject_pwa(fh.read()),
+                                      "text/html; charset=utf-8")
+            except OSError:
+                return self._deny(404, "dashboard html not found")
+        if path in ("/classic", "/classic/"):
+            # The pre-Aurora dashboard, kept at its own address.
+            query = {k: v[0] for k, v in
+                     urllib.parse.parse_qs(parts.query).items() if v}
+            if REQUIRE_LOGIN and not self._is_authed(query):
+                return self._redirect("/login")
             try:
                 with open(resolve_dashboard_html(), "rb") as fh:
                     return self._send(200, inject_pwa(fh.read()),
@@ -1307,9 +1424,9 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 return self._deny(404, "dashboard html not found")
         if path in ("/aurora", "/aurora/"):
-            # Read-only preview of the committed Aurora app. It carries the
-            # same token/login gate as the data routes because the injected
-            # bootstrap fetches them; the local dashboard remains the default.
+            # Alias for the canonical dashboard so old bookmarks and the old
+            # PWA start_url keep working. Same token/login gate as the data
+            # routes because the injected bootstrap fetches them.
             query = {k: v[0] for k, v in
                      urllib.parse.parse_qs(parts.query).items() if v}
             if REQUIRE_LOGIN and not self._is_authed(query):
@@ -1318,13 +1435,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._deny(403, "missing or wrong token")
             src = resolve_aurora_html()
             if not src:
-                return self._deny(404, "aurora preview not found")
+                return self._deny(404, "aurora dashboard not found")
             try:
                 with open(src, "rb") as fh:
-                    return self._send(200, inject_aurora_live(fh.read()),
-                                      "text/html; charset=utf-8")
+                    return self._send(
+                        200,
+                        inject_pwa(inject_aurora_live(fh.read())),
+                        "text/html; charset=utf-8")
             except OSError:
-                return self._deny(404, "aurora preview not found")
+                return self._deny(404, "aurora dashboard not found")
         if not self._is_authed():
             return self._deny(403, "missing or wrong token")
         if path == "/garmin_sleep.csv":
@@ -1508,13 +1627,10 @@ def probe_existing_instance(port):
 def launch_url(port, token):
     """Return the page `--open` should land on.
 
-    The athlete asked the launcher to open the Aurora preview directly, so it
-    wins whenever the committed file is present. The local dashboard stays the
-    default at `/` and is still the fallback: a clean checkout without
-    `flow_outputs/aurora_dashboard.html` opens `/`, never a 404.
+    `/` is the dashboard, so it is always the right entry point. When the
+    committed app is missing, `/` falls back to the local page rather than a
+    404, so the launcher never needs to know which one is installed.
     """
-    if resolve_aurora_html():
-        return "http://127.0.0.1:%d/aurora?tk=%s" % (port, token)
     return "http://127.0.0.1:%d/?tk=%s" % (port, token)
 
 
@@ -1570,7 +1686,7 @@ def main():
     if BIND_HOST not in ("127.0.0.1", "localhost"):
         ALLOWED_HOSTS |= set(local_ipv4s())
     url = "http://127.0.0.1:%d/?tk=%s" % (PORT, TOKEN)
-    aurora_url = "http://127.0.0.1:%d/aurora?tk=%s" % (PORT, TOKEN)
+    classic_url = "http://127.0.0.1:%d/classic?tk=%s" % (PORT, TOKEN)
     open_url = launch_url(PORT, TOKEN)
     # Probe BEFORE binding. On Windows SO_REUSEADDR lets a second bind to the
     # same port succeed, which would silently start a rival server instead of
@@ -1599,7 +1715,7 @@ def main():
         print("Could not bind %s:%d: %s" % (BIND_HOST, PORT, exc))
         sys.exit(1)
     print("Coach Dashboard local server: %s" % url)
-    print("Aurora preview (read-only, live API data): %s" % aurora_url)
+    print("Classic dashboard (pre-Aurora page): %s" % classic_url)
     if args.open:
         print("Opening in your browser: %s" % open_url)
     if REQUIRE_LOGIN:

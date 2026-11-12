@@ -261,12 +261,12 @@ def test_service_worker_falls_back_to_the_cache_on_an_origin_outage(server):
     assert "req.method !== 'GET'" in text
 
 
-def test_dashboard_html_receives_the_pwa_tags(server, monkeypatch, tmp_path):
+def test_classic_dashboard_receives_the_pwa_tags(server, monkeypatch, tmp_path):
     html = tmp_path / "index.html"
     html.write_text("<!doctype html><html><head><title>x</title></head>"
                     "<body>hi</body></html>", encoding="utf-8")
     monkeypatch.setattr(G, "resolve_dashboard_html", lambda: str(html))
-    status, _, body = _get(server, "/")
+    status, _, body = _get(server, "/classic")
     text = body.decode("utf-8")
     assert status == 200
     assert '<link rel="manifest" href="/manifest.webmanifest">' in text
@@ -474,8 +474,9 @@ def aurora_html(monkeypatch, tmp_path):
     return html
 
 
-def test_aurora_preview_is_served_with_the_live_bootstrap(server, aurora_html):
-    status, ctype, body = _get(server, "/aurora")
+def test_root_serves_aurora_with_the_live_bootstrap(server, aurora_html):
+    """Aurora is the dashboard now, so `/` must carry the live layer."""
+    status, ctype, body = _get(server, "/")
     assert status == 200
     assert ctype == "text/html; charset=utf-8"
     text = body.decode("utf-8")
@@ -483,6 +484,37 @@ def test_aurora_preview_is_served_with_the_live_bootstrap(server, aurora_html):
     assert "/api/activities" in text
     assert "/api/load" in text
     assert "/api/coaching" in text
+    assert G.PWA_MARK in text
+
+
+def test_aurora_address_remains_an_alias(server, aurora_html):
+    """Old bookmarks and the previous PWA start_url still work."""
+    status, _, body = _get(server, "/aurora")
+    assert status == 200
+    assert G.AURORA_LIVE_MARK in body.decode("utf-8")
+
+
+def test_classic_serves_the_local_dashboard(server, monkeypatch, tmp_path):
+    html = tmp_path / "index.html"
+    html.write_text("<!doctype html><html><body>classic-page</body></html>",
+                    encoding="utf-8")
+    monkeypatch.setattr(G, "resolve_dashboard_html", lambda: str(html))
+    status, _, body = _get(server, "/classic")
+    assert status == 200
+    assert b"classic-page" in body
+
+
+def test_root_falls_back_to_the_local_dashboard_without_aurora(
+        server, monkeypatch, tmp_path):
+    """A clean checkout without the committed app still opens a real page."""
+    html = tmp_path / "index.html"
+    html.write_text("<!doctype html><html><body>fallback-page</body></html>",
+                    encoding="utf-8")
+    monkeypatch.setattr(G, "resolve_aurora_html", lambda: None)
+    monkeypatch.setattr(G, "resolve_dashboard_html", lambda: str(html))
+    status, _, body = _get(server, "/")
+    assert status == 200
+    assert b"fallback-page" in body
 
 
 def test_aurora_preview_requires_the_dash_token(server, aurora_html):
@@ -511,10 +543,10 @@ def test_inject_aurora_live_is_idempotent():
     assert once.decode("utf-8").count(G.AURORA_LIVE_MARK) == 1
 
 
-def test_launch_url_opens_the_aurora_preview(aurora_html):
-    """--open lands on the preview, which is what the athlete asked for."""
+def test_launch_url_opens_the_dashboard_at_root(aurora_html):
+    """`/` is the dashboard, so --open lands there."""
     assert G.launch_url(8765, "tok") == \
-        "http://127.0.0.1:8765/aurora?tk=tok"
+        "http://127.0.0.1:8765/?tk=tok"
 
 
 def test_launch_url_falls_back_to_the_local_dashboard(monkeypatch):
@@ -527,6 +559,45 @@ def test_launch_url_carries_the_run_port_and_token(aurora_html):
     url = G.launch_url(9999, "abc123")
     assert ":9999/" in url
     assert url.endswith("?tk=abc123")
+
+
+def test_aurora_rewrites_the_chart_cdn_to_the_vendored_file(
+        server, tmp_path, monkeypatch):
+    """Charts must not depend on cdn.jsdelivr.net: the server swaps the CDN URL
+    for the committed copy so the app works offline and behind a blocked CDN."""
+    html = tmp_path / "aurora_dashboard.html"
+    html.write_text(
+        '<!doctype html><html><head><script src="%s"></script></head>'
+        '<body>x</body></html>' % G.CHART_CDN,
+        encoding="utf-8")
+    vendor = tmp_path / "chart.umd.min.js"
+    vendor.write_text("/* chart */", encoding="utf-8")
+    monkeypatch.setattr(G, "resolve_aurora_html", lambda: str(html))
+    monkeypatch.setattr(G, "CHART_FILE", str(vendor))
+    _, _, body = _get(server, "/aurora")
+    text = body.decode("utf-8")
+    assert "/vendor/chart.umd.min.js" in text
+    assert G.CHART_CDN not in text
+
+
+def test_vendored_chart_js_is_served_without_the_token(
+        server, tmp_path, monkeypatch):
+    vendor = tmp_path / "chart.umd.min.js"
+    vendor.write_text("/* chart */", encoding="utf-8")
+    monkeypatch.setattr(G, "CHART_FILE", str(vendor))
+    status, ctype, body = _get(server, "/vendor/chart.umd.min.js", token=None)
+    assert status == 200
+    assert ctype == "text/javascript; charset=utf-8"
+    assert body == b"/* chart */"
+
+
+def test_aurora_gets_the_pwa_tags(server, aurora_html):
+    """Mobile install/offline is injected into /aurora, not only /."""
+    _, _, body = _get(server, "/aurora")
+    text = body.decode("utf-8")
+    assert G.PWA_MARK in text
+    assert "/manifest.webmanifest" in text
+    assert "/sw.js" in text
 
 
 # --------------------------------------------------------- nutrition routes

@@ -104,6 +104,75 @@ def test_activity_exposes_the_fields_the_brief_requires(conn):
         assert field in a, "missing %s" % field
 
 
+def test_activity_exposes_device_summary_fields(conn):
+    """Calories, cadence and pace are in the database; the API must not drop
+    them, because the run detail and the pace charts read them."""
+    _seed_run(conn, "garmin:111", _iso(1))
+    conn.execute(
+        "UPDATE activities SET calories=520, avg_cadence=170, max_cadence=182,"
+        " avg_pace_s_per_mi=530, best_pace_s_per_mi=480,"
+        " training_stress_score=88 WHERE activity_id=?",
+        ("garmin:111",),
+    )
+    a = G.api_activities(conn)["activities"][0]
+    assert a["calories"] == 520
+    assert a["avg_cadence"] == 170
+    assert a["max_cadence"] == 182
+    assert a["avg_pace_s_per_mi"] == 530
+    assert a["best_pace_s_per_mi"] == 480
+    assert a["training_stress_score"] == 88
+
+
+def test_lap_splits_are_read_from_the_published_csv(conn, tmp_path, monkeypatch):
+    """The database has no splits table, so the API joins the published CSV by
+    source file. Without this the run detail has a canvas and no data."""
+    _seed_run(conn, "garmin:111", _iso(1))
+    conn.execute(
+        "INSERT INTO activity_raw_refs (activity_id, source_file, sha256,"
+        " byte_size, parser, parser_version, imported_utc)"
+        " VALUES (?,?,?,?,?,?,?)",
+        ("garmin:111", "2026-10-01_111.fit", "a" * 64, 100,
+         "garmin_fit_reader", "1.1.0", "2026-10-01T00:00:00Z"),
+    )
+    csv_path = tmp_path / "garmin_export.csv"
+    csv_path.write_text(
+        "Source File,Lap Splits,Best 5K Time,Number of Laps\n"
+        '2026-10-01_111.fit,"8:35, 8:51, 9:02",27:12,3\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(G, "EXPORT_CSV", str(csv_path))
+    a = G.api_activities(conn)["activities"][0]
+    assert a["splits"] == [515, 531, 542]
+    assert a["best_5k_s"] == 1632
+    assert a["laps"] == 3
+
+
+def test_splits_are_null_when_the_csv_is_absent(conn, tmp_path, monkeypatch):
+    """No CSV is not an error and must never become an invented split."""
+    _seed_run(conn, "garmin:111", _iso(1))
+    conn.execute(
+        "INSERT INTO activity_raw_refs (activity_id, source_file, sha256,"
+        " byte_size, parser, parser_version, imported_utc)"
+        " VALUES (?,?,?,?,?,?,?)",
+        ("garmin:111", "2026-10-01_111.fit", "a" * 64, 100,
+         "garmin_fit_reader", "1.1.0", "2026-10-01T00:00:00Z"),
+    )
+    monkeypatch.setattr(G, "EXPORT_CSV", str(tmp_path / "missing.csv"))
+    a = G.api_activities(conn)["activities"][0]
+    assert a["splits"] is None
+    assert a["best_5k_s"] is None
+    assert a["laps"] is None
+
+
+def test_split_and_pace_parsers_reject_malformed_cells():
+    assert G._pace_seconds("27:12") == 1632
+    assert G._pace_seconds("") is None
+    assert G._pace_seconds("nope") is None
+    assert G._split_seconds("8:35, 8:51") == [515, 531]
+    assert G._split_seconds("") is None
+    assert G._split_seconds("8:35, nope") is None
+
+
 def test_source_file_resolves_through_raw_refs_not_a_second_convention(conn):
     _seed_run(conn, "garmin:111", _iso(1))
     conn.execute(

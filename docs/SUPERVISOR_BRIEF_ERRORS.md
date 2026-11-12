@@ -926,3 +926,83 @@ The full `adopt-flow-generated-dashboard` task remains open: the lifting
 importer, bodyweight and weekly-summary endpoints, queue retry semantics, PWA
 install path, and retiring the local dashboard are all still unimplemented.
 `/aurora` is still a preview.
+
+# Seventeenth correction: 2026-11-12, Aurora adopted, charts restored, mobile explained
+
+## The gap
+
+The athlete asked three questions after the sixteenth correction: why Aurora was
+still a preview, why the graphs had disappeared, and why mobile had stopped
+working. The honest answers were that adoption had never been finished, that
+Aurora shipped with three canvases where the local page had ten, and that the
+ngrok tunnel was simply not running. This entry records the code change and the
+mobile finding.
+
+## Aurora is the dashboard
+
+- `/` now serves the committed `flow_outputs/aurora_dashboard.html` behind the
+  existing token/login gate. The pre-Aurora page moved to `/classic`.
+- `/aurora` remains an alias, so old bookmarks and the previous PWA `start_url`
+  keep working.
+- `/` falls back to the local page when the committed app is absent, so a clean
+  checkout still opens a real dashboard instead of a `404`.
+- `launch_url()` now always opens `/`; it no longer has to choose between two
+  pages. `inject_pwa()` is applied to Aurora as well as the classic page.
+- The live-data badge now reads `LIVE DATA` and links to `/classic` instead of
+  pointing back at the page it is already on.
+
+## Charts
+
+- The artifact had three canvases (load, fitness, splits). The Analysis view now
+  renders seven run-based charts: training load, weekly mileage, distance by run
+  coloured by distance band, pace and heart rate, fitness scatter, run bubbles,
+  and pacing fade. The run detail keeps the per-mile splits chart.
+- Bodyweight and strength remain honest empty states: there is no bodyweight
+  measurement and no confirmed strength session.
+- Chart.js v4.4.4 is vendored at `flow_outputs/vendor/chart.umd.min.js` and
+  served at `/vendor/chart.umd.min.js`. The server rewrites the artifact's
+  `cdn.jsdelivr.net` URL at serve time, so charts work offline or behind a
+  blocked CDN without editing the flow output.
+- Chart creation is synchronous. The original `requestAnimationFrame` never ran
+  in a background tab, which left blank canvases.
+- `GET /api/activities` now carries `title`, `calories`, `avg_cadence`,
+  `max_cadence`, `avg_pace_s_per_mi`, `best_pace_s_per_mi`,
+  `training_stress_score`, and joins `garmin_export.csv` by `Source File` for
+  `splits`, `best_5k_s` and `laps`. The database has no splits table; a missing
+  or malformed CSV yields `null`, never an invented split.
+
+## Mobile
+
+- ngrok is installed at `C:\Users\benpi\coach-dashboard\ngrok.exe` (3.39.11),
+  the saved authtoken is valid, and the reserved domain
+  `https://foam-tackiness-header.ngrok-free.dev` starts successfully. **No new
+  authtoken is needed.** The tunnel was not running, so the public URL was dead.
+- `start-dashboard.cmd` starts the server and the tunnel together; the athlete
+  must keep its window open. The public `/ping` returns `200`, and `/` and
+  `/aurora` return the login page until the athlete signs in.
+- LAN mode was re-verified on port 8804: `--lan` served `/ping` and `/aurora`
+  over `http://192.168.12.146:8804`. Service workers still require https or
+  localhost, so offline install works through the tunnel, not plain LAN http.
+
+## Verification
+
+- In-browser against the live database: 72 runs; the seven Analysis charts
+  rendered with 72/72/72/31/72/72/72 points; the run-detail splits chart showed
+  six mile splits; `/classic` still rendered its ten canvases; no console errors
+  on either page.
+- New tests cover the API summary fields and CSV splits (4), the CDN rewrite,
+  vendored file and PWA tags (3), and the routing switch: `/` serves Aurora,
+  `/aurora` aliases it, `/classic` serves the local page, and `/` falls back
+  when Aurora is absent (3).
+- The live suite is **565 passed, 1 skipped** (566 collected) and the clean
+  checkout is **536 passed, 30 skipped**. `docs/VERIFICATION_REPORT.md`,
+  `docs/IMPLEMENTATION_INVENTORY.md`, `SUPERVISOR_BRIEF.md` and
+  `brief_facts.json` carry the new counts.
+
+## Still not done
+
+The lifting importer (`GET`/`POST /api/lifts`, e1RM, bodyweight-adjusted
+pull-ups/dips) is still unimplemented, so the strength chart stays an empty
+state. Bodyweight and weekly-summary endpoints, queue retry semantics, and
+replacing the generated narrative panels with live text remain open. The
+`Garmin Daily Sync` scheduled task is still Disabled.

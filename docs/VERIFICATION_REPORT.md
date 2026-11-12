@@ -17,11 +17,11 @@ were imported. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-555 passed, 1 skipped (556 collected)
+565 passed, 1 skipped (566 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `526 passed, 30 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `536 passed, 30 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`, so CI fails only on a real defect. `ruff check .` is clean.
 
@@ -31,9 +31,9 @@ skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 | `tests/test_recommend_snapshots.py` | 25 |
 | `tests/test_training_data.py` | 64 |
 | `tests/test_brief_bridge.py` | 62 |
-| `tests/test_dashboard_api.py` | 38 |
+| `tests/test_dashboard_api.py` | 42 |
 | `tests/test_trainloop_cli.py` | 22 |
-| `tests/test_dashboard_api_http.py` | 62 |
+| `tests/test_dashboard_api_http.py` | 68 |
 | `tests/test_nutrition.py` | 33 |
 | `tests/test_fit_reader_elevation.py` | 21 |
 | `tests/test_splits.py` | 10 |
@@ -47,7 +47,7 @@ skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_brief_consistency.py` | 37 |
 | `tests/test_sync_import.py` | 5 |
-| **Total** | **553** (552 pass, 1 skip) |
+| **Total** | **566** (565 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -268,9 +268,9 @@ Pinned by `test_facts_digest_ignores_the_timestamp`,
 
 ## Dashboard server and mobile copy
 
-`garmin_server.py` serves the gitignored `dashboard/index.html` and the
-read-only JSON API (`/api/activities`, `/api/load`, `/api/coaching`) on the same
-origin. It defaults to loopback and a per-launch token. The athlete decided the
+`garmin_server.py` serves the committed Aurora app at `/`, the gitignored
+`dashboard/index.html` at `/classic`, and the read-only JSON API
+(`/api/activities`, `/api/load`, `/api/coaching`) on the same origin. It defaults to loopback and a per-launch token. The athlete decided the
 dashboard should also be reachable from a phone on the home WiFi, so the server
 gained a deliberate, opt-in exposure path rather than an always-on one:
 
@@ -284,12 +284,12 @@ gained a deliberate, opt-in exposure path rather than an always-on one:
 - **No CORS headers are sent.** The page and the API share one origin, so CORS
   is unnecessary; `test_no_cors_headers_are_ever_sent` asserts
   `Access-Control-Allow-Origin` never appears.
-- The dashboard file is generated outside this repository, so it cannot be
-  relied on to carry PWA tags. As the HTML is served, the server injects the
-  manifest link, mobile `theme-color`/viewport meta and the service-worker
-  registration (`inject_pwa()`), and serves a real `/manifest.webmanifest` and
-  `/sw.js`. Both are served above the token gate because the browser fetches
-  them itself.
+- Neither dashboard file is relied on to carry PWA tags. The classic page is
+  generated outside this repository, and the committed Aurora artifact predates
+  them. As either HTML is served, the server injects the manifest link, mobile
+  `theme-color`/viewport meta and the service-worker registration
+  (`inject_pwa()`), and serves a real `/manifest.webmanifest` and `/sw.js`.
+  Both are served above the token gate because the browser fetches them itself.
 - The service worker is **network-first with an offline fallback** (`SW_JS`). It
   keeps the last dashboard page and its API responses in the device's Cache
   Storage so the app still opens when the laptop - and therefore the tunnel - is
@@ -322,7 +322,7 @@ needs more than the token, so the server gained an additive password gate:
 - `--idle-timeout 0` disables the idle shutdown, which is needed for a
   long-lived tunnel.
 
-`tests/test_dashboard_api_http.py` (62 tests) covers the manifest and worker
+`tests/test_dashboard_api_http.py` (68 tests) covers the manifest and worker
 routes, the injected tags, injection idempotence, host/port allowlisting, the
 offline fallback (the worker keeps the shell and API data, and falls back to the
 cache on a `5xx` origin outage), and the login gate (redirect, form, wrong
@@ -332,13 +332,35 @@ over plain `http://<lan-ip>` the "Add to Home Screen" action produces a live
 shortcut with no offline worker; the worker - and therefore the offline copy -
 activates only under https (the tunnel) or on localhost.
 
-### Aurora preview (`/aurora`)
+### Aurora is the dashboard (`/`), classic page at `/classic`
 
 The CrewAI flow commits a self-contained app at
-`flow_outputs/aurora_dashboard.html`. It is served read-only at `/aurora`
-behind the same token/login gate as the data routes; `/` still serves the
-athlete's local dashboard, so this is a preview and not an adoption.
+`flow_outputs/aurora_dashboard.html`. It is now the canonical dashboard at `/`
+behind the same token/login gate as the data routes. The pre-Aurora page is
+kept at `/classic`, and `/aurora` remains an alias so old bookmarks and the
+previous PWA `start_url` keep working. If the committed artifact is absent (a
+clean checkout), `/` falls back to the local page rather than returning `404`.
 
+- **Chart parity.** The flow artifact had only three canvases (load, fitness,
+  splits). The Analysis view now renders seven run-based charts: training load,
+  weekly mileage, distance by run coloured by distance band, pace and heart
+  rate, fitness scatter, run bubbles, and pacing fade. The run detail keeps the
+  per-mile splits chart. Bodyweight and strength remain honest empty states
+  because there is no bodyweight or strength data.
+- **No CDN.** Chart.js v4.4.4 is vendored at
+  `flow_outputs/vendor/chart.umd.min.js` (205,749 bytes, SHA-256
+  `B38076762F7363BC9E912B68B8E034826798DB5DF26BB61F000EC2E7A3137BC7`) and
+  served at `/vendor/chart.umd.min.js`. The server rewrites the artifact's
+  `cdn.jsdelivr.net` URL at serve time, so the committed file stays exactly as
+  the flow produced it and the app works offline or behind a blocked CDN.
+- **Synchronous chart creation.** The artifact used `requestAnimationFrame`,
+  which never runs in a background tab and left blank canvases. Charts are now
+  created as soon as the view's HTML is in the DOM.
+- `GET /api/activities` now exposes the device summary fields the charts need
+  (`title`, `calories`, `avg_cadence`, `max_cadence`, `avg_pace_s_per_mi`,
+  `best_pace_s_per_mi`, `training_stress_score`) and joins the published CSV by
+  `Source File` for `splits`, `best_5k_s` and `laps`. The database has no splits
+  table; a missing or malformed CSV yields null, never an invented split.
 - The committed file bakes in its run corpus, `SUMMARY` totals and ACWR. The
   server injects `AURORA_LIVE_SCRIPT` at serve time (`inject_aurora_live()`,
   idempotent via the `aurora-live-v1` marker) to replace the corpus and totals
@@ -346,22 +368,23 @@ athlete's local dashboard, so this is a preview and not an adoption.
   training-signal card from `/api/coaching`. A failed call leaves the committed
   snapshot in place and the badge says the API was unavailable; it never invents
   a value. The generated narrative panels remain the committed snapshot.
+- `inject_pwa()` is applied to Aurora as well as the classic page, so the
+  manifest, mobile meta and service-worker registration work on the dashboard
+  the athlete actually uses.
 - **Artifact bug fixed:** the generated `analysis()` view had an unclosed
   template literal (`` `card")} `` instead of `` `card`)} ``), which raised
   `SyntaxError: missing ) after argument list` at line 148 and stopped the whole
   app from initialising. It was corrected in place in the committed artifact.
-- Verified in-browser against the live database: 72 runs, live ACWR 1.19, the
-  signal card showing `BUILD` from `/api/coaching`, and no console errors.
-- Five wire tests cover the route: served with the bootstrap, token required,
-  query token accepted, `404` when the file is absent, and injection
-  idempotence.
-- `--open` now launches straight into `/aurora`, because the athlete asked the
-  double-click launcher to show the preview. `launch_url()` falls back to `/`
-  whenever `flow_outputs/aurora_dashboard.html` is absent, so a clean checkout
-  still opens a real page instead of a `404`. `/` remains the default route and
-  still serves the local dashboard; this changes what the launcher opens, not
-  what the server considers canonical. Three tests pin both branches and the
-  port/token carried in the URL.
+- Verified in-browser against the live database: 72 runs, seven Analysis charts
+  with data (72/72/72/31/72/72/72 points), the run-detail splits chart showing
+  six mile splits, and no console errors. `/classic` still renders its ten
+  canvases with no console errors.
+- Eight wire tests cover the routes: `/` serves Aurora with the live bootstrap
+  and PWA tags, `/aurora` remains an alias, `/classic` serves the local page,
+  `/` falls back when Aurora is absent, the token gate still applies, the CDN
+  rewrite and vendored file, and injection idempotence.
+- `--open` lands on `/`, the canonical dashboard; `launch_url()` no longer
+  chooses between two pages.
 
 ### Nutrition ingestion (`nutrition.py`, `/api/nutrition`)
 
@@ -379,7 +402,7 @@ a missing date column, unparseable dates, and negative or non-numeric values.
   committed template, so athlete nutrition is not published.
   `GARMIN_NUTRITION_FILE` overrides the path for tests. The committed
   `nutrition_log.csv` remains headers-only.
-- The `/aurora` live layer replaces `NUTRITION` from the API, overrides
+- The Aurora live layer (served at `/` and `/aurora`) replaces `NUTRITION` from the API, overrides
   `window.importCSV` to POST the raw CSV, and maps `calories` to the `kcal`
   field the committed FUEL view reads.
 - Verified in-browser with a synthetic two-day log: the FUEL tab listed both
