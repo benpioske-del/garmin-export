@@ -17,11 +17,11 @@ were imported. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-507 passed, 1 skipped (508 collected)
+552 passed, 1 skipped (553 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `478 passed, 30 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `523 passed, 30 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`, so CI fails only on a real defect. `ruff check .` is clean.
 
@@ -33,7 +33,8 @@ skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 | `tests/test_brief_bridge.py` | 62 |
 | `tests/test_dashboard_api.py` | 38 |
 | `tests/test_trainloop_cli.py` | 22 |
-| `tests/test_dashboard_api_http.py` | 47 |
+| `tests/test_dashboard_api_http.py` | 59 |
+| `tests/test_nutrition.py` | 33 |
 | `tests/test_fit_reader_elevation.py` | 21 |
 | `tests/test_splits.py` | 10 |
 | `tests/test_provenance.py` | 18 |
@@ -46,7 +47,7 @@ skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_brief_consistency.py` | 37 |
 | `tests/test_sync_import.py` | 5 |
-| **Total** | **508** (507 pass, 1 skip) |
+| **Total** | **553** (552 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -321,7 +322,7 @@ needs more than the token, so the server gained an additive password gate:
 - `--idle-timeout 0` disables the idle shutdown, which is needed for a
   long-lived tunnel.
 
-`tests/test_dashboard_api_http.py` (47 tests) covers the manifest and worker
+`tests/test_dashboard_api_http.py` (59 tests) covers the manifest and worker
 routes, the injected tags, injection idempotence, host/port allowlisting, the
 offline fallback (the worker keeps the shell and API data, and falls back to the
 cache on a `5xx` origin outage), and the login gate (redirect, form, wrong
@@ -354,6 +355,29 @@ athlete's local dashboard, so this is a preview and not an adoption.
 - Five wire tests cover the route: served with the bootstrap, token required,
   query token accepted, `404` when the file is absent, and injection
   idempotence.
+
+### Nutrition ingestion (`nutrition.py`, `/api/nutrition`)
+
+CalTrak exports one row per food entry, so `parse_caltrak_csv()` aggregates
+rows that share a date into one daily total. It accepts the app's header
+aliases, four date formats, and treats empty numeric cells as zero; it rejects
+a missing date column, unparseable dates, and negative or non-numeric values.
+
+- `GET /api/nutrition` is token/login-gated, rejects unknown query parameters
+  with a `400`, and returns `{days, count, fields, source, storage}`.
+- `POST /api/nutrition` accepts `{"days": [...]}` or `{"csv": "..."}` and
+  upserts one row per date, returning `{accepted, upserted, total_days}`.
+  Repeating a date updates it instead of appending a duplicate.
+- The log is stored at `paths.data_dir()/nutrition_log.csv`, never in the
+  committed template, so athlete nutrition is not published.
+  `GARMIN_NUTRITION_FILE` overrides the path for tests. The committed
+  `nutrition_log.csv` remains headers-only.
+- The `/aurora` live layer replaces `NUTRITION` from the API, overrides
+  `window.importCSV` to POST the raw CSV, and maps `calories` to the `kcal`
+  field the committed FUEL view reads.
+- Verified in-browser with a synthetic two-day log: the FUEL tab listed both
+  days (`Calories 2100 · Protein 150g`) and the run detail showed
+  `1950 kcal · 140g protein · 200g carbs`, with no console errors.
 
 ## Privacy checks
 

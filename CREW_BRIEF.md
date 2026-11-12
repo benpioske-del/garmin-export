@@ -244,7 +244,7 @@ source. Re-derive it if you can.
 | FIT files with lap records | 72 of 72 | `python brief_consistency.py` |
 | Splits published | yes (`Best 5K Time`, `Lap Splits`) | header of `garmin_export.csv` |
 | Fastest measured 5 km crossing | 24:42 on 2026-06-16, measured | `brief_facts.json` → `best_5k` |
-| Tests | 507 passed, 1 skipped (508 collected) | `python -m pytest` |
+| Tests | 552 passed, 1 skipped (553 collected) | `python -m pytest` |
 | Dashboard API routes | 3, implemented and tested | `python dashboard_contract.py` |
 | Dashboard consumes the API | yes, all three | `python dashboard_contract.py` |
 

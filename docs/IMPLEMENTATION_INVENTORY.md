@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 507 passed, 1 skipped (Windows symlink case) |
+| Tests | 552 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -75,7 +75,8 @@ Docs: [`DATA_QUALITY.md`](DATA_QUALITY.md),
 | CSV export | `garmin_export.csv` | 72 activities, 31 columns |
 | Publisher | `export_publish.py` | guard, remote sync, history-safety enforcement |
 | Sync | `garmin_sync.py` | OAuth, local only |
-| Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching`; `/aurora` previews the committed flow app |
+| Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching`; `/aurora` previews the committed flow app; `GET`/`POST /api/nutrition` read and ingest the local nutrition log |
+| Nutrition | `nutrition.py` | CalTrak CSV parse/aggregate, header aliases, local daily log at `paths.data_dir()/nutrition_log.csv` |
 | Audit | `fit_audit.py` | rewritten: hashes, parser versions, counts only |
 | Brief bridge | `brief_bridge.py` | `post` / `ingest` / `paste` / `serve` / `capture` |
 | Profile | `profile.json` | `hr_max` set to 198; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` still `null` |
@@ -91,7 +92,7 @@ profile as empty is reading an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 507 passed, 1 skipped. |
+| `python -m pytest` | Works. 552 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -292,9 +293,9 @@ unchanged, covered by regression tests in `tests/test_dashboard_api_http.py`.
 download cannot leave the dashboard behind; the order and the failure reporting
 are pinned by `tests/test_sync_import.py`.
 
-Tests: `tests/test_dashboard_api.py` (38) and `tests/test_dashboard_api_http.py`
-(47). `smoke_dashboard_api.py` runs the same paths against the live database and
-is deliberately not part of pytest.
+Tests: `tests/test_dashboard_api.py` (38), `tests/test_dashboard_api_http.py`
+(59) and `tests/test_nutrition.py` (33). `smoke_dashboard_api.py` runs the same
+paths against the live database and is deliberately not part of pytest.
 
 `/aurora` serves the committed `flow_outputs/aurora_dashboard.html` as a
 read-only preview behind the same gate; `/` still serves the local dashboard.
@@ -302,6 +303,32 @@ The generated file bakes in its corpus and totals, so `inject_aurora_live()`
 replaces them from the live API routes at serve time and says so in a badge. The
 artifact's `analysis()` view had an unclosed template literal that stopped the
 app from initialising; that was corrected in the committed file.
+
+### Nutrition ingestion
+
+`nutrition.py` parses a CalTrak export server-side. CalTrak emits one row per
+food entry, so `parse_caltrak_csv()` sums rows that share a date and returns one
+daily total per date. It accepts the same header aliases the app's importer uses
+(`date`/`day`, `calories`/`kcal`/`energy`, `protein`, `carbs`/`carbohydrates`/
+`carb`, `fat`), normalises `YYYY-MM-DD`, `YYYY/MM/DD`, `M/D/YYYY` and `M/D/YY`,
+treats empty numeric cells as zero, and rejects a missing date column,
+unparseable dates, and negative or non-numeric values.
+
+- `GET /api/nutrition` returns `{days, count, fields, source, storage}` behind
+  the token/login gate. Unknown query parameters are a `400`.
+- `POST /api/nutrition` accepts `{"days": [...]}` or `{"csv": "..."}`. The CSV
+  form is what makes aggregation a server responsibility rather than a browser
+  one. Repeating a date upserts that day's row; it never appends a duplicate.
+  It returns `{"accepted": n, "upserted": m, "total_days": k}`.
+- Rows are written to `paths.data_dir()/nutrition_log.csv`, not the committed
+  template, so athlete nutrition is never published. `GARMIN_NUTRITION_FILE`
+  overrides the path (tests use it). The committed `nutrition_log.csv` remains
+  the schema of record and is still headers-only.
+- The `/aurora` live layer replaces `NUTRITION` from `GET /api/nutrition` and
+  overrides `window.importCSV` to POST the raw CSV, so the FUEL tab and the run
+  detail's "Fuel that day" card show stored totals rather than localStorage.
+  The committed view reads `kcal`, so the live layer maps `calories` to `kcal`
+  at that seam.
 
 `dashboard/index.html` is untracked and gitignored because it contains
 hand-entered athlete data, so the panel markup is not in version control. It is

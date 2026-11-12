@@ -124,6 +124,7 @@ PUBLISHED_MODULES = frozenset([
     "garmin_sync.py",
     "health.py",
     "loadcalc.py",
+    "nutrition.py",
     "paths.py",
     "recommend.py",
     "smoke_dashboard_api.py",

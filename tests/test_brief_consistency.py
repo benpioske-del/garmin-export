@@ -18,14 +18,14 @@ import pytest
 import brief_consistency as B
 from conftest import requires_live_corpus
 
-# Eleven open rows, two task files. The 2026-11-11 flow brief (52f0da8) moved
+# Ten open rows, two task files. The 2026-11-11 flow brief (52f0da8) moved
 # connect-dashboard-to-data-layer into CLOSED TASKS, so it is no longer an
 # unbacked open row; the pinned canary sentence is retained separately at the
 # top of the brief. The backlog shape changed to `Rank N: slug | prose` and is
-# parsed as RANKED. Three new ranked backlog rows arrived with the CalTrak /
-# Aurora update and are pinned here deliberately:
-#   caltrak-nutrition-ingestion, lift-logger-and-lifting-log-ingestion,
-#   bodyweight-and-weekly-summary-endpoints
+# parsed as RANKED. The CalTrak row was implemented and moved to CLOSED TASKS
+# (docs/SUPERVISOR_BRIEF_ERRORS.md, fifteenth correction); two ranked backlog
+# rows remain pinned deliberately:
+#   lift-logger-and-lifting-log-ingestion, bodyweight-and-weekly-summary-endpoints
 KNOWN_UNBACKED = {
     "complete-athlete-profile-and-timezone-provenance",
     "capture-confirmed-strength-history",
@@ -35,7 +35,6 @@ KNOWN_UNBACKED = {
     "build-long-run-pace-durability",
     "introduce-conservative-runner-strength",
     "establish-authenticated-athlete-ownership",
-    "caltrak-nutrition-ingestion",
     "lift-logger-and-lifting-log-ingestion",
     "bodyweight-and-weekly-summary-endpoints",
 }

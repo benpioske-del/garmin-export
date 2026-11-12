@@ -509,3 +509,132 @@ def test_inject_aurora_live_is_idempotent():
     twice = G.inject_aurora_live(once)
     assert once == twice
     assert once.decode("utf-8").count(G.AURORA_LIVE_MARK) == 1
+
+
+# --------------------------------------------------------- nutrition routes
+
+@pytest.fixture
+def nutrition_file(monkeypatch, tmp_path):
+    """Point the module at a temp log so the athlete's real log is untouched."""
+    import nutrition
+    path = tmp_path / "nutrition_log.csv"
+    monkeypatch.setattr(nutrition, "NUTRITION_FILE", str(path))
+    return path
+
+
+def _post_json(base, path, payload, token=TOKEN, raw=None):
+    body = raw if raw is not None else json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(base + path, data=body, method="POST")
+    req.add_header("Content-Type", "application/json")
+    if token is not None:
+        req.add_header("X-Dash-Token", token)
+
+    def parsed(data):
+        try:
+            return json.loads(data.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            # The gate denies with plain text, not JSON.
+            return {"raw": data.decode("utf-8", "replace")}
+
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            return r.status, r.headers.get("Content-Type"), parsed(r.read())
+    except urllib.error.HTTPError as e:
+        return e.code, e.headers.get("Content-Type"), parsed(e.read())
+
+
+def test_nutrition_get_starts_empty(server, nutrition_file):
+    status, ctype, payload = _json(server, "/api/nutrition")
+    assert status == 200
+    assert ctype == "application/json; charset=utf-8"
+    assert payload["days"] == []
+    assert payload["count"] == 0
+    assert payload["fields"] == ["date", "calories", "protein", "carbs", "fat"]
+    assert "local" in payload["storage"]
+
+
+def test_nutrition_get_requires_the_dash_token(server, nutrition_file):
+    status, _, _ = _get(server, "/api/nutrition", token=None)
+    assert status == 403
+
+
+def test_nutrition_get_rejects_unknown_query_parameters(server, nutrition_file):
+    status, _, payload = _json(server, "/api/nutrition?from=2026-11-01")
+    assert status == 400
+    assert payload["error"] == "unsupported query parameter"
+
+
+def test_nutrition_post_upserts_and_get_reflects_it(server, nutrition_file):
+    status, _, result = _post_json(server, "/api/nutrition", {
+        "days": [{"date": "2026-11-10", "calories": 500, "protein": 30,
+                  "carbs": 60, "fat": 15}]})
+    assert status == 200
+    assert result == {"accepted": 1, "upserted": 1, "total_days": 1}
+    status, _, payload = _json(server, "/api/nutrition")
+    assert payload["count"] == 1
+    assert payload["days"][0]["calories"] == 500
+
+
+def test_nutrition_post_repeat_date_updates_one_row(server, nutrition_file):
+    day = {"date": "2026-11-10", "calories": 500}
+    _post_json(server, "/api/nutrition", {"days": [day]})
+    _, _, result = _post_json(server, "/api/nutrition", {
+        "days": [{"date": "2026-11-10", "calories": 600}]})
+    assert result["total_days"] == 1
+    _, _, payload = _json(server, "/api/nutrition")
+    assert payload["count"] == 1
+    assert payload["days"][0]["calories"] == 600
+
+
+def test_nutrition_post_accepts_a_raw_caltrak_csv(server, nutrition_file):
+    text = ("date,calories,protein,carbs,fat\n"
+            "2026-11-10,300,20,30,10\n"
+            "2026-11-10,200,10,20,5\n")
+    status, _, result = _post_json(server, "/api/nutrition", {"csv": text})
+    assert status == 200
+    assert result["upserted"] == 1
+    _, _, payload = _json(server, "/api/nutrition")
+    assert payload["days"][0]["calories"] == 500
+    assert payload["days"][0]["protein"] == 30
+
+
+def test_nutrition_post_requires_the_dash_token(server, nutrition_file):
+    status, _, _ = _post_json(server, "/api/nutrition",
+                              {"days": []}, token=None)
+    assert status == 403
+
+
+def test_nutrition_post_rejects_a_malformed_payload(server, nutrition_file):
+    status, _, payload = _post_json(server, "/api/nutrition",
+                                    {"days": [{"date": "nope"}]})
+    assert status == 400
+    assert payload["error"] == "invalid nutrition payload"
+
+
+def test_nutrition_post_rejects_non_json(server, nutrition_file):
+    status, _, payload = _post_json(server, "/api/nutrition", None,
+                                    raw=b"not json")
+    assert status == 400
+    assert payload["error"] == "body must be JSON"
+
+
+def test_nutrition_post_rejects_a_non_object_body(server, nutrition_file):
+    status, _, payload = _post_json(server, "/api/nutrition", [1, 2, 3])
+    assert status == 400
+    assert payload["error"] == "body must be a JSON object"
+
+
+def test_nutrition_route_sends_no_cors_headers(server, nutrition_file):
+    req = urllib.request.Request(server + "/api/nutrition")
+    req.add_header("X-Dash-Token", TOKEN)
+    with urllib.request.urlopen(req, timeout=10) as r:
+        assert r.headers.get("Access-Control-Allow-Origin") is None
+
+
+def test_aurora_bootstrap_wires_the_nutrition_route(server, aurora_html):
+    _, _, body = _get(server, "/aurora")
+    text = body.decode("utf-8")
+    assert "/api/nutrition" in text
+    assert "loadNutrition" in text
+    # The committed FUEL view reads `kcal`; the API schema is `calories`.
+    assert "kcal:" in text

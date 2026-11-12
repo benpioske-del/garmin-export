@@ -327,6 +327,7 @@ MEGACMD_REMOTE = "/CoachDashboard"
 # server must not grow a second parser, a second load formula or a second
 # coaching rule, or the dashboard and the CLI would drift apart.
 import loadcalc            # noqa: E402
+import nutrition           # noqa: E402
 import recommend           # noqa: E402
 import trainingdb          # noqa: E402
 import trainloop           # noqa: E402
@@ -748,6 +749,28 @@ AURORA_LIVE_SCRIPT = """
     if (!w) { return null; }
     return w.combined_load != null ? Number(w.combined_load) : Number(w.value);
   }
+  function loadNutrition() {
+    return getJSON("/api/nutrition").then(function (p) {
+      var days = ((p && p.days) || []).map(function (d) {
+        // The committed app's FUEL view reads `kcal`; the API schema is the
+        // committed CSV's `calories`. Map at the seam so both stay canonical.
+        return {
+          date: d.date,
+          kcal: d.calories != null ? d.calories : d.kcal,
+          protein: d.protein,
+          carbs: d.carbs,
+          fat: d.fat
+        };
+      });
+      NUTRITION.length = 0;
+      Array.prototype.push.apply(NUTRITION, days);
+      LIVE.nutrition = true;
+      return days.length;
+    }, function (e) {
+      failures.push(String(e));
+      return 0;
+    });
+  }
   function acwr(load) {
     var w = (load && load.windows) || {};
     var acute = loadValue(w["7d"]);
@@ -760,7 +783,7 @@ AURORA_LIVE_SCRIPT = """
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
     });
   }
-  var LIVE = { activities: false, load: null, coaching: null };
+  var LIVE = { activities: false, load: null, coaching: null, nutrition: false };
   function paintSignal() {
     var card = document.querySelector("#app .card.signal");
     if (!card || !LIVE.coaching) { return; }
@@ -799,6 +822,44 @@ AURORA_LIVE_SCRIPT = """
     if (typeof render === "function") { render(); }
     paintSignal();
   }
+  function importNutritionCsv(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var headers = { "Content-Type": "application/json" };
+      var t = token();
+      if (t) { headers["X-Dash-Token"] = t; }
+      fetch("/api/nutrition", {
+        method: "POST",
+        headers: headers,
+        credentials: "same-origin",
+        body: JSON.stringify({ csv: String(reader.result) })
+      }).then(function (r) {
+        if (!r.ok) { throw new Error("HTTP " + r.status); }
+        return r.json();
+      }).then(function (res) {
+        return loadNutrition().then(function () {
+          if (typeof show === "function") {
+            show("CalTrak imported: " + (res.upserted || 0) + " days");
+          }
+          if (typeof navigate === "function") { navigate("#fuel"); }
+          else { refresh(); }
+        });
+      }).catch(function (e) {
+        if (typeof show === "function") {
+          show("CalTrak import failed: " + e);
+        }
+        badge("nutrition upload failed", String(e));
+      });
+    };
+    reader.readAsText(file);
+  }
+  // The committed app imports CalTrak CSV into localStorage only. Replace that
+  // handler so the server parses and stores the rows, then re-read the live log.
+  window.importCSV = function (event) {
+    var file = event.target.files && event.target.files[0];
+    if (!file) { return; }
+    importNutritionCsv(file);
+  };
   badge("connecting", "");
   var failures = [];
   var jobs = [
@@ -812,15 +873,20 @@ AURORA_LIVE_SCRIPT = """
     }, function (e) { failures.push(String(e)); }),
     getJSON("/api/coaching").then(function (p) {
       LIVE.coaching = p;
-    }, function (e) { failures.push(String(e)); })
+    }, function (e) { failures.push(String(e)); }),
+    loadNutrition()
   ];
   Promise.all(jobs).then(function () {
+    var missing = [];
+    if (!LIVE.activities) { missing.push("activities"); }
+    if (!LIVE.load) { missing.push("load"); }
+    if (!LIVE.coaching) { missing.push("coaching"); }
+    if (!LIVE.nutrition) { missing.push("nutrition"); }
     if (failures.length) {
-      badge("embedded snapshot (API unavailable)", failures.join("; "));
-    } else if (LIVE.activities) {
-      badge("live activity, load and coaching data", "");
+      badge("partial live data (" + missing.join(", ") + " unavailable)",
+            failures.join("; "));
     } else {
-      badge("no activities returned", "");
+      badge("live activity, load, coaching and nutrition data", "");
     }
     refresh();
   });
@@ -1050,6 +1116,46 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(401, login_page("Wrong password."),
                           "text/html; charset=utf-8")
 
+    def _handle_nutrition_post(self):
+        """POST /api/nutrition - validate and upsert daily nutrition totals.
+
+        Accepts either the app's queued shape ``{"days": [...]}`` or a raw
+        CalTrak export ``{"csv": "..."}``. The CSV path exists so aggregation
+        happens on the server, not only in the browser. Repeating a date
+        updates that day's row instead of appending a duplicate.
+        """
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+        except ValueError:
+            length = 0
+        if length < 1 or length > 2 * 1024 * 1024:
+            return self._send_json(413, {
+                "error": "nutrition payload must be 1..2097152 bytes"})
+        try:
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+        except Exception:
+            return self._send_json(400, {"error": "body must be JSON"})
+        if not isinstance(body, dict):
+            return self._send_json(400, {
+                "error": "body must be a JSON object"})
+        try:
+            if "csv" in body:
+                if not isinstance(body["csv"], str):
+                    raise nutrition.NutritionError("'csv' must be a string")
+                days = nutrition.parse_caltrak_csv(body["csv"])
+                result = nutrition.upsert_days(days)
+            else:
+                result = nutrition.upsert_days(body.get("days"))
+        except nutrition.NutritionError as exc:
+            return self._send_json(400, {
+                "error": "invalid nutrition payload",
+                "detail": str(exc),
+            })
+        except OSError:
+            return self._send_json(500, {
+                "error": "could not write nutrition log"})
+        return self._send_json(200, result)
+
     def _deny(self, code, reason):
         try:
             payload = reason.encode("utf-8", "replace")
@@ -1245,6 +1351,22 @@ class Handler(BaseHTTPRequestHandler):
             # parameter cannot smuggle a second value past the checks below.
             raw = urllib.parse.parse_qs(parts.query)
             query = {k: v[0] for k, v in raw.items() if v}
+            if path == "/api/nutrition":
+                # Read-only daily totals. It does not need the database or an
+                # as_of window, so it is dispatched before _api() opens one.
+                if query:
+                    return self._send_json(400, {
+                        "error": "unsupported query parameter",
+                        "parameter": sorted(query)[0],
+                        "supported": [],
+                    })
+                try:
+                    return self._send_json(200, nutrition.payload())
+                except nutrition.NutritionError as exc:
+                    return self._send_json(500, {
+                        "error": "nutrition log unreadable",
+                        "detail": str(exc),
+                    })
             return self._api(path, query)
         if path.startswith("/fit/"):
             name = path[len("/fit/"):].replace("/", "")
@@ -1323,6 +1445,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(res).encode("utf-8"),
                                   "application/json; charset=utf-8")
             return self._send_zip(payload, name)
+        if path == "/api/nutrition":
+            return self._handle_nutrition_post()
         return self._deny(404, "not found")
 
     def log_message(self, fmt, *args):

@@ -817,3 +817,74 @@ literal was corrected in place in the committed artifact.
 CalTrak nutrition ingestion and the lifting-log importer remain unimplemented;
 both CSVs are headers only, so there is no real data to ingest yet. Full Aurora
 adoption (retiring the local dashboard) also remains the athlete's decision.
+
+---
+
+# Fifteenth correction: 2026-11-12, CalTrak nutrition ingestion
+
+This is a code change, not a writer error. The athlete selected **Start CalTrak
+ingestion** after the `/aurora` preview shipped. The backlog's Rank 1 task
+`caltrak-nutrition-ingestion` is now implemented and moved to CLOSED TASKS; the
+lifting importer and the rest of full Aurora adoption remain open.
+
+## What was built
+
+- `nutrition.py` parses a CalTrak export server-side. CalTrak emits one row per
+  food entry, so `parse_caltrak_csv()` sums rows that share a date into one
+  daily total. It accepts the app's header aliases (`date`/`day`,
+  `calories`/`kcal`/`energy`, `protein`, `carbs`/`carbohydrates`/`carb`, `fat`),
+  normalises `YYYY-MM-DD`, `YYYY/MM/DD`, `M/D/YYYY` and `M/D/YY`, treats empty
+  numeric cells as zero, and rejects a missing date column, unparseable dates,
+  and negative or non-numeric values.
+- `GET /api/nutrition` is token/login-gated, rejects unknown query parameters
+  with a `400`, and returns `{days, count, fields, source, storage}`. It is
+  dispatched before `_api()` because it needs neither the database nor an
+  `as_of` window, and it is deliberately not added to `API_ROUTES` so the
+  `test_exactly_the_three_brief_routes_exist` pin still holds.
+- `POST /api/nutrition` accepts `{"days": [...]}` or `{"csv": "..."}`. The CSV
+  form keeps aggregation on the server instead of only in the browser. It
+  upserts one row per date and returns `{accepted, upserted, total_days}`.
+- The `/aurora` live layer now replaces `NUTRITION` from `GET /api/nutrition`,
+  overrides `window.importCSV` to POST the raw CSV and reload, and maps the
+  API's `calories` to the `kcal` field the committed FUEL view reads. Without
+  that mapping the FUEL tab would have shown "not recorded" for every calorie
+  total.
+
+## Where the rows live
+
+The committed `nutrition_log.csv` is a schema template and stays headers-only.
+Ingested rows are written to `paths.data_dir()/nutrition_log.csv`, so athlete
+nutrition is never published to the public repository. `GARMIN_NUTRITION_FILE`
+overrides the path and the tests use it; no test reads or writes the athlete's
+real log.
+
+## Verification
+
+- `tests/test_nutrition.py` (33 tests): aggregation across rows, sorted dates,
+  fractional totals, empty cells, missing columns, header aliases, four date
+  formats, every rejection path, payload normalisation, read/upsert idempotency,
+  repeated-date update, schema header, corrupt-header error, missing file, and
+  the committed template staying headers-only.
+- `tests/test_dashboard_api_http.py` grew by 12 tests: the empty GET envelope,
+  the token gate, query-parameter rejection, upsert and repeat-date update, raw
+  CSV POST, malformed/non-JSON/non-object payloads, no CORS, and the Aurora
+  bootstrap wiring.
+- Verified in-browser against a synthetic two-day log: the FUEL tab listed both
+  days (`Calories 2100 · Protein 150g`) and the run detail showed
+  `1950 kcal · 140g protein · 200g carbs`, with no console errors.
+- `nutrition.py` was added to `export_publish.PUBLISHED_MODULES`; without that
+  the publish-scope guard reports a new root module as an unpublished stray.
+- The live suite moves from 507 to **552 passed, 1 skipped** (553 collected) and
+  the clean checkout from 478 to **523 passed, 30 skipped**.
+  `docs/VERIFICATION_REPORT.md`, `docs/IMPLEMENTATION_INVENTORY.md`,
+  `CREW_BRIEF.md`, `brief_facts.json` and the brief's quoted figures were
+  updated to match. `KNOWN_UNBACKED` in `tests/test_brief_consistency.py`
+  dropped `caltrak-nutrition-ingestion` because the brief now carries it in
+  CLOSED TASKS.
+
+## Still not done
+
+The lifting-log importer (`GET`/`POST /api/lifts`, e1RM, bodyweight-adjusted
+pull-ups/dips) is Rank 2 and remains unimplemented. `lifting_log.csv` is still
+headers only. The bodyweight and weekly-summary endpoints, the queue retry
+semantics, and retiring the local dashboard remain open.
