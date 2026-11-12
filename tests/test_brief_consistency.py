@@ -18,14 +18,15 @@ import pytest
 import brief_consistency as B
 from conftest import requires_live_corpus
 
-# Nine ranked backlog rows, two task files. The 2026-11-10 brief (60a95ad)
-# dropped the three slugs completed in the ninth correction
-# (formalize-continuity-review..., make-coaching-rationales...,
-# harden-bridge-and-release-quality-gates), so the pinned set shrank to nine.
-# The primary task, connect-dashboard-to-data-layer, still appears both as a
-# verification row and as a backlog row; neither has a task file of its own.
+# Eleven open rows, two task files. The 2026-11-11 flow brief (52f0da8) moved
+# connect-dashboard-to-data-layer into CLOSED TASKS, so it is no longer an
+# unbacked open row; the pinned canary sentence is retained separately at the
+# top of the brief. The backlog shape changed to `Rank N: slug | prose` and is
+# parsed as RANKED. Three new ranked backlog rows arrived with the CalTrak /
+# Aurora update and are pinned here deliberately:
+#   caltrak-nutrition-ingestion, lift-logger-and-lifting-log-ingestion,
+#   bodyweight-and-weekly-summary-endpoints
 KNOWN_UNBACKED = {
-    "connect-dashboard-to-data-layer",
     "complete-athlete-profile-and-timezone-provenance",
     "capture-confirmed-strength-history",
     "implement-gated-weather-enrichment",
@@ -34,6 +35,9 @@ KNOWN_UNBACKED = {
     "build-long-run-pace-durability",
     "introduce-conservative-runner-strength",
     "establish-authenticated-athlete-ownership",
+    "caltrak-nutrition-ingestion",
+    "lift-logger-and-lifting-log-ingestion",
+    "bodyweight-and-weekly-summary-endpoints",
 }
 
 # (label, stated) pairs the brief gets wrong. The fifth brief's stale numbers
@@ -61,6 +65,24 @@ def test_ranked_backlog_rows_are_counted():
     """The fourth brief carried only a prose backlog and a prose primary task."""
     statuses = {s for _, s, _ in B.brief_rows()}
     assert "RANKED" in statuses, "rank: N | slug | prose rows are not parsed"
+
+
+def test_numbered_rank_backlog_rows_are_counted(monkeypatch, tmp_path):
+    """The 2026-11-11 flow brief switched to `Rank N: slug | prose`.
+
+    Same ranked backlog, another prefix. A parser that only knows
+    `rank: N | ...` silently drops every row in this shape.
+    """
+    monkeypatch.setattr(B, "BRIEF", str(tmp_path / "numbered.md"))
+    open(B.BRIEF, "w", encoding="utf-8").write(
+        "Rank 1: caltrak-nutrition-ingestion | parse CalTrak CSV server-side\n"
+        "Rank 2: lift-logger-and-lifting-log-ingestion | ingest lifting_log.csv\n")
+    rows = B.brief_rows()
+    assert [r[0] for r in rows] == [
+        "caltrak-nutrition-ingestion",
+        "lift-logger-and-lifting-log-ingestion",
+    ]
+    assert {r[1] for r in rows} == {"RANKED"}
 
 
 def test_the_queue_is_the_real_queue():

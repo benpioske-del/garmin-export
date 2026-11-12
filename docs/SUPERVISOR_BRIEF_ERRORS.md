@@ -683,3 +683,76 @@ invisible until someone ran `trainloop.py bootstrap` by hand.
 The brief and docs were corrected in place from 496 passed to **501 passed**
 (the test count moved because five tests were added), and the clean-checkout
 figure from 467 to **472 passed**.
+
+---
+
+# Thirteenth correction: 2026-11-11, the CalTrak/Aurora flow update
+
+This entry records a flow update, not a writer fabrication. The CrewAI flow ran
+at **2026-11-11 22:24 CST** (`2026-11-12T04:24Z`) and pushed four commits
+straight to `origin/main`:
+
+| Commit | Change |
+| --- | --- |
+| `52f0da8` | `SUPERVISOR_BRIEF.md` rewritten |
+| `f1333a0` | new `flow_outputs/aurora_dashboard.html` |
+| `b2b64ee` | `nutrition_log.csv` template (headers only) |
+| `d775add` | `lifting_log.csv` template (headers only) |
+
+The local tree was four commits behind because the flow pushes to GitHub and
+does not write the local brief inbox or the local CrewAI output database. Both
+were still empty when the update was looked for. The commits were pulled with
+`git pull --ff-only`; nothing was rewritten on the remote.
+
+## What the brief got right
+
+The measured numbers matched the repository, so the facts gate found no numeric
+or reason conflict: 72 FIT files / 72 activities, 1 open `activity_gap` review,
+0 `timezone_uncertain`, 0 strength sessions, `hr_max=198`, and both new CSV
+templates correctly described as headers only. The primary task
+`adopt-flow-generated-dashboard` and the `Rank 1` backlog item
+`caltrak-nutrition-ingestion` describe work that genuinely does not exist yet.
+
+## What was corrected in place
+
+- **Date.** The brief said `Generated: 2026-11-12`, which is the UTC date of the
+  run. It was corrected to `2026-11-11 (US Central; flow ran
+  2026-11-12T04:24Z)`, consistent with the timezone decision already recorded.
+- **`0.0.0.0` binding.** The brief reissued "bind the server to `0.0.0.0`". That
+  was decided against: the server keeps its loopback default and `--lan`/`--host`
+  is the explicit opt-in. The requirement, acceptance check, setup step and
+  next-check row were all corrected.
+- **CORS and preflight.** The brief reissued `Access-Control-Allow-Origin: *`
+  and `OPTIONS` preflight handling. Both were decided against: the dashboard and
+  API are same-origin and a guard test asserts that no CORS header is sent. The
+  requirement, acceptance check and next-check row were corrected.
+- **Backlog shape.** The writer switched from `Priority: high - slug | prose` to
+  `Rank 1: slug | prose`. `brief_consistency.py` gained a `NUMBERED` pattern so
+  those rows are still parsed as ranked backlog instead of silently dropped.
+- **Pinned canary retained.** The flow moved `connect-dashboard-to-data-layer`
+  into `CLOSED TASKS`. The deliberately false sentence ("dashboard/index.html
+  does not use it") is still required by `test_dashboard_conflict_detects_the_prose_claim`,
+  so it is retained as a labelled PINNED CANARY note at the top of the brief.
+  `KNOWN_UNBACKED` no longer contains that slug.
+- **New unbacked rows pinned.** Three legitimate ranked backlog slugs arrived
+  with the update and were added to `KNOWN_UNBACKED`:
+  `caltrak-nutrition-ingestion`, `lift-logger-and-lifting-log-ingestion`, and
+  `bodyweight-and-weekly-summary-endpoints`. A new test,
+  `test_numbered_rank_backlog_rows_are_counted`, pins the `Rank N:` parser.
+- **Test count.** Adding that test moved the live suite from 501 to **502
+  passed, 1 skipped** (503 collected) and the clean checkout from 472 to **473
+  passed, 30 skipped**. `docs/VERIFICATION_REPORT.md`,
+  `docs/IMPLEMENTATION_INVENTORY.md`, `CREW_BRIEF.md`, `brief_facts.json` and
+  the brief's quoted figures were updated to match.
+
+## Still the athlete's decision
+
+The flow's primary task is not implemented and was not started here. Serving
+`flow_outputs/aurora_dashboard.html` at `/aurora` would replace the local
+dashboard, and the CalTrak ingestion work depends on nutrition data that does
+not exist yet (the CSV is headers only). Both need the athlete to say whether
+Aurora becomes the product UI before any code changes.
+
+After these edits the consistency checker reports exactly one conflict, the
+pinned dashboard canary, and exits 1 on it as designed. No other figure or state
+in the brief is contradicted by the live repository.

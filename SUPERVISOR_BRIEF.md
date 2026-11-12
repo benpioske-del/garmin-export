@@ -1,8 +1,21 @@
 UNVERIFIED LLM OUTPUT
 
 # Athletic Performance Hub - Supervisor Brief
-## Generated: 2026-11-12
+## Generated: 2026-11-11 (US Central; flow ran 2026-11-12T04:24Z)
 ## Run by: CrewAI Flow Supervisor
+
+> FACT-GATE NOTE (2026-11-11): this flow brief is the first to include the
+> committed Aurora dashboard and the CalTrak/nutrition/lifting templates. Its
+> measured numbers agree with `brief_facts.json` and
+> `docs/VERIFICATION_REPORT.md`. The `0.0.0.0`, `Access-Control-Allow-Origin: *`
+> and `OPTIONS` preflight requirements reissued from earlier runs were corrected
+> in place to the decided LAN/token/same-origin behavior. The pinned dashboard
+> canary is retained below. See `docs/SUPERVISOR_BRIEF_ERRORS.md`, thirteenth
+> correction.
+>
+> PINNED CANARY - deliberately false, retained so `brief_consistency.py` keeps
+> flagging it: the tested data layer exists in activities.py, loadcalc.py, and
+> recommend.py, but dashboard/index.html does not use it.
 
 ---
 ## CLOSED TASKS
@@ -14,7 +27,7 @@ data-layer-and-provenance | 4051291 | migrations 001-006
 fit-audit-and-guard | evidence from SUPERVISOR_BRIEF.md | 0 parse failures, 72/72 GPS, guard verified
 formalize-continuity-review-without-synthetic-activities | evidence from docs/VERIFICATION_REPORT.md | 1 open activity_gap; no synthetic activities may be created; accepted corpus is 72 activities
 make-coaching-rationales-deterministic-and-auditable | evidence from docs/IMPLEMENTATION_INVENTORY.md | tests/recommend_snapshots.py pins every reachable coaching branch to golden JSON with fixed as_of and supplied hr_max
-harden-bridge-and-release-quality-gates | evidence from docs/VERIFICATION_REPORT.md | 501 passed, 1 skipped; facts gate, rejected-brief staging, content-derived idempotency, and publish protections are tested
+harden-bridge-and-release-quality-gates | evidence from docs/VERIFICATION_REPORT.md | 502 passed, 1 skipped; facts gate, rejected-brief staging, content-derived idempotency, and publish protections are tested
 connect-dashboard-to-data-layer | evidence from docs/IMPLEMENTATION_INVENTORY.md and docs/VERIFICATION_REPORT.md | GET /api/activities, GET /api/load, and GET /api/coaching are served on the same origin and the dashboard fetches them
 
 ---
@@ -35,7 +48,7 @@ establish-authenticated-athlete-ownership | BLOCKED / PARKED AND DEMOTED | Authe
 - FIT file count: 72. Source: docs/VERIFICATION_REPORT.md, "files inspected           : 72".
 - Activity count: 72. Source: docs/VERIFICATION_REPORT.md, `{"activities": 72, "open_reviews": 1}`.
 - Open review count: 1. Source: docs/VERIFICATION_REPORT.md, `{"activities": 72, "open_reviews": 1}`.
-- Test result: 501 passed, 1 skipped. Source: docs/VERIFICATION_REPORT.md, "501 passed, 1 skipped (502 collected)".
+- Test result: 502 passed, 1 skipped. Source: docs/VERIFICATION_REPORT.md, "502 passed, 1 skipped (503 collected)".
 - Parse failures: 0. Source: docs/VERIFICATION_REPORT.md, "parse failures            : 0".
 - Files with GPS: 72. Source: docs/VERIFICATION_REPORT.md, "files with GPS            : 72".
 - Open timezone_uncertain reviews: 0. Source: docs/VERIFICATION_REPORT.md, "0 open `timezone_uncertain` reviews".
@@ -82,7 +95,7 @@ The primary decision is to adopt the committed Aurora dashboard rather than rely
 
 The existing data-layer dashboard integration is closed. The verified read-only routes are `/api/activities`, `/api/load`, and `/api/coaching`. Preserve those routes and do not reopen the completed dashboard data-layer task.
 
-The local product now needs a server route for the committed Aurora app, mobile-network behavior, CORS and preflight handling, and upload endpoints for the app's offline sync queue. The app must use live server responses and visible errors rather than treating embedded arrays as authoritative.
+The local product now needs a server route for the committed Aurora app, the existing LAN/token access path, and upload endpoints for the app's offline sync queue. The app must use live server responses and visible errors rather than treating embedded arrays as authoritative.
 
 The app and log templates do not establish that nutrition, lifting, bodyweight, or CalTrak data already exist. Both CSV files contain headers only. Do not claim that real nutrition or strength analysis is available until rows are recorded and ingested.
 
@@ -113,9 +126,9 @@ Server implementation:
    - `GET /api/load`
    - `GET /api/coaching`
 3. Wire the Aurora app to live API data. Embedded arrays in the generated HTML must not be treated as authoritative.
-4. Bind the local server to `0.0.0.0`.
-5. Return `Access-Control-Allow-Origin: *` on API responses.
-6. Handle `OPTIONS` preflight requests with a successful response and the required CORS headers.
+4. Preserve the existing server bind behavior: loopback by default, with `--lan`/`--host` as the explicit opt-in for a home-Wi-Fi bind. Do not hard-code `0.0.0.0`.
+5. Do not add CORS headers. The dashboard and API are same-origin, and a guard test asserts that no `Access-Control-Allow-Origin` header is sent.
+6. Do not add `OPTIONS` preflight handling. Same-origin requests do not require it.
 7. Keep `GET /api/activities` within the existing local-server expectation of less than 500 ms. Add or update a test that measures this behavior without using synthetic activities.
 8. Add `POST /api/lifts`:
    - Request JSON shape: `{ "rows": [ ... ] }`.
@@ -156,9 +169,9 @@ Acceptance checks:
 - `GET /aurora` returns the committed Aurora HTML.
 - The response is generated from `flow_outputs/aurora_dashboard.html`, not `dashboard/index.html`.
 - The existing `/api/activities`, `/api/load`, and `/api/coaching` routes still return their established live data.
-- `OPTIONS` requests succeed for the API routes and include CORS headers.
-- API responses include `Access-Control-Allow-Origin: *`.
-- The server listens on `0.0.0.0`.
+- The server keeps its loopback default and the explicit `--lan`/`--host` opt-in; it is not hard-coded to `0.0.0.0`.
+- No `Access-Control-Allow-Origin` header is added; same-origin requests continue to work.
+- No `OPTIONS` preflight handler is added; the existing same-origin behavior is preserved.
 - `GET /api/activities` completes within 500 ms under the local test fixture.
 - A valid `POST /api/lifts` appends rows and returns an accepted-row count.
 - Repeating the same lifting payload identifier does not append duplicate rows.
@@ -168,22 +181,22 @@ Acceptance checks:
 - Failed upload responses leave items in the client queue.
 - Successful upload responses remove the corresponding items from the client queue.
 - The app displays a visible error when a live endpoint fails.
-- Tests cover route serving, CORS, preflight, upload validation, idempotency, nutrition upsert behavior, and the existing read-only API routes.
+- Tests cover route serving, same-origin behavior, upload validation, idempotency, nutrition upsert behavior, and the existing read-only API routes.
 - The full test suite passes without introducing synthetic activities or unsupported HR-zone claims.
 
 ---
 ## PWA / MOBILE SETUP (for opencode)
 
-Update `garmin_server.py` so the server binds to `0.0.0.0`. Add `Access-Control-Allow-Origin: *` to API responses and handle `OPTIONS` preflight requests. Preserve the local performance expectation that `/api/activities` responds in less than 500 ms.
+Update `garmin_server.py` only as needed to serve the committed Aurora app at `/aurora`. Preserve the existing loopback default and the explicit `--lan`/`--host` opt-in for home-Wi-Fi access, the token-over-HTTP protection, and the same-origin API behavior. Do not add `0.0.0.0` as a hard-coded bind, CORS headers, or `OPTIONS` preflight handling. Preserve the local performance expectation that `/api/activities` responds in less than 500 ms.
 
 Verification steps:
 
 1. Start the server on the laptop using the normal project command.
-2. Confirm the server is listening on `0.0.0.0`.
+2. Confirm the server is listening on loopback by default, and on the LAN address only when `--lan`/`--host` is passed.
 3. From the laptop, open `/aurora` and confirm the committed Aurora app loads.
 4. Confirm `/api/activities`, `/api/load`, and `/api/coaching` return live responses.
-5. Confirm an `OPTIONS` request succeeds and returns the CORS headers.
-6. From another device on the same home Wi-Fi, open `http://<laptop-ip>:<port>/aurora`.
+5. Confirm the app and API work same-origin without CORS or preflight handling.
+6. From another device on the same home Wi-Fi, start the server with `--lan` and open the token-bearing `http://<laptop-ip>:<port>/aurora` URL.
 7. Confirm the phone can load the app and receive activity data.
 8. Enter a lift and confirm the queued payload posts to `/api/lifts`.
 9. Import nutrition data through the FUEL tab and confirm the queued payload posts to `/api/nutrition`.
@@ -231,7 +244,7 @@ Rank 11: establish-authenticated-athlete-ownership | Keep parked and last. This 
 ---
 ## NEXT SUPERVISOR CHECK
 
-- adopt-flow-generated-dashboard | Verify `GET /aurora`, live API wiring, CORS, preflight, `0.0.0.0` binding, activity latency, lift upload idempotency, nutrition upsert behavior, visible errors, and offline queue retry behavior.
+- adopt-flow-generated-dashboard | Verify `GET /aurora`, live API wiring, same-origin behavior, loopback default and `--lan` opt-in, activity latency, lift upload idempotency, nutrition upsert behavior, visible errors, and offline queue retry behavior.
 - caltrak-nutrition-ingestion | Verify CalTrak parsing, `GET /api/nutrition`, daily aggregation, and FUEL rendering after the primary task.
 - lift-logger-and-lifting-log-ingestion | Verify `GET /api/lifts`, lifting schema ingestion, Epley e1RM, pull-up and dip handling, and per-session bodyweight.
 - bodyweight-and-weekly-summary-endpoints | Verify `GET /api/bodyweight`, `GET /api/week`, the bodyweight trend, and This week card against stored data.

@@ -50,6 +50,11 @@ CANON = os.path.join(REPO, "garmin_export.csv")
 ROW = re.compile(r"^\s*([a-z0-9][a-z0-9-]{6,})\s*\|\s*([A-Z][A-Z /-]*[A-Z])\s*\|\s*(.+)$")
 # `rank: N | slug | prose`, the original backlog shape.
 RANKED = re.compile(r"^\s*rank:\s*\d+\s*\|\s*([a-z0-9][a-z0-9-]{6,})\s*\|\s*(.+)$")
+# `Rank 1: slug | prose`, the backlog shape the flow uses from the
+# thirteenth brief (2026-11-11) onward. Same rows, another prefix.
+NUMBERED = re.compile(
+    r"^\s*rank\s+\d+\s*:\s*([a-z0-9][a-z0-9-]{6,})\s*\|\s*(.+)$",
+    re.IGNORECASE)
 # `Priority: high - slug | prose`, the backlog shape the flow uses from the
 # seventh brief (2026-11-06) onward. Same rows, different prefix.
 PRIORITY = re.compile(
@@ -73,6 +78,10 @@ def brief_rows():
             rows.append((m.group(1), m.group(2).strip(), m.group(3).strip()))
             continue
         m = RANKED.match(line)
+        if m:
+            rows.append((m.group(1), "RANKED", m.group(2).strip()))
+            continue
+        m = NUMBERED.match(line)
         if m:
             rows.append((m.group(1), "RANKED", m.group(2).strip()))
             continue
