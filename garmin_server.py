@@ -85,6 +85,25 @@ def resolve_dashboard_html():
     if best_name:
         return os.path.join(DASH_DIR, best_name)
     return HTML_FILE if os.path.exists(HTML_FILE) else os.path.join(ROOT, "index.html")
+
+
+# The committed Aurora app from the CrewAI flow. It is served read-only as a
+# preview at /aurora; the athlete's local dashboard stays the default at /. The
+# generated file embeds a snapshot of the corpus, so a small script is injected
+# at serve time to replace that snapshot with live /api/* data.
+AURORA_FILE = os.path.join(ROOT, "flow_outputs", "aurora_dashboard.html")
+AURORA_LIVE_MARK = "aurora-live-v1"
+
+
+def resolve_aurora_html():
+    """Return the committed Aurora preview, or None when it is absent.
+
+    Resolved per request for the same reason as the dashboard: a long-lived
+    server must not keep serving a stale copy after the file changes.
+    """
+    return AURORA_FILE if os.path.exists(AURORA_FILE) else None
+
+
 SLEEP_CSV = os.path.join(DATA_DIR, "garmin_sleep.csv")
 HR_CSV = os.path.join(DATA_DIR, "garmin_hr.csv")
 FIT_DIR = paths.fit_dir()
@@ -632,6 +651,206 @@ def inject_pwa(html):
     return text.encode("utf-8")
 
 
+# The Aurora app is a generated artifact: its run corpus, SUMMARY totals and
+# ACWR are baked into the HTML. Serving it unchanged would present a snapshot as
+# live. This script replaces the corpus and totals from /api/activities, derives
+# ACWR from /api/load, and repaints the training-signal card from /api/coaching.
+# It never invents a value: a failed call leaves the committed snapshot in place
+# and the badge says the API was unavailable. The generated narrative panels are
+# still the committed snapshot; adopting them as the product is a separate task.
+AURORA_LIVE_SCRIPT = """
+<script>
+/* aurora-live-v1: replace the committed snapshot with live API data. */
+(function () {
+  if (window.__AURORA_LIVE__) { return; }
+  window.__AURORA_LIVE__ = true;
+
+  function token() {
+    try {
+      var q = new URLSearchParams(window.location.search);
+      return q.get("tk") || "";
+    } catch (e) { return ""; }
+  }
+  function getJSON(path) {
+    var headers = {};
+    var t = token();
+    if (t) { headers["X-Dash-Token"] = t; }
+    return fetch(path, { headers: headers, credentials: "same-origin" })
+      .then(function (r) {
+        if (!r.ok) { throw new Error(path + " returned HTTP " + r.status); }
+        return r.json();
+      });
+  }
+  function pad(n) { return String(n).padStart(2, "0"); }
+  function pace(sec) {
+    if (!isFinite(sec) || sec <= 0) { return null; }
+    var m = Math.floor(sec / 60), s = Math.round(sec % 60);
+    if (s === 60) { m += 1; s = 0; }
+    return m + ":" + pad(s);
+  }
+  function hms(sec) {
+    if (!isFinite(sec) || sec == null) { return null; }
+    sec = Math.round(sec);
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    return h ? h + ":" + pad(m) + ":" + pad(s) : m + ":" + pad(s);
+  }
+  function band(mi) { return mi < 5 ? "SHORT" : (mi <= 9 ? "MEDIUM" : "LONG"); }
+  function isoDaysAgo(days) {
+    var d = new Date();
+    d.setDate(d.getDate() - days);
+    return d.toISOString().slice(0, 10);
+  }
+  function mapRun(a) {
+    var mi = Number(a.distance_mi) || 0;
+    var sec = Number(a.moving_time_s) || 0;
+    var start = String(a.start_local || a.start_utc || "");
+    return {
+      date: start.slice(0, 10),
+      distance: Math.round(mi * 100) / 100,
+      time: hms(sec),
+      avgHR: a.avg_hr == null ? null : Number(a.avg_hr),
+      maxHR: a.max_hr == null ? null : Number(a.max_hr),
+      cadence: null,
+      avgPace: pace(mi > 0 ? sec / mi : null),
+      bestPace: null,
+      best5k: null,
+      splits: null,
+      ascent: a.total_ascent_ft == null ? null : Math.round(Number(a.total_ascent_ft)),
+      descent: a.total_descent_ft == null ? null : Math.round(Number(a.total_descent_ft)),
+      calories: null,
+      laps: null,
+      bestLap: null,
+      source: a.source_file || "trainloop.db",
+      band: band(mi)
+    };
+  }
+  function isRun(a) { return a && a.sport && /run/i.test(String(a.sport)); }
+  function applyActivities(payload) {
+    var runs = (payload.activities || []).filter(isRun).map(mapRun)
+      .filter(function (r) { return r.date; })
+      .sort(function (a, b) { return a.date.localeCompare(b.date); });
+    if (!runs.length) { return false; }
+    RUNS.length = 0;
+    Array.prototype.push.apply(RUNS, runs);
+    var miles = runs.reduce(function (s, r) { return s + (r.distance || 0); }, 0);
+    var last = runs[runs.length - 1];
+    var since = isoDaysAgo(6);
+    var week = runs.filter(function (r) { return r.date >= since; });
+    SUMMARY.total_runs = runs.length;
+    SUMMARY.total_miles = Math.round(miles * 100) / 100;
+    SUMMARY.latest_run_date = last.date;
+    SUMMARY.latest_run_distance = last.distance;
+    SUMMARY.this_week_miles = Math.round(
+      week.reduce(function (s, r) { return s + (r.distance || 0); }, 0) * 100) / 100;
+    return true;
+  }
+  function loadValue(w) {
+    if (!w) { return null; }
+    return w.combined_load != null ? Number(w.combined_load) : Number(w.value);
+  }
+  function acwr(load) {
+    var w = (load && load.windows) || {};
+    var acute = loadValue(w["7d"]);
+    var chronic = loadValue(w["28d"]);
+    if (!isFinite(acute) || !isFinite(chronic) || chronic <= 0) { return null; }
+    return acute / (chronic / 4);
+  }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+  var LIVE = { activities: false, load: null, coaching: null };
+  function paintSignal() {
+    var card = document.querySelector("#app .card.signal");
+    if (!card || !LIVE.coaching) { return; }
+    var c = LIVE.coaching;
+    var a = acwr(LIVE.load);
+    var state = c.refused ? "DATA INSUFFICIENT"
+      : String(c.state || "unavailable").toUpperCase();
+    var why = (c.blocking_conditions && c.blocking_conditions.length)
+      ? c.blocking_conditions.slice(0, 3).join(" \\u00b7 ")
+      : "Coaching state from /api/coaching";
+    card.innerHTML =
+      '<div class="eyebrow">Training signal</div>' +
+      '<h2 class="' + (c.refused ? "warn" : "good") + '">' + esc(state) + "</h2>" +
+      '<p class="sub">' + esc(why) + "</p>" +
+      '<span class="pill">ACWR ' + (a == null ? "unavailable" : a.toFixed(2)) +
+      " \\u00b7 live /api/coaching</span>";
+  }
+  function badge(text, title) {
+    var el = document.getElementById("aurora-live-badge");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "aurora-live-badge";
+      el.style.cssText = "position:fixed;top:8px;right:8px;z-index:9999;" +
+        "font:12px/1.4 system-ui,sans-serif;background:#0b1020;color:#9fe;" +
+        "padding:5px 9px;border:1px solid #234;border-radius:999px;" +
+        "box-shadow:0 2px 10px #0008";
+      document.body.appendChild(el);
+    }
+    var t = token();
+    var href = "/" + (t ? "?tk=" + encodeURIComponent(t) : "");
+    el.innerHTML = "LIVE PREVIEW \\u00b7 " + esc(text) +
+      ' \\u00b7 <a style="color:#9fe" href="' + esc(href) + '">main dashboard</a>';
+    if (title) { el.title = title; }
+  }
+  function refresh() {
+    if (typeof render === "function") { render(); }
+    paintSignal();
+  }
+  badge("connecting", "");
+  var failures = [];
+  var jobs = [
+    getJSON("/api/activities").then(function (p) {
+      LIVE.activities = applyActivities(p);
+    }, function (e) { failures.push(String(e)); }),
+    getJSON("/api/load").then(function (p) {
+      LIVE.load = p;
+      var a = acwr(p);
+      if (a != null) { COACH.acwr = a; }
+    }, function (e) { failures.push(String(e)); }),
+    getJSON("/api/coaching").then(function (p) {
+      LIVE.coaching = p;
+    }, function (e) { failures.push(String(e)); })
+  ];
+  Promise.all(jobs).then(function () {
+    if (failures.length) {
+      badge("embedded snapshot (API unavailable)", failures.join("; "));
+    } else if (LIVE.activities) {
+      badge("live activity, load and coaching data", "");
+    } else {
+      badge("no activities returned", "");
+    }
+    refresh();
+  });
+  window.addEventListener("hashchange", function () {
+    setTimeout(paintSignal, 0);
+  });
+})();
+</script>
+"""
+
+
+def inject_aurora_live(html):
+    """Add the live-data bootstrap to the Aurora preview.
+
+    Idempotent (skips work if the marker is already present) and a no-op on
+    bytes that are not UTF-8 HTML, so it can never corrupt the served file.
+    """
+    try:
+        text = html.decode("utf-8")
+    except UnicodeDecodeError:
+        return html
+    if AURORA_LIVE_MARK in text:
+        return html
+    if "</body>" in text:
+        text = text.replace("</body>", AURORA_LIVE_SCRIPT + "</body>", 1)
+    else:
+        text = text + AURORA_LIVE_SCRIPT
+    return text.encode("utf-8")
+
+
 # ---------------------------------------------------------------------------
 # Password login.
 #
@@ -981,6 +1200,25 @@ class Handler(BaseHTTPRequestHandler):
                                       "text/html; charset=utf-8")
             except OSError:
                 return self._deny(404, "dashboard html not found")
+        if path in ("/aurora", "/aurora/"):
+            # Read-only preview of the committed Aurora app. It carries the
+            # same token/login gate as the data routes because the injected
+            # bootstrap fetches them; the local dashboard remains the default.
+            query = {k: v[0] for k, v in
+                     urllib.parse.parse_qs(parts.query).items() if v}
+            if REQUIRE_LOGIN and not self._is_authed(query):
+                return self._redirect("/login")
+            if not self._is_authed(query):
+                return self._deny(403, "missing or wrong token")
+            src = resolve_aurora_html()
+            if not src:
+                return self._deny(404, "aurora preview not found")
+            try:
+                with open(src, "rb") as fh:
+                    return self._send(200, inject_aurora_live(fh.read()),
+                                      "text/html; charset=utf-8")
+            except OSError:
+                return self._deny(404, "aurora preview not found")
         if not self._is_authed():
             return self._deny(403, "missing or wrong token")
         if path == "/garmin_sleep.csv":
@@ -1222,6 +1460,8 @@ def main():
         print("Could not bind %s:%d: %s" % (BIND_HOST, PORT, exc))
         sys.exit(1)
     print("Coach Dashboard local server: %s" % url)
+    print("Aurora preview (read-only, live API data): "
+          "http://127.0.0.1:%d/aurora?tk=%s" % (PORT, TOKEN))
     if REQUIRE_LOGIN:
         print("Password required: sign in at http://127.0.0.1:%d/ "
               "(the ?tk= URL above still opens it directly on this machine)."

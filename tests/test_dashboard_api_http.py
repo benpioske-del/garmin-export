@@ -457,3 +457,55 @@ def test_login_is_skipped_when_no_password_is_set(server):
     status, _, body = _call(_NO_REDIRECT, server, "/")
     assert status == 200
     assert b"Sign in" not in body
+
+
+# --------------------------------------------------------- aurora preview
+
+@pytest.fixture
+def aurora_html(monkeypatch, tmp_path):
+    """A minimal stand-in for the committed flow output."""
+    html = tmp_path / "aurora_dashboard.html"
+    html.write_text(
+        '<!doctype html><html><head><title>aurora</title></head>'
+        '<body><main id="app"></main>'
+        '<script>const RUNS=[];const SUMMARY={};</script></body></html>',
+        encoding="utf-8")
+    monkeypatch.setattr(G, "resolve_aurora_html", lambda: str(html))
+    return html
+
+
+def test_aurora_preview_is_served_with_the_live_bootstrap(server, aurora_html):
+    status, ctype, body = _get(server, "/aurora")
+    assert status == 200
+    assert ctype == "text/html; charset=utf-8"
+    text = body.decode("utf-8")
+    assert G.AURORA_LIVE_MARK in text
+    assert "/api/activities" in text
+    assert "/api/load" in text
+    assert "/api/coaching" in text
+
+
+def test_aurora_preview_requires_the_dash_token(server, aurora_html):
+    status, _, _ = _get(server, "/aurora", token=None)
+    assert status == 403
+
+
+def test_aurora_preview_accepts_the_token_in_the_query(server, aurora_html):
+    status, ctype, body = _get(server, "/aurora?tk=" + TOKEN, token=None)
+    assert status == 200
+    assert ctype == "text/html; charset=utf-8"
+    assert G.AURORA_LIVE_MARK in body.decode("utf-8")
+
+
+def test_aurora_preview_is_404_when_the_file_is_absent(server, monkeypatch):
+    monkeypatch.setattr(G, "resolve_aurora_html", lambda: None)
+    status, _, _ = _get(server, "/aurora")
+    assert status == 404
+
+
+def test_inject_aurora_live_is_idempotent():
+    html = b"<html><body>x</body></html>"
+    once = G.inject_aurora_live(html)
+    twice = G.inject_aurora_live(once)
+    assert once == twice
+    assert once.decode("utf-8").count(G.AURORA_LIVE_MARK) == 1

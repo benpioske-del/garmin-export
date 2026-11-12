@@ -17,11 +17,11 @@ were imported. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-502 passed, 1 skipped (503 collected)
+507 passed, 1 skipped (508 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `473 passed, 30 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `478 passed, 30 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`, so CI fails only on a real defect. `ruff check .` is clean.
 
@@ -33,7 +33,7 @@ skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 | `tests/test_brief_bridge.py` | 62 |
 | `tests/test_dashboard_api.py` | 38 |
 | `tests/test_trainloop_cli.py` | 22 |
-| `tests/test_dashboard_api_http.py` | 42 |
+| `tests/test_dashboard_api_http.py` | 47 |
 | `tests/test_fit_reader_elevation.py` | 21 |
 | `tests/test_splits.py` | 10 |
 | `tests/test_provenance.py` | 18 |
@@ -46,7 +46,7 @@ skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_brief_consistency.py` | 37 |
 | `tests/test_sync_import.py` | 5 |
-| **Total** | **503** (502 pass, 1 skip) |
+| **Total** | **508** (507 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -321,7 +321,7 @@ needs more than the token, so the server gained an additive password gate:
 - `--idle-timeout 0` disables the idle shutdown, which is needed for a
   long-lived tunnel.
 
-`tests/test_dashboard_api_http.py` (42 tests) covers the manifest and worker
+`tests/test_dashboard_api_http.py` (47 tests) covers the manifest and worker
 routes, the injected tags, injection idempotence, host/port allowlisting, the
 offline fallback (the worker keeps the shell and API data, and falls back to the
 cache on a `5xx` origin outage), and the login gate (redirect, form, wrong
@@ -330,6 +330,30 @@ flag, session expiry). **Caveat:** service workers require a secure context, so
 over plain `http://<lan-ip>` the "Add to Home Screen" action produces a live
 shortcut with no offline worker; the worker - and therefore the offline copy -
 activates only under https (the tunnel) or on localhost.
+
+### Aurora preview (`/aurora`)
+
+The CrewAI flow commits a self-contained app at
+`flow_outputs/aurora_dashboard.html`. It is served read-only at `/aurora`
+behind the same token/login gate as the data routes; `/` still serves the
+athlete's local dashboard, so this is a preview and not an adoption.
+
+- The committed file bakes in its run corpus, `SUMMARY` totals and ACWR. The
+  server injects `AURORA_LIVE_SCRIPT` at serve time (`inject_aurora_live()`,
+  idempotent via the `aurora-live-v1` marker) to replace the corpus and totals
+  from `/api/activities`, derive ACWR from `/api/load`, and repaint the
+  training-signal card from `/api/coaching`. A failed call leaves the committed
+  snapshot in place and the badge says the API was unavailable; it never invents
+  a value. The generated narrative panels remain the committed snapshot.
+- **Artifact bug fixed:** the generated `analysis()` view had an unclosed
+  template literal (`` `card")} `` instead of `` `card`)} ``), which raised
+  `SyntaxError: missing ) after argument list` at line 148 and stopped the whole
+  app from initialising. It was corrected in place in the committed artifact.
+- Verified in-browser against the live database: 72 runs, live ACWR 1.19, the
+  signal card showing `BUILD` from `/api/coaching`, and no console errors.
+- Five wire tests cover the route: served with the bootstrap, token required,
+  query token accepted, `404` when the file is absent, and injection
+  idempotence.
 
 ## Privacy checks
 

@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 502 passed, 1 skipped (Windows symlink case) |
+| Tests | 507 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -75,7 +75,7 @@ Docs: [`DATA_QUALITY.md`](DATA_QUALITY.md),
 | CSV export | `garmin_export.csv` | 72 activities, 31 columns |
 | Publisher | `export_publish.py` | guard, remote sync, history-safety enforcement |
 | Sync | `garmin_sync.py` | OAuth, local only |
-| Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching` |
+| Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching`; `/aurora` previews the committed flow app |
 | Audit | `fit_audit.py` | rewritten: hashes, parser versions, counts only |
 | Brief bridge | `brief_bridge.py` | `post` / `ingest` / `paste` / `serve` / `capture` |
 | Profile | `profile.json` | `hr_max` set to 198; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` still `null` |
@@ -91,7 +91,7 @@ profile as empty is reading an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 502 passed, 1 skipped. |
+| `python -m pytest` | Works. 507 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -293,8 +293,15 @@ download cannot leave the dashboard behind; the order and the failure reporting
 are pinned by `tests/test_sync_import.py`.
 
 Tests: `tests/test_dashboard_api.py` (38) and `tests/test_dashboard_api_http.py`
-(40). `smoke_dashboard_api.py` runs the same paths against the live database and
+(47). `smoke_dashboard_api.py` runs the same paths against the live database and
 is deliberately not part of pytest.
+
+`/aurora` serves the committed `flow_outputs/aurora_dashboard.html` as a
+read-only preview behind the same gate; `/` still serves the local dashboard.
+The generated file bakes in its corpus and totals, so `inject_aurora_live()`
+replaces them from the live API routes at serve time and says so in a badge. The
+artifact's `analysis()` view had an unclosed template literal that stopped the
+app from initialising; that was corrected in the committed file.
 
 `dashboard/index.html` is untracked and gitignored because it contains
 hand-entered athlete data, so the panel markup is not in version control. It is

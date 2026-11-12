@@ -756,3 +756,64 @@ Aurora becomes the product UI before any code changes.
 After these edits the consistency checker reports exactly one conflict, the
 pinned dashboard canary, and exits 1 on it as designed. No other figure or state
 in the brief is contradicted by the live repository.
+
+---
+
+# Fourteenth correction: 2026-11-12, the Aurora artifact bug and the preview route
+
+This is a code change, not a writer error. The athlete chose to **preview**
+Aurora at `/aurora` rather than adopt it as the product UI, so the local
+dashboard stays the default at `/`.
+
+## The generated artifact was broken
+
+`flow_outputs/aurora_dashboard.html` (commit `f1333a0`) could not run at all.
+The generated `analysis()` view contained an unclosed template literal:
+
+```
+... </p>`,`card")} ${card(`<div class="eyebrow">Fitness trend</div>...
+```
+
+The `` `card")} `` is missing its closing backtick; it should be `` `card`)} ``.
+The browser reported `SyntaxError: missing ) after argument list` at line 148,
+so the entire script failed to parse, `RUNS`/`SUMMARY` were never defined, and
+the page rendered blank. Serving it unchanged would have shipped a dead app. The
+literal was corrected in place in the committed artifact.
+
+## What the preview does
+
+- `garmin_server.py` gained `resolve_aurora_html()` and a token/login-gated
+  `/aurora` route. `/` is untouched and still serves the athlete's local
+  dashboard; the preview is additive.
+- The artifact bakes in a corpus snapshot, `SUMMARY` totals and ACWR. Rather
+  than editing the generated file's data, the server injects
+  `AURORA_LIVE_SCRIPT` at serve time (`inject_aurora_live()`, idempotent via the
+  `aurora-live-v1` marker). It replaces the corpus and totals from
+  `/api/activities`, derives ACWR from `/api/load`, and repaints the
+  training-signal card from `/api/coaching`.
+- It never invents a value: if a call fails, the committed snapshot stays and
+  the badge says the API was unavailable. The generated narrative panels remain
+  the committed snapshot; replacing them is part of full adoption, which was not
+  requested.
+- A `LIVE PREVIEW` badge links back to `/` with the token preserved.
+
+## Verification
+
+- Live in-browser against the real database: 72 runs, live ACWR **1.19**, the
+  signal card showing **BUILD** from `/api/coaching`, and no console errors. The
+  committed snapshot had `this_week_miles=16.73`; the live layer computed
+  **25.82** from `/api/activities`.
+- Five wire tests were added to `tests/test_dashboard_api_http.py`: the route is
+  served with the bootstrap, the token is required, a query token is accepted,
+  the route is `404` when the file is absent, and injection is idempotent.
+- That moves the live suite from 502 to **507 passed, 1 skipped** (508
+  collected) and the clean checkout from 473 to **478 passed, 30 skipped**.
+  `docs/VERIFICATION_REPORT.md`, `docs/IMPLEMENTATION_INVENTORY.md`,
+  `CREW_BRIEF.md`, `brief_facts.json` and the brief's quoted figures were
+  updated to match.
+
+## Still not done
+
+CalTrak nutrition ingestion and the lifting-log importer remain unimplemented;
+both CSVs are headers only, so there is no real data to ingest yet. Full Aurora
+adoption (retiring the local dashboard) also remains the athlete's decision.
