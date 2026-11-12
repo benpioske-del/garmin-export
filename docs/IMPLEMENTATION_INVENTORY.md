@@ -286,8 +286,11 @@ set the page redirects to `/login` unless authed, and every data route accepts
 either the token or the cookie. `--clear-password` removes it and
 `--idle-timeout 0` keeps the server up for a long-lived tunnel.
 
-The pre-existing `fit-list`, `fit/<name>`, `ping`, `sync` and cloud routes are
+The pre-existing `fit-list`, `fit/<name>`, `ping` and cloud routes are
 unchanged, covered by regression tests in `tests/test_dashboard_api_http.py`.
+`sync` now runs `garmin_sync.py` and then `trainloop.py bootstrap`, so a
+download cannot leave the dashboard behind; the order and the failure reporting
+are pinned by `tests/test_sync_import.py`.
 
 Tests: `tests/test_dashboard_api.py` (38) and `tests/test_dashboard_api_http.py`
 (40). `smoke_dashboard_api.py` runs the same paths against the live database and

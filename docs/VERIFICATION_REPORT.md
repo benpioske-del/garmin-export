@@ -157,7 +157,7 @@ reconciliation to perform.
 
 Note for anyone re-running this: `trainloop.py load` only *computes* load. The
 command that imports new FIT files is `trainloop.py bootstrap`. This trap has now
-recurred three times. On 2026-10-04 the database held 57 while the FIT directory
+recurred four times. On 2026-10-04 the database held 57 while the FIT directory
 and CSV held 58; on 2026-10-15 it held 58 while they held 61; and on 2026-11-06 it
 held 61 while the FIT directory held 69 (and the published CSV 68) - the eight
 runs from 2026-10-13 to 2026-11-06 had been downloaded but never imported, so
@@ -167,7 +167,11 @@ every load figure and the dashboard silently excluded them. Re-running
 (`{"inserted": 8, "unchanged": 61}`), bringing the table to 69. On 2026-11-09
 the 2026-11-08 run was imported (`{"inserted": 1, "unchanged": 69}`), bringing
 the table to 70. On 2026-11-11 two more runs (2026-11-10 and 2026-11-11) were
-imported (`{"inserted": 2, "unchanged": 70}`), bringing the table to 72.
+imported (`{"inserted": 2, "unchanged": 70}`), bringing the table to 72. The
+2026-11-10 run was the fourth recurrence: it was on disk but absent from the
+dashboard. `POST /sync` now runs `trainloop.py bootstrap` after `garmin_sync.py`,
+and the import is attempted even when the download fails, so the dashboard path
+can no longer stop after the download.
 
 ## Training load and recommendation
 
