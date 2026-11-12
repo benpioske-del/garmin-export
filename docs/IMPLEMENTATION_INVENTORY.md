@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 552 passed, 1 skipped (Windows symlink case) |
+| Tests | 573 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -75,7 +75,7 @@ Docs: [`DATA_QUALITY.md`](DATA_QUALITY.md),
 | CSV export | `garmin_export.csv` | 72 activities, 31 columns |
 | Publisher | `export_publish.py` | guard, remote sync, history-safety enforcement |
 | Sync | `garmin_sync.py` | OAuth, local only |
-| Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching`; `/` serves the committed Aurora app, `/classic` the local page, `/aurora` remains an alias; `GET`/`POST /api/nutrition` read and ingest the local nutrition log |
+| Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching`; `/` serves the committed Aurora app, `/classic` the local page, `/aurora` remains an alias; `GET`/`POST /api/nutrition` read and ingest the local nutrition log; `POST /share-target` is the Android share-sheet fallback; `POST /sync` runs the Garmin download and import |
 | Nutrition | `nutrition.py` | CalTrak CSV parse/aggregate, header aliases, local daily log at `paths.data_dir()/nutrition_log.csv` |
 | Audit | `fit_audit.py` | rewritten: hashes, parser versions, counts only |
 | Brief bridge | `brief_bridge.py` | `post` / `ingest` / `paste` / `serve` / `capture` |
@@ -92,7 +92,7 @@ profile as empty is reading an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 552 passed, 1 skipped. |
+| `python -m pytest` | Works. 573 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -310,11 +310,16 @@ replaces them from the live API routes at serve time and says so in a badge. The
 artifact's `analysis()` view had an unclosed template literal that stopped the
 app from initialising; that was corrected in the committed file.
 
-Chart parity was restored in the artifact's `analysis()` view: seven run-based
-charts (training load, weekly mileage, distance by run coloured by band, pace and
-heart rate, fitness scatter, run bubbles, pacing fade) plus the per-mile splits
-chart on a run detail. Bodyweight and strength are empty states because no such
-data exists. Chart.js v4.4.4 is vendored at
+Chart parity was restored and then expanded in the artifact's `analysis()` view:
+nineteen run-based charts in seven labelled groups (Volume, Intensity & effort,
+Mechanics & terrain, Performance & pacing, Consistency, Body & strength,
+Coaching), plus the per-mile splits chart on a run detail. The new charts are
+monthly and cumulative mileage, TSS, calories, average vs maximum HR, climbing
+cost, cadence, elevation gain, pace distribution, best 5K trend, latest-run
+splits, a training-calendar heatmap, days between runs, and runs per month.
+Charts with no data use `chartOrEmpty()` to show a named empty state instead of
+a blank canvas; TSS is blank in every source record and bodyweight/strength have
+no data at all. Chart.js v4.4.4 is vendored at
 `flow_outputs/vendor/chart.umd.min.js`; `inject_aurora_live()` rewrites the
 artifact's `cdn.jsdelivr.net` URL to `/vendor/chart.umd.min.js`, which the server
 serves above the token gate. Chart creation is synchronous, because the original
@@ -350,7 +355,21 @@ unparseable dates, and negative or non-numeric values.
   overrides `window.importCSV` to POST the raw CSV, so the FUEL tab and the run
   detail's "Fuel that day" card show stored totals rather than localStorage.
   The committed view reads `kcal`, so the live layer maps `calories` to `kcal`
-  at that seam.
+  at that seam. It exposes `window.auroraReloadAll` and
+  `window.auroraReloadNutrition` so the sync button and importer redraw from
+  the server.
+- **Android share target.** CalTrak has no account or cloud API; its log is
+  shared as a file. `MANIFEST_JSON` declares a `share_target` for
+  `/share-target` (`POST`, `multipart/form-data`, file field `log`), so CalTrak's
+  Share Log can go straight to the dashboard from Android's share sheet. The
+  service worker intercepts the POST and forwards `{csv: text}` to
+  `/api/nutrition`; `POST /share-target` is the server fallback for the first
+  share before the worker is active. `multipart_file_text()` parses the body
+  (Python 3.13 removed `cgi`), and both paths call `parse_caltrak_csv()` and
+  redirect to `/?shared=ok|empty|error`.
+- **One-tap Garmin sync.** The home view's `Sync Garmin now` button POSTs
+  `/sync`, which runs `garmin_sync.py` and then `trainloop.py bootstrap`, and
+  reloads from the API. The same button works from the phone and the laptop.
 
 `dashboard/index.html` is untracked and gitignored because it contains
 hand-entered athlete data, so the panel markup is not in version control. It is

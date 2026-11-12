@@ -642,6 +642,22 @@ MANIFEST_JSON = {
     "display": "standalone",
     "background_color": "#111418",
     "theme_color": "#111418",
+    # Android share sheet: CalTrak's Share Log can post the CSV straight here,
+    # so the athlete never emails a file to himself. Chrome dispatches the POST
+    # to the service worker; the server route is the fallback when it is not
+    # active yet. iOS has no Web Share Target, so it uses a Shortcut instead.
+    "share_target": {
+        "action": "/share-target",
+        "method": "POST",
+        "enctype": "multipart/form-data",
+        "params": {
+            "files": [{
+                "name": "log",
+                "accept": ["text/csv", "text/plain", "application/json",
+                           ".csv", ".json"],
+            }],
+        },
+    },
 }
 
 # Network-first with an offline fallback. The worker keeps the last dashboard
@@ -677,10 +693,33 @@ SW_JS = (
     "    return new Request(req, { headers: h });\n"
     "  } catch (e) { return req; }\n"
     "}\n"
+    "async function shareTarget(req) {\n"
+    "  function done(q) {\n"
+    "    return Response.redirect(\n"
+    "      new URL('/?shared=' + q, self.location.origin).href, 303);\n"
+    "  }\n"
+    "  try {\n"
+    "    const form = await req.formData();\n"
+    "    const file = form.get('log') || form.get('files');\n"
+    "    if (!file || typeof file.text !== 'function') { return done('empty'); }\n"
+    "    const text = await file.text();\n"
+    "    const res = await fetch('/api/nutrition', {\n"
+    "      method: 'POST',\n"
+    "      headers: { 'Content-Type': 'application/json' },\n"
+    "      credentials: 'same-origin',\n"
+    "      body: JSON.stringify({ csv: text })\n"
+    "    });\n"
+    "    return done(res.ok ? 'ok' : 'error');\n"
+    "  } catch (e) { return done('error'); }\n"
+    "}\n"
     "self.addEventListener('fetch', function (event) {\n"
     "  const req = event.request;\n"
-    "  if (req.method !== 'GET') return;\n"
     "  const url = new URL(req.url);\n"
+    "  if (req.method === 'POST' && url.pathname === '/share-target') {\n"
+    "    event.respondWith(shareTarget(req));\n"
+    "    return;\n"
+    "  }\n"
+    "  if (req.method !== 'GET') return;\n"
     "  if (url.origin !== self.location.origin) return;\n"
     "  const nav = req.mode === 'navigate' || url.pathname === '/';\n"
     "  const isData = url.pathname.indexOf('/api/') === 0\n"
@@ -791,6 +830,9 @@ AURORA_LIVE_SCRIPT = """
       avgHR: a.avg_hr == null ? null : Number(a.avg_hr),
       maxHR: a.max_hr == null ? null : Number(a.max_hr),
       cadence: a.avg_cadence == null ? null : Number(a.avg_cadence),
+      maxCadence: a.max_cadence == null ? null : Number(a.max_cadence),
+      tss: a.training_stress_score == null ? null
+        : Number(a.training_stress_score),
       avgPace: pace(a.avg_pace_s_per_mi != null ? Number(a.avg_pace_s_per_mi)
         : (mi > 0 ? sec / mi : null)),
       bestPace: a.best_pace_s_per_mi == null ? null
@@ -942,22 +984,23 @@ AURORA_LIVE_SCRIPT = """
     importNutritionCsv(file);
   };
   badge("connecting", "");
-  var failures = [];
-  var jobs = [
-    getJSON("/api/activities").then(function (p) {
-      LIVE.activities = applyActivities(p);
-    }, function (e) { failures.push(String(e)); }),
-    getJSON("/api/load").then(function (p) {
-      LIVE.load = p;
-      var a = acwr(p);
-      if (a != null) { COACH.acwr = a; }
-    }, function (e) { failures.push(String(e)); }),
-    getJSON("/api/coaching").then(function (p) {
-      LIVE.coaching = p;
-    }, function (e) { failures.push(String(e)); }),
-    loadNutrition()
-  ];
-  Promise.all(jobs).then(function () {
+  function collect(failures) {
+    return Promise.all([
+      getJSON("/api/activities").then(function (p) {
+        LIVE.activities = applyActivities(p);
+      }, function (e) { failures.push(String(e)); }),
+      getJSON("/api/load").then(function (p) {
+        LIVE.load = p;
+        var a = acwr(p);
+        if (a != null) { COACH.acwr = a; }
+      }, function (e) { failures.push(String(e)); }),
+      getJSON("/api/coaching").then(function (p) {
+        LIVE.coaching = p;
+      }, function (e) { failures.push(String(e)); }),
+      loadNutrition()
+    ]);
+  }
+  function announce(failures) {
     var missing = [];
     if (!LIVE.activities) { missing.push("activities"); }
     if (!LIVE.load) { missing.push("load"); }
@@ -969,8 +1012,20 @@ AURORA_LIVE_SCRIPT = """
     } else {
       badge("live activity, load, coaching and nutrition data", "");
     }
-    refresh();
-  });
+  }
+  // The Sync Garmin button and the CalTrak importer both call these, so the
+  // page redraws from the server instead of trusting the browser's own copy.
+  window.auroraReloadNutrition = function () {
+    return loadNutrition().then(function () { refresh(); });
+  };
+  window.auroraReloadAll = function () {
+    var failures = [];
+    return collect(failures).then(function () {
+      announce(failures);
+      refresh();
+    });
+  };
+  window.auroraReloadAll();
   window.addEventListener("hashchange", function () {
     setTimeout(paintSignal, 0);
   });
@@ -1129,6 +1184,43 @@ def login_page(error=""):
     return LOGIN_PAGE.replace("{error}", err).encode("utf-8")
 
 
+def multipart_file_text(body, content_type):
+    """Return the text of the first file part in a multipart/form-data body.
+
+    The Android share target posts the CalTrak CSV as a file part. ``cgi`` was
+    removed in Python 3.13, so this parses just enough of the format: find the
+    boundary, split the parts, and take the first one that carries a filename.
+    Returns None for anything it does not recognise rather than guessing.
+    """
+    match = re.search(r'boundary=(?:"([^"]+)"|([^;]+))', content_type or "")
+    if not match:
+        return None
+    boundary = (match.group(1) or match.group(2)).strip()
+    if not boundary:
+        return None
+    delimiter = b"--" + boundary.encode("utf-8")
+    for part in body.split(delimiter):
+        if b"\r\n\r\n" in part:
+            head, data = part.split(b"\r\n\r\n", 1)
+        elif b"\n\n" in part:
+            head, data = part.split(b"\n\n", 1)
+        else:
+            continue
+        if b"filename=" not in head:
+            continue
+        # Only the CRLF that precedes the next boundary belongs to the
+        # envelope. The file's own trailing newline is content.
+        if data.endswith(b"\r\n"):
+            data = data[:-2]
+        elif data.endswith(b"\n"):
+            data = data[:-1]
+        try:
+            return data.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            return None
+    return None
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = ""
     sys_version = ""
@@ -1198,6 +1290,30 @@ class Handler(BaseHTTPRequestHandler):
             _login_failures = 0
         return self._send(401, login_page("Wrong password."),
                           "text/html; charset=utf-8")
+
+    def _handle_share_target(self):
+        """POST /share-target - the Android share-sheet fallback.
+
+        The service worker normally intercepts this and posts JSON, but on the
+        very first share (before the worker is active) the browser sends the
+        multipart form here instead. Both paths end in the same parser.
+        """
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+        except ValueError:
+            length = 0
+        if length < 1 or length > 5 * 1024 * 1024:
+            return self._redirect("/?shared=error")
+        text = multipart_file_text(self.rfile.read(length),
+                                   self.headers.get("Content-Type"))
+        if not text:
+            return self._redirect("/?shared=empty")
+        try:
+            days = nutrition.parse_caltrak_csv(text)
+            nutrition.upsert_days(days)
+        except (nutrition.NutritionError, OSError):
+            return self._redirect("/?shared=error")
+        return self._redirect("/?shared=ok")
 
     def _handle_nutrition_post(self):
         """POST /api/nutrition - validate and upsert daily nutrition totals.
@@ -1508,6 +1624,10 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.unquote(parts.path)
         if path == "/login":
             return self._handle_login()
+        if path == "/share-target":
+            if not self._is_authed():
+                return self._redirect("/login")
+            return self._handle_share_target()
         if not self._is_authed():
             return self._deny(403, "missing or wrong token")
         if path == "/sync":

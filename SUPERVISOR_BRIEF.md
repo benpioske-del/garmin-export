@@ -18,6 +18,10 @@ UNVERIFIED LLM OUTPUT
 > Chart.js, the `/api/activities` summary/splits fields, and the mobile tunnel
 > finding are recorded in the seventeenth correction.
 >
+> PHONE CAPTURE NOTE (2026-11-12): the Android share target for CalTrak and the
+> one-tap Garmin sync button are recorded in the eighteenth correction, along
+> with the expanded Analysis charts. The pinned canary below is unchanged.
+>
 > PINNED CANARY - deliberately false, retained so `brief_consistency.py` keeps
 > flagging it: the tested data layer exists in activities.py, loadcalc.py, and
 > recommend.py, but dashboard/index.html does not use it.
@@ -32,7 +36,7 @@ data-layer-and-provenance | 4051291 | migrations 001-006
 fit-audit-and-guard | evidence from SUPERVISOR_BRIEF.md | 0 parse failures, 72/72 GPS, guard verified
 formalize-continuity-review-without-synthetic-activities | evidence from docs/VERIFICATION_REPORT.md | 1 open activity_gap; no synthetic activities may be created; accepted corpus is 72 activities
 make-coaching-rationales-deterministic-and-auditable | evidence from docs/IMPLEMENTATION_INVENTORY.md | tests/recommend_snapshots.py pins every reachable coaching branch to golden JSON with fixed as_of and supplied hr_max
-harden-bridge-and-release-quality-gates | evidence from docs/VERIFICATION_REPORT.md | 565 passed, 1 skipped; facts gate, rejected-brief staging, content-derived idempotency, and publish protections are tested
+harden-bridge-and-release-quality-gates | evidence from docs/VERIFICATION_REPORT.md | 573 passed, 1 skipped; facts gate, rejected-brief staging, content-derived idempotency, and publish protections are tested
 connect-dashboard-to-data-layer | evidence from docs/IMPLEMENTATION_INVENTORY.md and docs/VERIFICATION_REPORT.md | GET /api/activities, GET /api/load, and GET /api/coaching are served on the same origin and the dashboard fetches them
 caltrak-nutrition-ingestion | evidence from docs/VERIFICATION_REPORT.md and docs/IMPLEMENTATION_INVENTORY.md | nutrition.py parses and aggregates CalTrak CSV; GET/POST /api/nutrition serve and upsert daily totals; the FUEL tab consumes live nutrition data
 
@@ -54,7 +58,7 @@ establish-authenticated-athlete-ownership | BLOCKED / PARKED AND DEMOTED | Authe
 - FIT file count: 72. Source: docs/VERIFICATION_REPORT.md, "files inspected           : 72".
 - Activity count: 72. Source: docs/VERIFICATION_REPORT.md, `{"activities": 72, "open_reviews": 1}`.
 - Open review count: 1. Source: docs/VERIFICATION_REPORT.md, `{"activities": 72, "open_reviews": 1}`.
-- Test result: 565 passed, 1 skipped. Source: docs/VERIFICATION_REPORT.md, "565 passed, 1 skipped (566 collected)".
+- Test result: 573 passed, 1 skipped. Source: docs/VERIFICATION_REPORT.md, "573 passed, 1 skipped (574 collected)".
 - Parse failures: 0. Source: docs/VERIFICATION_REPORT.md, "parse failures            : 0".
 - Files with GPS: 72. Source: docs/VERIFICATION_REPORT.md, "files with GPS            : 72".
 - Open timezone_uncertain reviews: 0. Source: docs/VERIFICATION_REPORT.md, "0 open `timezone_uncertain` reviews".
@@ -63,7 +67,8 @@ establish-authenticated-athlete-ownership | BLOCKED / PARKED AND DEMOTED | Authe
 - hr_max: 198. Source: docs/VERIFICATION_REPORT.md, "with `hr_max=198` supplied by the caller".
 - Nutrition rows: 0 in the committed repository; `nutrition_log.csv` is headers only. Ingested rows are written to the local data directory and are not published. Source: docs/IMPLEMENTATION_INVENTORY.md, "Nutrition ingestion".
 - Lifting rows: 0 in the committed repository; `lifting_log.csv` is headers only. Source: the committed file at `d775add`.
-- CalTrak integration status: implemented. `nutrition.py` parses and aggregates CalTrak CSV; `GET`/`POST /api/nutrition` serve and upsert daily totals; the FUEL tab consumes live data. Source: docs/VERIFICATION_REPORT.md, "Nutrition ingestion".
+- CalTrak integration status: implemented. `nutrition.py` parses and aggregates CalTrak CSV; `GET`/`POST /api/nutrition` serve and upsert daily totals; the FUEL tab consumes live data; the PWA share target posts CalTrak's Share Log straight to the server. Source: docs/VERIFICATION_REPORT.md, "Nutrition ingestion".
+- One-tap Garmin sync status: implemented. The home view's `Sync Garmin now` button POSTs `/sync`, which runs `garmin_sync.py` then `trainloop.py bootstrap`, from the phone or the laptop. Source: docs/VERIFICATION_REPORT.md, "One-tap Garmin sync".
 - Bodyweight trend status: not stated in the newest repo docs.
 
 ---

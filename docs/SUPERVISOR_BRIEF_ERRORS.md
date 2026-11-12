@@ -1006,3 +1006,65 @@ pull-ups/dips) is still unimplemented, so the strength chart stays an empty
 state. Bodyweight and weekly-summary endpoints, queue retry semantics, and
 replacing the generated narrative panels with live text remain open. The
 `Garmin Daily Sync` scheduled task is still Disabled.
+
+# Eighteenth correction: 2026-11-12, CalTrak share target, one-tap Garmin sync, chart expansion
+
+## The gap
+
+After Aurora became canonical, the athlete still had to email a CalTrak CSV to
+himself to get nutrition into the dashboard, and the Analysis view still felt
+sparse compared with the classic page. This entry records the phone capture path
+and the chart expansion.
+
+## Phone capture
+
+- CalTrak has no account or cloud API; its log lives on the device. The web
+  manifest now declares a `share_target` for `/share-target` (`POST`,
+  `multipart/form-data`, one file field `log`), so once the PWA is installed,
+  CalTrak's Share Log appears in Android's share sheet and posts the CSV straight
+  to the server.
+- Chrome routes the POST through the service worker, which forwards
+  `{csv: text}` to `/api/nutrition`. `POST /share-target` is the server fallback
+  for the first share before the worker is active. `multipart_file_text()`
+  parses the body because Python 3.13 removed `cgi`. Both paths aggregate with
+  `parse_caltrak_csv()` and redirect to `/?shared=ok|empty|error`.
+- The Aurora FUEL importer now POSTs to `/api/nutrition` instead of writing
+  browser `localStorage`, so the phone and laptop share one log.
+- The home view has a `Sync Garmin now` button that POSTs `/sync` (download then
+  `trainloop.py bootstrap`) and reloads from the API. The same button works on
+  the phone and the laptop. No new ngrok authtoken is needed.
+
+## Charts
+
+- The Analysis view now renders nineteen run-based charts in seven labelled
+  groups: Volume, Intensity & effort, Mechanics & terrain, Performance &
+  pacing, Consistency, Body & strength, Coaching.
+- New data-backed charts: monthly mileage, cumulative mileage, TSS, calories,
+  average vs maximum HR, climbing cost, cadence, elevation gain, pace
+  distribution, best 5K trend, latest-run splits, training-calendar heatmap,
+  days between runs, and runs per month.
+- `chartOrEmpty()` gives every no-data chart a named empty state instead of a
+  blank canvas. TSS is blank in every source record; bodyweight and strength
+  have no data at all.
+- The live layer exposes `window.auroraReloadAll` and
+  `window.auroraReloadNutrition`, and `mapRun` now carries `tss` and
+  `maxCadence`.
+
+## Verification
+
+- In-browser against the live database: 72 runs; nineteen Analysis charts
+  rendered with data (72 points on each run-based chart, 62 weeks, 16 months,
+  115 heatmap days); six mile splits on the latest run; no console errors.
+- New wire tests cover the manifest `share_target`, multipart parsing (3),
+  `/share-target` ingestion (3), and the live layer's reload hooks (1).
+- The live suite is **573 passed, 1 skipped** (574 collected) and the clean
+  checkout is **544 passed, 30 skipped**. `docs/VERIFICATION_REPORT.md`,
+  `docs/IMPLEMENTATION_INVENTORY.md`, `SUPERVISOR_BRIEF.md` and
+  `brief_facts.json` carry the new counts.
+
+## Still not done
+
+The lifting importer is still unimplemented, so the strength chart stays an
+empty state. Bodyweight and weekly-summary endpoints, queue retry semantics,
+and replacing the generated narrative panels with live text remain open. The
+`Garmin Daily Sync` scheduled task is still Disabled.

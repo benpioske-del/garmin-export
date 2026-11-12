@@ -10,7 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#050810;--card:rgba(255,255,255,.055);--line:rgba(255,255,255,.1);--text:#f5f7ff;--muted:#8991a8;--cyan:#00f5ff;--violet:#7c3aed;--green:#10ffa0;--amber:#ffb300;--red:#ff3d5a}
-*{box-sizing:border-box}html{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}body{margin:0;min-height:100vh;background:radial-gradient(circle at 10% 0%,#21104e 0,transparent 35%),radial-gradient(circle at 90% 15%,#003a43 0,transparent 35%),var(--bg);overflow-x:hidden}body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E")}a{color:inherit;text-decoration:none}button,input,select{font:inherit}button{border:0;color:inherit;cursor:pointer}.app{max-width:1180px;margin:auto;padding:20px 18px 100px}.top{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:25px}.brand{font-weight:900;letter-spacing:-1px;font-size:22px}.brand i{display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--violet),var(--cyan));margin-right:7px}.status{font-size:11px;color:var(--green);border:1px solid #10ffa055;border-radius:99px;padding:6px 10px}.status:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px}.view{animation:up .45s ease both}@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:800}.hero h1{font-size:clamp(34px,8vw,66px);line-height:.98;margin:9px 0 12px;letter-spacing:-3px}.gradient{background:linear-gradient(100deg,#fff,var(--cyan),#b98cff);-webkit-background-clip:text;background-clip:text;color:transparent}.sub{color:var(--muted);font-size:14px;line-height:1.55}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}.card{grid-column:span 12;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;backdrop-filter:blur(20px);box-shadow:0 12px 50px #0003}.half{grid-column:span 6}.third{grid-column:span 4}.signal{border-color:#7c3aed99;box-shadow:0 0 35px #7c3aed22}.signal h2{margin:7px 0;font-size:28px}.good{color:var(--green)}.warn{color:var(--amber)}.risk{color:var(--red)}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.stat{padding:13px;border:1px solid var(--line);border-radius:14px;background:#ffffff04}.value{font-size:25px;font-weight:900;font-variant-numeric:tabular-nums;margin-top:6px}.label{font-size:11px;color:var(--muted)}.sync{display:flex;flex-wrap:wrap;gap:20px;background:#ffffff06;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:15px;color:var(--muted);font-size:12px}.sync b{color:var(--text)}.section-title{display:flex;justify-content:space-between;align-items:center;margin:28px 0 12px}.section-title h2{margin:0;font-size:20px}.btn{background:linear-gradient(135deg,var(--violet),#2563eb);padding:12px 16px;border-radius:12px;font-weight:800;min-height:44px}.btn.ghost{background:#ffffff0b;border:1px solid var(--line)}.run-card{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:9px 0;padding:15px;border:1px solid var(--line);border-radius:16px;background:#ffffff04}.run-card:hover{border-color:#00f5ff88}.run-date{font-weight:800}.run-meta{color:var(--muted);font-size:12px;margin-top:5px}.run-distance{font-size:23px;font-weight:900;text-align:right}.chip{font-size:10px;padding:5px 8px;border-radius:99px;background:#00f5ff18;color:var(--cyan);font-weight:800}.chartbox{height:260px;position:relative}.chartbox.tall{height:340px}.empty{padding:28px 12px;text-align:center;color:var(--muted);border:1px dashed #ffffff22;border-radius:15px}.empty strong{display:block;color:var(--text);margin-bottom:8px}.detail-head{display:flex;justify-content:space-between;align-items:end;gap:12px}.detail-head h1{font-size:clamp(30px,7vw,55px);margin:7px 0;letter-spacing:-2px}.back{color:var(--cyan);font-size:13px;font-weight:700}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:14px}table{width:100%;border-collapse:collapse;min-width:680px;font-size:12px}th,td{text-align:left;padding:11px;border-bottom:1px solid #ffffff0b;white-space:nowrap}th{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;cursor:pointer}tr:hover{background:#ffffff08}.form{display:grid;gap:12px}.form label{font-size:12px;color:var(--muted)}.form input,.form select{width:100%;margin-top:6px;padding:13px;border-radius:11px;border:1px solid var(--line);background:#ffffff08;color:var(--text);outline:0}.form input:focus{border-color:var(--cyan)}.nav{position:fixed;z-index:10;bottom:0;left:0;right:0;background:#090d18eF;border-top:1px solid var(--line);backdrop-filter:blur(20px);display:flex;justify-content:center;gap:3px;padding:8px max(8px,env(safe-area-inset-left)) max(8px,env(safe-area-inset-bottom))}.nav a{font-size:10px;color:var(--muted);padding:9px 12px;border-radius:12px;text-align:center;font-weight:700}.nav a.active{color:var(--cyan);background:#00f5ff12}.fab{position:fixed;right:20px;bottom:78px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--violet),var(--cyan));font-size:28px;box-shadow:0 8px 30px #00f5ff44;z-index:11}.sheet{position:fixed;inset:0;background:#0009;z-index:20;display:none;align-items:end}.sheet.open{display:flex}.sheetbox{width:100%;background:#111727;border-radius:24px 24px 0 0;padding:22px;display:grid;gap:10px}.toast{position:fixed;z-index:30;top:18px;left:50%;transform:translateX(-50%);background:#172238;border:1px solid #ffffff22;padding:12px 16px;border-radius:99px;font-size:12px;display:none}.toast.show{display:block;animation:up .3s}.pill{display:inline-block;padding:6px 10px;border-radius:99px;background:#ffffff0b;color:var(--muted);font-size:11px}.report{white-space:normal;line-height:1.65;font-size:13px;color:#c8cede}.report h2,.report h3{color:var(--text);line-height:1.25}.report strong{color:var(--text)}.report table{min-width:500px}.report ul{padding-left:20px}.bars{display:flex;gap:4px;height:90px;align-items:end}.bar{flex:1;background:linear-gradient(var(--cyan),var(--violet));border-radius:4px 4px 0 0;min-height:3px}.attention{border-color:#ffb30066}.attention li{margin:8px 0;color:#c8cede}@media(max-width:700px){.app{padding:15px 12px 95px}.half,.third{grid-column:span 12}.stats{grid-template-columns:repeat(2,1fr)}.nav a{padding:9px 8px}.nav a span{display:block;margin-top:3px}.detail-head{align-items:start;flex-direction:column}.top{margin-bottom:18px}}
+*{box-sizing:border-box}html{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}body{margin:0;min-height:100vh;background:radial-gradient(circle at 10% 0%,#21104e 0,transparent 35%),radial-gradient(circle at 90% 15%,#003a43 0,transparent 35%),var(--bg);overflow-x:hidden}body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.4'/%3E%3C/svg%3E")}a{color:inherit;text-decoration:none}button,input,select{font:inherit}button{border:0;color:inherit;cursor:pointer}.app{max-width:1180px;margin:auto;padding:20px 18px 100px}.top{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:25px}.brand{font-weight:900;letter-spacing:-1px;font-size:22px}.brand i{display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--violet),var(--cyan));margin-right:7px}.status{font-size:11px;color:var(--green);border:1px solid #10ffa055;border-radius:99px;padding:6px 10px}.status:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px}.view{animation:up .45s ease both}@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);font-weight:800}.hero h1{font-size:clamp(34px,8vw,66px);line-height:.98;margin:9px 0 12px;letter-spacing:-3px}.gradient{background:linear-gradient(100deg,#fff,var(--cyan),#b98cff);-webkit-background-clip:text;background-clip:text;color:transparent}.sub{color:var(--muted);font-size:14px;line-height:1.55}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}.card{grid-column:span 12;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;backdrop-filter:blur(20px);box-shadow:0 12px 50px #0003}.half{grid-column:span 6}.third{grid-column:span 4}.signal{border-color:#7c3aed99;box-shadow:0 0 35px #7c3aed22}.signal h2{margin:7px 0;font-size:28px}.good{color:var(--green)}.warn{color:var(--amber)}.risk{color:var(--red)}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.stat{padding:13px;border:1px solid var(--line);border-radius:14px;background:#ffffff04}.value{font-size:25px;font-weight:900;font-variant-numeric:tabular-nums;margin-top:6px}.label{font-size:11px;color:var(--muted)}.sync{display:flex;flex-wrap:wrap;gap:20px;background:#ffffff06;border:1px solid var(--line);border-radius:14px;padding:13px;margin-bottom:15px;color:var(--muted);font-size:12px}.sync b{color:var(--text)}.section-title{display:flex;justify-content:space-between;align-items:center;margin:28px 0 12px}.section-title h2{margin:0;font-size:20px}.btn{background:linear-gradient(135deg,var(--violet),#2563eb);padding:12px 16px;border-radius:12px;font-weight:800;min-height:44px}.btn.ghost{background:#ffffff0b;border:1px solid var(--line)}.run-card{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:9px 0;padding:15px;border:1px solid var(--line);border-radius:16px;background:#ffffff04}.run-card:hover{border-color:#00f5ff88}.run-date{font-weight:800}.run-meta{color:var(--muted);font-size:12px;margin-top:5px}.run-distance{font-size:23px;font-weight:900;text-align:right}.chip{font-size:10px;padding:5px 8px;border-radius:99px;background:#00f5ff18;color:var(--cyan);font-weight:800}.chartbox{height:260px;position:relative}.chartbox.tall{height:340px}.empty{padding:28px 12px;text-align:center;color:var(--muted);border:1px dashed #ffffff22;border-radius:15px}.empty strong{display:block;color:var(--text);margin-bottom:8px}.detail-head{display:flex;justify-content:space-between;align-items:end;gap:12px}.detail-head h1{font-size:clamp(30px,7vw,55px);margin:7px 0;letter-spacing:-2px}.back{color:var(--cyan);font-size:13px;font-weight:700}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:14px}table{width:100%;border-collapse:collapse;min-width:680px;font-size:12px}th,td{text-align:left;padding:11px;border-bottom:1px solid #ffffff0b;white-space:nowrap}th{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:1px;cursor:pointer}tr:hover{background:#ffffff08}.form{display:grid;gap:12px}.form label{font-size:12px;color:var(--muted)}.form input,.form select{width:100%;margin-top:6px;padding:13px;border-radius:11px;border:1px solid var(--line);background:#ffffff08;color:var(--text);outline:0}.form input:focus{border-color:var(--cyan)}.nav{position:fixed;z-index:10;bottom:0;left:0;right:0;background:#090d18eF;border-top:1px solid var(--line);backdrop-filter:blur(20px);display:flex;justify-content:center;gap:3px;padding:8px max(8px,env(safe-area-inset-left)) max(8px,env(safe-area-inset-bottom))}.nav a{font-size:10px;color:var(--muted);padding:9px 12px;border-radius:12px;text-align:center;font-weight:700}.nav a.active{color:var(--cyan);background:#00f5ff12}.fab{position:fixed;right:20px;bottom:78px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,var(--violet),var(--cyan));font-size:28px;box-shadow:0 8px 30px #00f5ff44;z-index:11}.sheet{position:fixed;inset:0;background:#0009;z-index:20;display:none;align-items:end}.sheet.open{display:flex}.sheetbox{width:100%;background:#111727;border-radius:24px 24px 0 0;padding:22px;display:grid;gap:10px}.toast{position:fixed;z-index:30;top:18px;left:50%;transform:translateX(-50%);background:#172238;border:1px solid #ffffff22;padding:12px 16px;border-radius:99px;font-size:12px;display:none}.toast.show{display:block;animation:up .3s}.pill{display:inline-block;padding:6px 10px;border-radius:99px;background:#ffffff0b;color:var(--muted);font-size:11px}.report{white-space:normal;line-height:1.65;font-size:13px;color:#c8cede}.report h2,.report h3{color:var(--text);line-height:1.25}.report strong{color:var(--text)}.report table{min-width:500px}.report ul{padding-left:20px}.bars{display:flex;gap:4px;height:90px;align-items:end}.bar{flex:1;background:linear-gradient(var(--cyan),var(--violet));border-radius:4px 4px 0 0;min-height:3px}.attention{border-color:#ffb30066}.attention li{margin:8px 0;color:#c8cede}.group{grid-column:span 12;margin:16px 0 0;padding:14px 2px 2px;border-top:1px solid var(--line)}.group .eyebrow{color:var(--cyan)}.group p{margin:6px 0 0}.heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,11px);gap:3px;overflow-x:auto;padding:6px 0}.heat i{display:block;width:11px;height:11px;border-radius:2px;background:#ffffff0d}.heat i.h1{background:#10ffa044}.heat i.h2{background:#10ffa088}.heat i.h3{background:#10ffa0bb}.heat i.h4{background:#10ffa0}@media(max-width:700px){.app{padding:15px 12px 95px}.half,.third{grid-column:span 12}.stats{grid-template-columns:repeat(2,1fr)}.nav a{padding:9px 8px}.nav a span{display:block;margin-top:3px}.detail-head{align-items:start;flex-direction:column}.top{margin-bottom:18px}}
 </style>
 </head>
 <body>
@@ -122,12 +122,27 @@ function navigate(h){location.hash=h;render()}
 function openSheet(){document.getElementById("sheet").classList.add("open")}function closeSheet(){document.getElementById("sheet").classList.remove("open")}
 function card(x,c="card"){return `<section class="${c}">${x}</section>`}
 function chart(id,type,data,options={}){let c=document.getElementById(id);if(!c)return;charts.push(new Chart(c,{type,data,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#aeb7cc",font:{size:10}}}},scales:{x:{ticks:{color:"#8991a8"},grid:{color:"#ffffff0b"}},y:{ticks:{color:"#8991a8"},grid:{color:"#ffffff0b"}}},...options}}))}
+function chartOrEmpty(id,type,data,options,message){let c=document.getElementById(id);if(!c)return;let n=(data.datasets||[]).reduce((s,d)=>s+((d.data&&d.data.length)||0),0);if(!n){c.parentNode.innerHTML=`<div class="empty"><strong>No data yet</strong>${message||"This chart needs data that has not been recorded."}</div>`;return}chart(id,type,data,options)}
+async function syncGarmin(btn){
+  if(btn){btn.dataset.label=btn.textContent;btn.disabled=true;btn.textContent="Syncing…"}
+  show("Syncing with Garmin - usually 15 to 90 seconds");
+  try{
+    var tk=new URLSearchParams(location.search).get("tk")||"";
+    var h={"Content-Type":"application/json"};if(tk)h["X-Dash-Token"]=tk;
+    var r=await fetch("/sync",{method:"POST",headers:h,credentials:"same-origin"});
+    var res=await r.json().catch(function(){return{}});
+    if(!r.ok||!res.ok){var tail=(res&&res.output)?String(res.output).trim().split("\n").slice(-1)[0]:("HTTP "+r.status);throw new Error(tail)}
+    show("Garmin sync complete");
+    if(window.auroraReloadAll){await window.auroraReloadAll()}else{location.reload()}
+  }catch(e){show("Sync failed: "+(e&&e.message?e.message:e))}
+  finally{if(btn){btn.disabled=false;btn.textContent=btn.dataset.label||"Sync Garmin now"}}
+}
 function navActive(){let h=location.hash||"#home";document.querySelectorAll(".nav a").forEach(a=>a.classList.toggle("active",h.startsWith(a.getAttribute("href"))))}
 function header(title,sub=""){return `<div class="detail-head"><div><a class="back" href="#home">← Home</a><h1 class="gradient">${title}</h1><p class="sub">${sub}</p></div></div>`}
 function latest(){return RUNS[RUNS.length-1]}
 function home(){
 let r=latest(),week=RUNS.filter(x=>x.date>="2026-11-09"),last=RUNS.filter(x=>x.date>="2026-11-02"&&x.date<"2026-11-09"),days=Math.round((new Date("2026-11-12")-new Date(r.date))/864e5);
-return `<div class="view"><div class="sync"><span><b>${SUMMARY.total_runs}</b> runs synced</span><span><b>${SUMMARY.latest_run_date}</b> latest activity</span><span><b>${SUMMARY.latest_run_distance} mi</b> latest distance</span></div><div class="hero"><div class="eyebrow">Thursday · command centre</div><h1>Train with<br><span class="gradient">intent.</span></h1><p class="sub">Your current signal is based on the official coaching load and recent training pattern.</p></div><div class="grid">
+return `<div class="view"><div class="sync"><span><b>${SUMMARY.total_runs}</b> runs synced</span><span><b>${SUMMARY.latest_run_date}</b> latest activity</span><span><b>${SUMMARY.latest_run_distance} mi</b> latest distance</span><button class="btn ghost" style="margin-left:auto;padding:8px 12px;min-height:36px" onclick="syncGarmin(this)">Sync Garmin now</button></div><div class="hero"><div class="eyebrow">Thursday · command centre</div><h1>Train with<br><span class="gradient">intent.</span></h1><p class="sub">Your current signal is based on the official coaching load and recent training pattern.</p></div><div class="grid">
 ${card(`<div class="eyebrow">Training signal</div><h2 class="good">EASY</h2><p class="sub">Official ACWR is 1.24, below the 1.5 critical threshold. Protect recovery after the recent load spike.</p><span class="pill">ACWR 1.24 · from coaching analysis</span>`,`card signal`)}
 ${card(`<div class="eyebrow">Latest run analysed</div><h2>${r.date}</h2><div class="value gradient">${r.distance} mi</div><p class="sub">${r.avgPace}/mi · ${r.avgHR} bpm · Easy</p><button class="btn" onclick="navigate('#runs/${r.date}')">Open full report</button>`,`card half`)}
 ${card(`<div class="eyebrow">This week</div><div class="stats"><div class="stat"><div class="label">Miles</div><div class="value">${SUMMARY.this_week_miles}</div></div><div class="stat"><div class="label">Runs</div><div class="value">${week.length}</div></div><div class="stat"><div class="label">Last week</div><div class="value">${last.reduce((a,x)=>a+x.distance,0).toFixed(2)}</div></div><div class="stat"><div class="label">Planned long run</div><div class="value">9–10</div></div></div>`,`card half`)}
@@ -144,7 +159,17 @@ return `<div class="view">${header(date,`${r.distance} mi · ${r.band} run`)}<di
 function logRun(){return `<div class="view">${header("Log a run","Quick log · pending Garmin sync")}<section class="card form"><label>Date<input id="ld" type="date" value="${new Date().toISOString().slice(0,10)}"></label><label>Distance (mi)<input id="lx" type="number" step=".01" required></label><label>Time<input id="lt" type="text" placeholder="45:00"></label><label>Average HR<input id="lh" type="number"></label><label>RPE <input id="lr" type="number" min="1" max="10" value="5"></label><button class="btn" onclick="saveRun()">Save and open report</button></section></div>`}
 function saveRun(){let date=ld.value,d=+lx.value,t=lt.value||"0:00",hr=+lh.value||null,sec=paceSec(t)/(d||1),p=`${Math.floor(sec/60)}:${String(Math.round(sec%60)).padStart(2,"0")}`,r={date,distance:d,time:t,avgHR:hr,maxHR:null,cadence:null,avgPace:p,bestPace:null,best5k:null,splits:null,ascent:null,descent:null,calories:null,laps:null,bestLap:null,source:"Quick log · pending Garmin sync",band:d<5?"SHORT":d<=9?"MEDIUM":"LONG"};RUNS.push(r);RUNS.sort((a,b)=>a.date.localeCompare(b.date));localStorage.setItem("aurora_last_seen_run",date);show("Run saved · pending Garmin sync");navigate("#runs/"+date)}
 function fuel(date){let rows=NUTRITION.filter(x=>!date||x.date===date);return `<div class="view">${header(date||"Fuel","CalTrak nutrition")}<section class="card"><div class="section-title"><h2>${date||"Today"}</h2><label class="btn ghost">Import CSV<input type="file" accept=".csv,text/csv" hidden onchange="importCSV(event)"></label></div>${rows.length?rows.map(x=>`<a class="run-card" href="#fuel/${x.date}"><div><b>${x.date}</b><div class="run-meta">Calories ${x.kcal??"not recorded"} · Protein ${x.protein??"not recorded"}g</div></div><div class="run-distance">${x.carbs??"—"}<small>g carbs</small></div></a>`).join(""):`<div class="empty"><strong>Nutrition unavailable</strong>NO DATA: nutrition_log_url returned nothing. Import a CalTrak CSV to add daily totals.</div>`}</section><section class="card"><div class="eyebrow">How to use CalTrak</div><p class="sub">Export your food log from CalTrak on your phone, then choose the CSV above. Missing columns remain not recorded.</p></section></div>`}
-function importCSV(e){let f=e.target.files[0];if(!f)return;let rd=new FileReader;rd.onload=()=>{let lines=rd.result.trim().split(/\r?\n/),h=lines.shift().split(",").map(x=>x.trim().toLowerCase()),find=(...a)=>h.findIndex(x=>a.some(k=>x===k||x.includes(k))),di=find("date","day"),ki=find("calories","kcal","energy"),pi=find("protein"),ci=find("carbs","carbohydrates"),fi=find("fat"),map={};lines.forEach(l=>{let v=l.split(",");let date=v[di];if(!date)return;let x=map[date]||{date,kcal:0,protein:0,carbs:0,fat:0};if(ki>=0)x.kcal+=+v[ki]||0;if(pi>=0)x.protein+=+v[pi]||0;if(ci>=0)x.carbs+=+v[ci]||0;if(fi>=0)x.fat+=+v[fi]||0;map[date]=x});let imported=Object.values(map);localStorage.setItem("aurora_nutrition",JSON.stringify([...NUTRITION.filter(x=>!map[x.date]),...imported]));show("CalTrak imported");navigate("#fuel/"+(imported.at(-1)?.date||""))};rd.readAsText(f)}
+function importCSV(e){let f=e.target.files[0];if(!f)return;let rd=new FileReader;rd.onload=async()=>{
+  try{
+    var tk=new URLSearchParams(location.search).get("tk")||"";
+    var h={"Content-Type":"application/json"};if(tk)h["X-Dash-Token"]=tk;
+    var r=await fetch("/api/nutrition",{method:"POST",headers:h,credentials:"same-origin",body:JSON.stringify({csv:rd.result})});
+    var res=await r.json().catch(function(){return{}});
+    if(!r.ok)throw new Error(res.detail||("HTTP "+r.status));
+    show("CalTrak imported · "+(res.upserted||0)+" day(s)");
+    if(window.auroraReloadNutrition){await window.auroraReloadNutrition()}else{navigate("#fuel")}
+  }catch(err){show("Import failed: "+(err&&err.message?err.message:err))}
+};rd.readAsText(f)}
 function weeklyBars(runs){
   var m = {};
   runs.forEach(function (r) {
@@ -176,18 +201,125 @@ function fadePct(splits){
   if (!a) { return null; }
   return Math.round((b - a) / a * 1000) / 10;
 }
+function isoOf(d){
+  var m = String(d.getMonth() + 1).padStart(2, "0");
+  var day = String(d.getDate()).padStart(2, "0");
+  return d.getFullYear() + "-" + m + "-" + day;
+}
+function monthlyBars(runs){
+  var m = {};
+  runs.forEach(function (r) {
+    var k = String(r.date).slice(0, 7);
+    if (!m[k]) { m[k] = { miles: 0, runs: 0 }; }
+    m[k].miles += r.distance || 0;
+    m[k].runs += 1;
+  });
+  var keys = Object.keys(m).sort();
+  return {
+    labels: keys,
+    miles: keys.map(function (k) { return Math.round(m[k].miles * 100) / 100; }),
+    runs: keys.map(function (k) { return m[k].runs; })
+  };
+}
+function cumulativeMiles(runs){
+  var total = 0;
+  return runs.map(function (r) {
+    total += r.distance || 0;
+    return Math.round(total * 100) / 100;
+  });
+}
+function paceBuckets(runs){
+  var buckets = {};
+  runs.forEach(function (r) {
+    var s = paceSec(r.avgPace);
+    if (!isFinite(s) || s <= 0) { return; }
+    var lo = Math.floor(s / 30) * 30;
+    buckets[lo] = (buckets[lo] || 0) + 1;
+  });
+  var keys = Object.keys(buckets).map(Number).sort(function (a, b) { return a - b; });
+  return {
+    labels: keys.map(function (k) {
+      return Math.floor(k / 60) + ":" + String(k % 60).padStart(2, "0");
+    }),
+    counts: keys.map(function (k) { return buckets[k]; })
+  };
+}
+function daysBetween(runs){
+  var out = [];
+  for (var i = 1; i < runs.length; i++) {
+    var a = new Date(runs[i - 1].date + "T00:00:00");
+    var b = new Date(runs[i].date + "T00:00:00");
+    out.push({
+      date: runs[i].date,
+      gap: Math.round((b - a) / 864e5)
+    });
+  }
+  return out;
+}
+function heatmap(runs){
+  if (!runs.length) { return ""; }
+  var byDate = {};
+  runs.forEach(function (r) {
+    byDate[r.date] = (byDate[r.date] || 0) + 1;
+  });
+  var last = new Date(runs[runs.length - 1].date + "T00:00:00");
+  var start = new Date(last);
+  start.setDate(start.getDate() - 111);
+  var dow = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - dow);
+  var cells = [], d = new Date(start);
+  while (d <= last) {
+    var k = isoOf(d);
+    var n = byDate[k] || 0;
+    var cls = n === 0 ? "" : n === 1 ? "h1" : n === 2 ? "h2" : n === 3 ? "h3" : "h4";
+    cells.push('<i class="' + cls + '" title="' + k +
+      (n ? " \u00b7 " + n + " run" + (n > 1 ? "s" : "") : "") + '"></i>');
+    d.setDate(d.getDate() + 1);
+  }
+  return '<div class="heat">' + cells.join("") + "</div>";
+}
+function groupHead(title, sub){
+  return '<div class="group"><div class="eyebrow">' + title + "</div>" +
+    (sub ? '<p class="sub">' + sub + "</p>" : "") + "</div>";
+}
 function analysis(){
-  var tick = { ticks: { color: "#8991a8" }, grid: { color: "#ffffff0b" } };
-  return `<div class="view">${header("Analysis","Every chart is computed from the live activity rows.")}<div class="grid">
+  return `<div class="view">${header("Analysis","Every chart is computed from the live activity rows. Empty states mean the data was never recorded, not that a chart was dropped.")}<div class="grid">
+    ${groupHead("Volume","How much you ran, and how it accumulated.")}
     ${card(`<div class="eyebrow">Training load</div><div class="chartbox"><canvas id="load"></canvas></div><p class="sub">Miles per run across the full retained history.</p>`,`card`)}
     ${card(`<div class="eyebrow">Weekly mileage</div><div class="chartbox"><canvas id="weekly"></canvas></div><p class="sub">Miles and run count by week.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Monthly mileage</div><div class="chartbox"><canvas id="monthly"></canvas></div><p class="sub">Miles and run count by calendar month.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Cumulative mileage</div><div class="chartbox"><canvas id="cumulative"></canvas></div><p class="sub">Total miles banked since the first retained run.</p>`,`card half`)}
     ${card(`<div class="eyebrow">Distance by run</div><div class="chartbox"><canvas id="dist"></canvas></div><p class="sub">Each bar is a run in chronological order, coloured by distance band.</p>`,`card half`)}
+
+    ${groupHead("Intensity &amp; effort","Heart rate, training stress and the cost of each run.")}
     ${card(`<div class="eyebrow">Pace and heart rate</div><div class="chartbox"><canvas id="pacehr"></canvas></div><p class="sub">Average pace and average heart rate over time.</p>`,`card`)}
+    ${card(`<div class="eyebrow">Training stress score</div><div class="chartbox"><canvas id="tss"></canvas></div><p class="sub">Per-run TSS as reported by the live activity API.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Calories per run</div><div class="chartbox"><canvas id="calories"></canvas></div><p class="sub">Energy recorded by the watch for each run.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Average vs maximum HR</div><div class="chartbox"><canvas id="hrmax"></canvas></div><p class="sub">How much headroom each run left between average and peak effort.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Climbing cost</div><div class="chartbox"><canvas id="ascentpace"></canvas></div><p class="sub">Ascent against pace. Points above the cloud are slower for the same climbing.</p>`,`card half`)}
+
+    ${groupHead("Mechanics &amp; terrain","Cadence, elevation and the shape of the ground.")}
+    ${card(`<div class="eyebrow">Cadence</div><div class="chartbox"><canvas id="cadence"></canvas></div><p class="sub">Average steps per minute, with maximum cadence where recorded.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Elevation gain</div><div class="chartbox"><canvas id="elevation"></canvas></div><p class="sub">Total ascent per run in feet.</p>`,`card half`)}
+
+    ${groupHead("Performance &amp; pacing","Fitness, fade and how pace is distributed.")}
     ${card(`<div class="eyebrow">Fitness trend</div><div class="chartbox"><canvas id="fit"></canvas></div><p class="sub">Recorded pace against average heart rate.</p>`,`card half`)}
     ${card(`<div class="eyebrow">Run bubbles</div><div class="chartbox"><canvas id="bubble"></canvas></div><p class="sub">Sequence, pace and distance at a glance.</p>`,`card half`)}
-    ${card(`<div class="eyebrow">Pacing fade</div><div class="chartbox"><canvas id="fade"></canvas></div><p class="sub">Second-half pace vs first-half pace, per run with splits. Below zero is a negative split.</p>`,`card`)}
+    ${card(`<div class="eyebrow">Pacing fade</div><div class="chartbox"><canvas id="fade"></canvas></div><p class="sub">Second-half pace vs first-half pace, per run with splits. Below zero is a negative split.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Pace distribution</div><div class="chartbox"><canvas id="pacedist"></canvas></div><p class="sub">How many runs landed in each 30-second pace bucket.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Best 5K trend</div><div class="chartbox"><canvas id="best5k"></canvas></div><p class="sub">Fastest 5K within each run, from the live split data.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Latest run splits</div><div class="chartbox"><canvas id="latesplits"></canvas></div><p class="sub">Per-mile splits for the most recent run that has them.</p>`,`card half`)}
+
+    ${groupHead("Consistency","Whether the training actually happened.")}
+    ${card(`<div class="eyebrow">Training calendar</div>${heatmap(RUNS)}<p class="sub">Every day in the last 16 weeks. Brighter cells hold more runs.</p>`,`card`)}
+    ${card(`<div class="eyebrow">Days between runs</div><div class="chartbox"><canvas id="gaps"></canvas></div><p class="sub">Rest days between consecutive runs. Tall bars are layoffs.</p>`,`card half`)}
+    ${card(`<div class="eyebrow">Runs per month</div><div class="chartbox"><canvas id="monthruns"></canvas></div><p class="sub">Run count by calendar month, isolated from mileage.</p>`,`card half`)}
+
+    ${groupHead("Body &amp; strength","Load the watch cannot see.")}
     ${card(`<div class="eyebrow">Bodyweight</div><div class="empty"><strong>No bodyweight recorded</strong>Add a weight measurement to plot the trend.</div>`,`card half`)}
     ${card(`<div class="eyebrow">Strength 1RM</div><div class="empty"><strong>No strength sessions</strong>Log a session in LIFT to plot estimated 1RM.</div>`,`card half`)}
+
+    ${groupHead("Coaching","The current read and the plan.")}
     ${card(`<div class="eyebrow">Distance bands</div><div class="stats">${Object.entries(COACH.grades).map(function(e){return `<div class="stat"><div class="label">${e[0]}</div><div class="value">${e[1][0]}</div><p class="sub">${e[1][1]}</p></div>`}).join("")}</div>`,`card`)}
     ${card(`<div class="eyebrow">Injury risk</div><h2 class="warn">Moderate</h2><p class="sub">The official ACWR is ${COACH.acwr != null ? COACH.acwr.toFixed(2) : "unavailable"}, below the 1.5 critical threshold. Recent short-term loading still warrants caution.</p>`,`card half`)}
     ${card(`<div class="eyebrow">Four-week plan</div><p class="sub"><b>Week 1:</b> 20-22 mi, recovery and stabilization.<br><b>Week 2:</b> 22-24 mi, controlled tempo.<br><b>Week 3:</b> 24-26 mi, moderate build.<br><b>Week 4:</b> 20-22 mi, deload.</p>`,`card half`)}
@@ -219,15 +351,37 @@ function render(){
   document.getElementById("app").innerHTML = html;
   var tick = { ticks: { color: "#8991a8" }, grid: { color: "#ffffff0b" } };
   if (v === "analysis") {
+    var yAxis = { beginAtZero: true, ticks: { color: "#8991a8" }, grid: { color: "#ffffff0b" } };
+    var ySoft = { beginAtZero: false, ticks: { color: "#8991a8" }, grid: { color: "#ffffff0b" } };
     chart("load", "line", {labels: RUNS.map(function (r) { return r.date.slice(5); }), datasets: [{label: "Miles", data: RUNS.map(function (r) { return r.distance; }), borderColor: "#00f5ff", backgroundColor: "#00f5ff22", fill: true, tension: .3}]}, {scales: {x: tick, y: tick}});
     var w = weeklyBars(RUNS);
     chart("weekly", "bar", {labels: w.labels, datasets: [{label: "Miles", data: w.miles, backgroundColor: "#7c3aed"}, {label: "Runs", data: w.runs, type: "line", borderColor: "#10ffa0", backgroundColor: "#10ffa0", yAxisID: "y1", tension: .3}]}, {scales: {x: tick, y: {beginAtZero: true, ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Miles", color: "#8991a8"}}, y1: {beginAtZero: true, position: "right", grid: {drawOnChartArea: false}, ticks: {color: "#8991a8"}, title: {display: true, text: "Runs", color: "#8991a8"}}}});
+    var mo = monthlyBars(RUNS);
+    chart("monthly", "bar", {labels: mo.labels, datasets: [{label: "Miles", data: mo.miles, backgroundColor: "#7c3aed"}, {label: "Runs", data: mo.runs, type: "line", borderColor: "#10ffa0", backgroundColor: "#10ffa0", yAxisID: "y1", tension: .3}]}, {scales: {x: tick, y: {beginAtZero: true, ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Miles", color: "#8991a8"}}, y1: {beginAtZero: true, position: "right", grid: {drawOnChartArea: false}, ticks: {color: "#8991a8"}, title: {display: true, text: "Runs", color: "#8991a8"}}}});
+    chart("cumulative", "line", {labels: RUNS.map(function (r) { return r.date.slice(5); }), datasets: [{label: "Cumulative miles", data: cumulativeMiles(RUNS), borderColor: "#10ffa0", backgroundColor: "#10ffa022", fill: true, tension: .25}]}, {scales: {x: tick, y: yAxis}});
     chart("dist", "bar", {labels: RUNS.map(function (r) { return r.date.slice(5); }), datasets: [{label: "Distance", data: RUNS.map(function (r) { return r.distance; }), backgroundColor: RUNS.map(function (r) { return bandColor(r.band); })}]}, {scales: {x: tick, y: {beginAtZero: true, ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Miles", color: "#8991a8"}}}});
     chart("pacehr", "line", {labels: RUNS.map(function (r) { return r.date.slice(5); }), datasets: [{label: "Pace s/mi", data: RUNS.map(function (r) { return paceSec(r.avgPace); }), borderColor: "#00f5ff", backgroundColor: "#00f5ff22", yAxisID: "y", tension: .3}, {label: "Avg HR", data: RUNS.map(function (r) { return r.avgHR; }), borderColor: "#ff3d5a", backgroundColor: "#ff3d5a22", yAxisID: "y1", tension: .3}]}, {scales: {x: tick, y: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Pace s/mi", color: "#8991a8"}}, y1: {position: "right", grid: {drawOnChartArea: false}, ticks: {color: "#8991a8"}, title: {display: true, text: "HR", color: "#8991a8"}}}});
+    var tss = RUNS.filter(function (r) { return r.tss != null; });
+    chartOrEmpty("tss", "bar", {labels: tss.map(function (r) { return r.date.slice(5); }), datasets: [{label: "TSS", data: tss.map(function (r) { return r.tss; }), backgroundColor: "#ffb300"}]}, {scales: {x: tick, y: yAxis}}, "Training stress score appears once the live activity API supplies it.");
+    chart("calories", "bar", {labels: RUNS.map(function (r) { return r.date.slice(5); }), datasets: [{label: "Calories", data: RUNS.map(function (r) { return r.calories; }), backgroundColor: "#ff3d5a"}]}, {scales: {x: tick, y: yAxis}});
+    chart("hrmax", "line", {labels: RUNS.map(function (r) { return r.date.slice(5); }), datasets: [{label: "Avg HR", data: RUNS.map(function (r) { return r.avgHR; }), borderColor: "#00f5ff", backgroundColor: "#00f5ff22", tension: .3}, {label: "Max HR", data: RUNS.map(function (r) { return r.maxHR; }), borderColor: "#ff3d5a", backgroundColor: "#ff3d5a22", tension: .3}]}, {scales: {x: tick, y: ySoft}});
+    chart("ascentpace", "scatter", {datasets: [{label: "Runs", data: RUNS.filter(function (r) { return r.ascent != null && isFinite(paceSec(r.avgPace)); }).map(function (r) { return {x: r.ascent, y: paceSec(r.avgPace)}; }), backgroundColor: "#7c3aed"}]}, {scales: {x: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Ascent (ft)", color: "#8991a8"}}, y: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Pace s/mi", color: "#8991a8"}}}});
+    chart("cadence", "bar", {labels: RUNS.map(function (r) { return r.date.slice(5); }), datasets: [{label: "Avg cadence", data: RUNS.map(function (r) { return r.cadence; }), backgroundColor: "#00f5ff"}, {label: "Max cadence", data: RUNS.map(function (r) { return r.maxCadence; }), type: "line", borderColor: "#ffb300", backgroundColor: "#ffb300", tension: .3}]}, {scales: {x: tick, y: ySoft}});
+    chart("elevation", "bar", {labels: RUNS.map(function (r) { return r.date.slice(5); }), datasets: [{label: "Ascent (ft)", data: RUNS.map(function (r) { return r.ascent; }), backgroundColor: "#10ffa0"}]}, {scales: {x: tick, y: yAxis}});
     chart("fit", "scatter", {datasets: [{label: "Runs", data: RUNS.map(function (r) { return {x: paceSec(r.avgPace), y: r.avgHR}; }), backgroundColor: "#10ffa0"}]}, {scales: {x: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Pace seconds/mi", color: "#8991a8"}}, y: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Average HR", color: "#8991a8"}}}});
     chart("bubble", "bubble", {datasets: [{label: "Runs", data: RUNS.map(function (r, i) { return {x: i + 1, y: paceSec(r.avgPace), r: Math.max(3, r.distance)}; }), backgroundColor: "#7c3aed99"}]}, {scales: {x: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Run sequence", color: "#8991a8"}}, y: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Pace s/mi", color: "#8991a8"}}}});
     var fades = RUNS.map(function (r) { return {date: r.date, pct: fadePct(r.splits)}; }).filter(function (x) { return x.pct !== null; });
-    chart("fade", "line", {labels: fades.map(function (x) { return x.date.slice(5); }), datasets: [{label: "Fade %", data: fades.map(function (x) { return x.pct; }), borderColor: "#ffb300", backgroundColor: "#ffb30022", fill: true, tension: .3, pointBackgroundColor: fades.map(function (x) { return x.pct > 0 ? "#ff3d5a" : "#10ffa0"; })}]}, {scales: {x: tick, y: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Second half vs first half %", color: "#8991a8"}}}});
+    chartOrEmpty("fade", "line", {labels: fades.map(function (x) { return x.date.slice(5); }), datasets: [{label: "Fade %", data: fades.map(function (x) { return x.pct; }), borderColor: "#ffb300", backgroundColor: "#ffb30022", fill: true, tension: .3, pointBackgroundColor: fades.map(function (x) { return x.pct > 0 ? "#ff3d5a" : "#10ffa0"; })}]}, {scales: {x: tick, y: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Second half vs first half %", color: "#8991a8"}}}}, "Pacing fade needs per-mile splits, which appear with the live split data.");
+    var pb = paceBuckets(RUNS);
+    chart("pacedist", "bar", {labels: pb.labels, datasets: [{label: "Runs", data: pb.counts, backgroundColor: "#00f5ff"}]}, {scales: {x: tick, y: yAxis}});
+    var b5 = RUNS.filter(function (r) { return r.best5k != null && isFinite(paceSec(r.best5k)); });
+    chartOrEmpty("best5k", "line", {labels: b5.map(function (r) { return r.date.slice(5); }), datasets: [{label: "Best 5K pace", data: b5.map(function (r) { return paceSec(r.best5k); }), borderColor: "#10ffa0", backgroundColor: "#10ffa022", fill: true, tension: .3}]}, {scales: {x: tick, y: {ticks: {color: "#8991a8"}, grid: {color: "#ffffff0b"}, title: {display: true, text: "Seconds per mile", color: "#8991a8"}}}}, "Best 5K pace appears once the live split data is available.");
+    var splitRun = RUNS.slice().reverse().find(function (r) { return r.splits && r.splits.length; });
+    var splitData = splitRun ? splitRun.splits : [];
+    chartOrEmpty("latesplits", "bar", {labels: splitData.map(function (_, i) { return "Mile " + (i + 1); }), datasets: [{label: "Seconds", data: splitData, backgroundColor: "#7c3aed"}]}, {scales: {x: tick, y: ySoft}}, "Per-mile splits appear once the live split data is available.");
+    var gaps = daysBetween(RUNS);
+    chart("gaps", "bar", {labels: gaps.map(function (g) { return g.date.slice(5); }), datasets: [{label: "Days since previous run", data: gaps.map(function (g) { return g.gap; }), backgroundColor: "#ffb300"}]}, {scales: {x: tick, y: yAxis}});
+    chart("monthruns", "bar", {labels: mo.labels, datasets: [{label: "Runs", data: mo.runs, backgroundColor: "#7c3aed"}]}, {scales: {x: tick, y: yAxis}});
   }
   if (v.startsWith("runs/")) {
     var r = RUNS.find(function (x) { return x.date === v.split("/")[1]; });
@@ -237,6 +391,17 @@ function render(){
   }
 }
 window.addEventListener("hashchange",render);render();
+/* Android share target lands back here with ?shared=ok|empty|error. Say what
+   happened, and jump to Fuel when rows actually landed. */
+(function () {
+  var s = new URLSearchParams(location.search).get("shared");
+  if (!s) { return; }
+  var msg = s === "ok" ? "CalTrak log imported from the share sheet"
+    : s === "empty" ? "The shared file had no readable rows"
+    : "The shared file could not be read as CalTrak CSV";
+  setTimeout(function () { show(msg); }, 300);
+  if (s === "ok") { setTimeout(function () { navigate("#fuel"); }, 500); }
+})();
 </script>
 </body>
 </html>

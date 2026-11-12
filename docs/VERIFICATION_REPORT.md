@@ -17,11 +17,11 @@ were imported. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-565 passed, 1 skipped (566 collected)
+573 passed, 1 skipped (574 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `536 passed, 30 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `544 passed, 30 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`, so CI fails only on a real defect. `ruff check .` is clean.
 
@@ -33,7 +33,7 @@ skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 | `tests/test_brief_bridge.py` | 62 |
 | `tests/test_dashboard_api.py` | 42 |
 | `tests/test_trainloop_cli.py` | 22 |
-| `tests/test_dashboard_api_http.py` | 68 |
+| `tests/test_dashboard_api_http.py` | 76 |
 | `tests/test_nutrition.py` | 33 |
 | `tests/test_fit_reader_elevation.py` | 21 |
 | `tests/test_splits.py` | 10 |
@@ -47,7 +47,7 @@ skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_brief_consistency.py` | 37 |
 | `tests/test_sync_import.py` | 5 |
-| **Total** | **566** (565 pass, 1 skip) |
+| **Total** | **574** (573 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -341,12 +341,18 @@ kept at `/classic`, and `/aurora` remains an alias so old bookmarks and the
 previous PWA `start_url` keep working. If the committed artifact is absent (a
 clean checkout), `/` falls back to the local page rather than returning `404`.
 
-- **Chart parity.** The flow artifact had only three canvases (load, fitness,
-  splits). The Analysis view now renders seven run-based charts: training load,
-  weekly mileage, distance by run coloured by distance band, pace and heart
-  rate, fitness scatter, run bubbles, and pacing fade. The run detail keeps the
-  per-mile splits chart. Bodyweight and strength remain honest empty states
-  because there is no bodyweight or strength data.
+- **Chart parity, then expansion.** The flow artifact had only three canvases
+  (load, fitness, splits). The Analysis view now renders nineteen run-based
+  charts in seven labelled groups: Volume (training load, weekly mileage,
+  monthly mileage, cumulative mileage, distance by run), Intensity & effort
+  (pace and heart rate, training stress score, calories, average vs maximum HR,
+  climbing cost), Mechanics & terrain (cadence, elevation gain), Performance &
+  pacing (fitness scatter, run bubbles, pacing fade, pace distribution, best 5K
+  trend, latest-run splits), Consistency (training-calendar heatmap, days
+  between runs, runs per month), Body & strength, and Coaching. The run detail
+  keeps the per-mile splits chart. Charts with no data show a named empty state
+  (`chartOrEmpty`) rather than a blank canvas: TSS is blank in every source
+  record, and bodyweight and strength have no data at all.
 - **No CDN.** Chart.js v4.4.4 is vendored at
   `flow_outputs/vendor/chart.umd.min.js` (205,749 bytes, SHA-256
   `B38076762F7363BC9E912B68B8E034826798DB5DF26BB61F000EC2E7A3137BC7`) and
@@ -375,14 +381,16 @@ clean checkout), `/` falls back to the local page rather than returning `404`.
   template literal (`` `card")} `` instead of `` `card`)} ``), which raised
   `SyntaxError: missing ) after argument list` at line 148 and stopped the whole
   app from initialising. It was corrected in place in the committed artifact.
-- Verified in-browser against the live database: 72 runs, seven Analysis charts
-  with data (72/72/72/31/72/72/72 points), the run-detail splits chart showing
-  six mile splits, and no console errors. `/classic` still renders its ten
-  canvases with no console errors.
-- Eight wire tests cover the routes: `/` serves Aurora with the live bootstrap
-  and PWA tags, `/aurora` remains an alias, `/classic` serves the local page,
-  `/` falls back when Aurora is absent, the token gate still applies, the CDN
-  rewrite and vendored file, and injection idempotence.
+- Verified in-browser against the live database: 72 runs, nineteen Analysis
+  charts with data (72 points on each run-based chart, 62 weeks, 16 months, 115
+  heatmap days), six mile splits on the latest run, and no console errors.
+  `/classic` still renders its ten canvases with no console errors.
+- Sixteen wire tests cover the routes and the mobile paths: `/` serves Aurora
+  with the live bootstrap and PWA tags, `/aurora` remains an alias, `/classic`
+  serves the local page, `/` falls back when Aurora is absent, the token gate
+  still applies, the CDN rewrite and vendored file, injection idempotence, the
+  manifest `share_target`, multipart parsing, `/share-target` ingestion, and the
+  live layer's reload hooks.
 - `--open` lands on `/`, the canonical dashboard; `launch_url()` no longer
   chooses between two pages.
 
@@ -404,7 +412,24 @@ a missing date column, unparseable dates, and negative or non-numeric values.
   `nutrition_log.csv` remains headers-only.
 - The Aurora live layer (served at `/` and `/aurora`) replaces `NUTRITION` from the API, overrides
   `window.importCSV` to POST the raw CSV, and maps `calories` to the `kcal`
-  field the committed FUEL view reads.
+  field the committed FUEL view reads. It also exposes
+  `window.auroraReloadAll` and `window.auroraReloadNutrition`, so the Garmin
+  sync button and the importer redraw from the server instead of a browser-only
+  copy.
+- **Android share target.** CalTrak has no account or cloud API; its log lives
+  on the device and is shared as a file. The web manifest now declares a
+  `share_target` for `/share-target` (`POST`, `multipart/form-data`, one file
+  field named `log` accepting `text/csv`, `text/plain`, JSON and `.csv`/`.json`).
+  After the PWA is installed, CalTrak's Share Log appears in Android's share
+  sheet; choosing Coach Dashboard posts the CSV to the server, which parses and
+  upserts it. Chrome normally routes the POST through the service worker, which
+  forwards `{csv: text}` to `/api/nutrition`; the server route is the fallback
+  for the first share before the worker is active. Both paths call
+  `parse_caltrak_csv()` and redirect to `/?shared=ok|empty|error`.
+- **One-tap Garmin sync.** The home view has a `Sync Garmin now` button that
+  POSTs `/sync` with the session cookie (or `?tk=`), runs `garmin_sync.py` then
+  `trainloop.py bootstrap`, and reloads from the API when it finishes. The same
+  button works on the phone and the laptop.
 - Verified in-browser with a synthetic two-day log: the FUEL tab listed both
   days (`Calories 2100 · Protein 150g`) and the run detail showed
   `1950 kcal · 140g protein · 200g carbs`, with no console errors.

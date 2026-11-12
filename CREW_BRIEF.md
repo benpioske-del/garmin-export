@@ -244,7 +244,7 @@ source. Re-derive it if you can.
 | FIT files with lap records | 72 of 72 | `python brief_consistency.py` |
 | Splits published | yes (`Best 5K Time`, `Lap Splits`) | header of `garmin_export.csv` |
 | Fastest measured 5 km crossing | 24:42 on 2026-06-16, measured | `brief_facts.json` → `best_5k` |
-| Tests | 552 passed, 1 skipped (553 collected) | `python -m pytest` |
+| Tests | 573 passed, 1 skipped (574 collected) | `python -m pytest` |
 | Dashboard API routes | 3, implemented and tested | `python dashboard_contract.py` |
 | Dashboard consumes the API | yes, all three | `python dashboard_contract.py` |
 
@@ -255,7 +255,7 @@ recalling a count.
 
 **`connect-dashboard-to-data-layer` is complete.** `garmin_server.py` serves
 `/api/activities`, `/api/load` and `/api/coaching` from the canonical data layer,
-`dashboard/index.html` consumes all three, and 80 tests cover it including 42
+`dashboard/index.html` consumes all three, and 118 tests cover it, including 76
 against a real bound HTTP server. Four briefs have asked for this work. Do not
 rebuild it. Verify with `python dashboard_contract.py`, which prints `PASS`.
 

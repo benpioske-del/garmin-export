@@ -727,3 +727,101 @@ def test_aurora_bootstrap_wires_the_nutrition_route(server, aurora_html):
     assert "loadNutrition" in text
     # The committed FUEL view reads `kcal`; the API schema is `calories`.
     assert "kcal:" in text
+
+# ------------------------------------------------ Android share target (PWA)
+
+def test_manifest_declares_the_caltrak_share_target(server):
+    _, _, body = _get(server, "/manifest.webmanifest", token=None)
+    m = json.loads(body.decode("utf-8"))
+    st = m["share_target"]
+    assert st["action"] == "/share-target"
+    assert st["method"] == "POST"
+    assert st["enctype"] == "multipart/form-data"
+    assert st["params"]["files"][0]["name"] == "log"
+
+
+def test_multipart_file_text_parses_a_file_part():
+    boundary = "----x"
+    body = (
+        ("--%s\r\n" % boundary).encode("utf-8")
+        + b'Content-Disposition: form-data; name="log"; filename="caltrak.csv"\r\n'
+        + b"Content-Type: text/csv\r\n\r\n"
+        + b"date,calories\n2026-11-10,500\n"
+        + ("\r\n--%s--\r\n" % boundary).encode("utf-8")
+    )
+    text = G.multipart_file_text(
+        body, "multipart/form-data; boundary=%s" % boundary)
+    assert text == "date,calories\n2026-11-10,500\n"
+
+
+def test_multipart_file_text_ignores_a_plain_field():
+    boundary = "----x"
+    body = (
+        ("--%s\r\n" % boundary).encode("utf-8")
+        + b'Content-Disposition: form-data; name="note"\r\n\r\n'
+        + b"hello\r\n"
+        + ("--%s--\r\n" % boundary).encode("utf-8")
+    )
+    assert G.multipart_file_text(
+        body, "multipart/form-data; boundary=%s" % boundary) is None
+
+
+def test_multipart_file_text_rejects_a_missing_boundary():
+    assert G.multipart_file_text(b"whatever", "multipart/form-data") is None
+
+
+def _post_multipart(base, path, content, token=TOKEN):
+    boundary = "----testboundary"
+    body = (
+        ("--%s\r\n" % boundary).encode("utf-8")
+        + b'Content-Disposition: form-data; name="log"; filename="caltrak.csv"\r\n'
+        + b"Content-Type: text/csv\r\n\r\n"
+        + content.encode("utf-8")
+        + ("\r\n--%s--\r\n" % boundary).encode("utf-8")
+    )
+    req = urllib.request.Request(base + path, data=body, method="POST")
+    req.add_header("Content-Type", "multipart/form-data; boundary=%s" % boundary)
+    if token is not None:
+        req.add_header("X-Dash-Token", token)
+    try:
+        with _NO_REDIRECT.open(req, timeout=10) as r:
+            return r.status, r.headers.get("Location"), r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.headers.get("Location"), e.read()
+
+
+def test_share_target_ingests_the_caltrak_csv_and_redirects(server,
+                                                           nutrition_file):
+    csv_text = ("date,calories,protein,carbs,fat\n"
+                "2026-11-10,300,20,30,10\n"
+                "2026-11-10,200,10,20,5\n")
+    status, location, _ = _post_multipart(server, "/share-target", csv_text)
+    assert status == 303
+    assert location == "/?shared=ok"
+    _, _, payload = _json(server, "/api/nutrition")
+    assert payload["days"][0]["calories"] == 500
+    assert payload["days"][0]["protein"] == 30
+
+
+def test_share_target_reports_an_unreadable_file(server, nutrition_file):
+    status, location, _ = _post_multipart(server, "/share-target", "not a csv")
+    assert status == 303
+    assert location == "/?shared=error"
+
+
+def test_share_target_requires_the_dash_token(server, nutrition_file):
+    status, location, _ = _post_multipart(
+        server, "/share-target", "date,calories\n2026-11-10,1\n", token=None)
+    # The gate redirects an unauthenticated browser to the login page.
+    assert status == 303
+    assert location == "/login"
+
+
+def test_aurora_bootstrap_exposes_reload_hooks_and_tss_fields(server,
+                                                              aurora_html):
+    _, _, body = _get(server, "/")
+    text = body.decode("utf-8")
+    assert "window.auroraReloadAll" in text
+    assert "window.auroraReloadNutrition" in text
+    assert "maxCadence" in text
+    assert "training_stress_score" in text
