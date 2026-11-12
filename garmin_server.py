@@ -299,6 +299,7 @@ BIND_HOST = "127.0.0.1"
 ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 last_request: float = time.time()
 SYNC_SCRIPT = os.path.join(ROOT, "garmin_sync.py")
+IMPORT_SCRIPT = os.path.join(ROOT, "trainloop.py")
 _sync_lock = threading.Lock()
 MEGACMD = ""
 MEGACMD_REMOTE = "/CoachDashboard"
@@ -312,24 +313,63 @@ import trainingdb          # noqa: E402
 import trainloop           # noqa: E402
 
 
-def _run_sync():
-    if not os.path.isfile(SYNC_SCRIPT):
-        return {"ok": False, "exit": None,
-                "output": "garmin_sync.py not found next to garmin_server.py."}
+def _run_step(argv, timeout, label):
+    """Run one pipeline step in the repository and capture its tail.
+
+    Every step is a separate process on purpose: the server must not grow a
+    second FIT parser or a second import path, so it shells out to the same
+    scripts a person would run.
+    """
     try:
-        proc = subprocess.run([sys.executable, SYNC_SCRIPT], capture_output=True,
-                              text=True, stdin=subprocess.DEVNULL, cwd=ROOT, timeout=300)
+        proc = subprocess.run([sys.executable] + argv, capture_output=True,
+                              text=True, stdin=subprocess.DEVNULL, cwd=ROOT,
+                              timeout=timeout)
         lines = [ln for ln in (proc.stdout or "").splitlines() if ln.strip()]
         out = "\n".join(lines[-25:])
         if proc.returncode != 0:
             out += "\n[exit code %d]" % proc.returncode
-        return {"ok": proc.returncode == 0, "exit": proc.returncode, "output": out[-4000:]}
+        return {"ok": proc.returncode == 0, "exit": proc.returncode,
+                "output": out[-4000:]}
     except subprocess.TimeoutExpired:
         return {"ok": False, "exit": None,
-                "output": "Garmin sync ran longer than 300s and was stopped."}
+                "output": "%s ran longer than %ds and was stopped."
+                          % (label, timeout)}
     except Exception as exc:
         return {"ok": False, "exit": None,
-                "output": "Could not start Garmin sync: %r" % (exc,)}
+                "output": "Could not start %s: %r" % (label, exc)}
+
+
+def _run_sync():
+    """Download new activities, then import them into trainloop.db.
+
+    Downloading and importing are separate steps. garmin_sync.py only writes
+    .FIT files; the dashboard, the audit and the supervisor briefs read
+    trainloop.db. Running only the download is what let a downloaded run stay
+    invisible on the dashboard, so the import always follows.
+
+    The import is attempted even when the download fails, so any FIT file that
+    did arrive (by an earlier run, or by copying one in by hand) is still
+    picked up. `ok` is true only when both steps succeed.
+    """
+    if not os.path.isfile(SYNC_SCRIPT):
+        return {"ok": False, "exit": None,
+                "output": "garmin_sync.py not found next to garmin_server.py."}
+    if not os.path.isfile(IMPORT_SCRIPT):
+        return {"ok": False, "exit": None,
+                "output": "trainloop.py not found next to garmin_server.py."}
+
+    download = _run_step([SYNC_SCRIPT], 300, "Garmin sync")
+    imported = _run_step([IMPORT_SCRIPT, "bootstrap"], 900, "Database import")
+    output = "== Garmin sync ==\n%s\n\n== Database import ==\n%s" % (
+        download["output"] or "(no output)",
+        imported["output"] or "(no output)")
+    return {
+        "ok": download["ok"] and imported["ok"],
+        "exit": imported["exit"] if download["ok"] else download["exit"],
+        "output": output[-4000:],
+        "download_ok": download["ok"],
+        "import_ok": imported["ok"],
+    }
 
 
 def fit_names():
