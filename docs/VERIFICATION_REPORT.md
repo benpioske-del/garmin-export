@@ -25,6 +25,11 @@ and no `dashboard/index.html`: `544 passed, 30 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`, so CI fails only on a real defect. `ruff check .` is clean.
 
+CI runs the suite on Python 3.12 and 3.13. `garminconnect>=0.3.13` declares
+`Requires-Python >=3.12`, so `requires-python` is now `>=3.12` and the old 3.10
+job was removed: it could never install the dependency, and it failed before
+lint or tests ran.
+
 | File | Tests |
 | --- | --- |
 | `tests/test_dashboard_contract.py` | 36 |
