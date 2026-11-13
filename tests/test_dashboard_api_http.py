@@ -611,12 +611,14 @@ def nutrition_file(monkeypatch, tmp_path):
     return path
 
 
-def _post_json(base, path, payload, token=TOKEN, raw=None):
+def _post_json(base, path, payload, token=TOKEN, raw=None, headers=None):
     body = raw if raw is not None else json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(base + path, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
     if token is not None:
         req.add_header("X-Dash-Token", token)
+    for key, value in (headers or {}).items():
+        req.add_header(key, value)
 
     def parsed(data):
         try:
@@ -825,3 +827,194 @@ def test_aurora_bootstrap_exposes_reload_hooks_and_tss_fields(server,
     assert "window.auroraReloadNutrition" in text
     assert "maxCadence" in text
     assert "training_stress_score" in text
+
+
+# --------------------------------------- phone webhook (Health Connect bridge)
+
+def _hook_token(server):
+    status, _, info = _json(server, "/api/nutrition/hook-info")
+    assert status == 200
+    return info["token"]
+
+
+def _hc_raw(record_id, date, calories, protein=0, carbs=0, fat=0):
+    return {
+        "start_time": date + "T08:00:00-08:00",
+        "end_time": date + "T08:05:00-08:00",
+        "calories": calories,
+        "protein_grams": protein,
+        "carbs_grams": carbs,
+        "fat_grams": fat,
+        "metadata": {"id": record_id},
+    }
+
+
+def test_hook_info_requires_the_dash_token(server, nutrition_file):
+    status, _, _ = _get(server, "/api/nutrition/hook-info", token=None)
+    assert status == 403
+
+
+def test_hook_info_returns_the_header_and_a_stable_token(server, nutrition_file):
+    _, _, first = _json(server, "/api/nutrition/hook-info")
+    _, _, second = _json(server, "/api/nutrition/hook-info")
+    assert first["path"] == "/api/nutrition/hook"
+    assert first["header"] == "X-Nutrition-Token"
+    assert first["token"]
+    assert first["token"] == second["token"]
+
+
+def test_hook_accepts_the_phone_token_without_a_browser_session(server,
+                                                                nutrition_file):
+    token = _hook_token(server)
+    status, ctype, result = _post_json(
+        server, "/api/nutrition/hook",
+        {"nutrition": [_hc_raw("a", "2026-11-10", 300, 20, 30, 10)]},
+        token=None, headers={"X-Nutrition-Token": token})
+    assert status == 200
+    assert ctype == "application/json; charset=utf-8"
+    assert result["ok"] is True
+    assert result["accepted"] == 1
+    assert result["source"] == "health-connect"
+    _, _, payload = _json(server, "/api/nutrition")
+    assert payload["days"][0]["calories"] == 300
+
+
+def test_hook_accepts_bearer_auth(server, nutrition_file):
+    token = _hook_token(server)
+    status, _, result = _post_json(
+        server, "/api/nutrition/hook",
+        {"nutrition": [_hc_raw("a", "2026-11-10", 300)]},
+        token=None, headers={"Authorization": "Bearer " + token})
+    assert status == 200
+    assert result["accepted"] == 1
+
+
+def test_hook_rejects_a_missing_token(server, nutrition_file):
+    status, _, payload = _post_json(
+        server, "/api/nutrition/hook",
+        {"nutrition": [_hc_raw("a", "2026-11-10", 300)]}, token=None)
+    assert status == 401
+    assert "nutrition token" in payload["error"]
+
+
+def test_hook_rejects_a_wrong_token(server, nutrition_file):
+    status, _, _ = _post_json(
+        server, "/api/nutrition/hook",
+        {"nutrition": [_hc_raw("a", "2026-11-10", 300)]},
+        token=None, headers={"X-Nutrition-Token": "not-the-hook-token"})
+    assert status == 401
+
+
+def test_hook_rejects_the_dashboard_token_as_the_hook_token(server,
+                                                            nutrition_file):
+    """The two secrets are separate; the login token must not work here."""
+    status, _, _ = _post_json(
+        server, "/api/nutrition/hook",
+        {"nutrition": [_hc_raw("a", "2026-11-10", 300)]},
+        token=None, headers={"X-Nutrition-Token": TOKEN})
+    assert status == 401
+
+
+def test_hook_rejects_a_non_object_payload(server, nutrition_file):
+    token = _hook_token(server)
+    status, _, payload = _post_json(
+        server, "/api/nutrition/hook", [1, 2, 3],
+        token=None, headers={"X-Nutrition-Token": token})
+    assert status == 400
+    assert payload["error"] == "invalid health connect payload"
+
+
+def test_hook_incremental_records_keep_the_whole_day(server, nutrition_file):
+    token = _hook_token(server)
+    headers = {"X-Nutrition-Token": token}
+    _post_json(server, "/api/nutrition/hook",
+               {"nutrition": [_hc_raw("a", "2026-11-10", 300, 20, 30, 10)]},
+               token=None, headers=headers)
+    _post_json(server, "/api/nutrition/hook",
+               {"nutrition": [_hc_raw("b", "2026-11-10", 250, 15, 40, 8)]},
+               token=None, headers=headers)
+    _, _, payload = _json(server, "/api/nutrition")
+    assert payload["days"][0]["calories"] == 550
+    assert payload["days"][0]["protein"] == 35
+
+
+def test_hook_applies_a_deletion(server, nutrition_file):
+    token = _hook_token(server)
+    headers = {"X-Nutrition-Token": token}
+    _post_json(server, "/api/nutrition/hook",
+               {"nutrition": [_hc_raw("a", "2026-11-10", 300),
+                              _hc_raw("b", "2026-11-10", 250)]},
+               token=None, headers=headers)
+    status, _, result = _post_json(
+        server, "/api/nutrition/hook",
+        {"nutrition": [], "deleted": [{"type": "nutrition", "id": "a"}]},
+        token=None, headers=headers)
+    assert status == 200
+    assert result["accepted"] == 0
+    _, _, payload = _json(server, "/api/nutrition")
+    assert payload["days"][0]["calories"] == 250
+
+
+def test_hook_accepts_a_daily_resolution_record(server, nutrition_file):
+    token = _hook_token(server)
+    status, _, result = _post_json(
+        server, "/api/nutrition/hook",
+        {"nutrition": [{
+            "start_time": "2026-11-10T00:00:00-08:00",
+            "end_time": "2026-11-11T00:00:00-08:00",
+            "calories": 2100,
+            "protein_grams": 140,
+            "carbs_grams": 220,
+            "fat_grams": 70,
+        }]},
+        token=None, headers={"X-Nutrition-Token": token})
+    assert status == 200
+    assert result["upserted"] == 1
+    _, _, payload = _json(server, "/api/nutrition")
+    assert payload["days"][0]["calories"] == 2100
+
+
+def test_hook_sends_no_cors_headers(server, nutrition_file):
+    token = _hook_token(server)
+    body = json.dumps(
+        {"nutrition": [_hc_raw("a", "2026-11-10", 300)]}).encode("utf-8")
+    req = urllib.request.Request(server + "/api/nutrition/hook", data=body,
+                                 method="POST")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("X-Nutrition-Token", token)
+    with urllib.request.urlopen(req, timeout=10) as r:
+        assert r.headers.get("Access-Control-Allow-Origin") is None
+
+
+# ------------------------------------------------- JSON CalTrak backups
+
+def test_nutrition_post_accepts_a_json_backup(server, nutrition_file):
+    status, _, result = _post_json(server, "/api/nutrition", {
+        "json": {"days": [{"date": "2026-11-10", "calories": 700}]}})
+    assert status == 200
+    assert result["upserted"] == 1
+    _, _, payload = _json(server, "/api/nutrition")
+    assert payload["days"][0]["calories"] == 700
+
+
+def test_nutrition_post_accepts_a_raw_backup_object(server, nutrition_file):
+    status, _, result = _post_json(server, "/api/nutrition", {
+        "version": 1,
+        "food_log": [{
+            "logged_at": "2026-11-10T08:00:00Z",
+            "food": {"calories": 300, "protein": 20, "carbs": 30, "fat": 10},
+        }],
+    })
+    assert status == 200
+    assert result["upserted"] == 1
+    _, _, payload = _json(server, "/api/nutrition")
+    assert payload["days"][0]["calories"] == 300
+
+
+def test_share_target_accepts_a_json_backup(server, nutrition_file):
+    text = json.dumps({"days": [{"date": "2026-11-10", "calories": 500}]})
+    status, location, _ = _post_multipart(server, "/share-target", text)
+    assert status == 303
+    assert location == "/?shared=ok"
+    _, _, payload = _json(server, "/api/nutrition")
+    assert payload["days"][0]["calories"] == 500

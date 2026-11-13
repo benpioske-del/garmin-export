@@ -244,7 +244,7 @@ source. Re-derive it if you can.
 | FIT files with lap records | 72 of 72 | `python brief_consistency.py` |
 | Splits published | yes (`Best 5K Time`, `Lap Splits`) | header of `garmin_export.csv` |
 | Fastest measured 5 km crossing | 24:42 on 2026-06-16, measured | `brief_facts.json` → `best_5k` |
-| Tests | 573 passed, 1 skipped (574 collected) | `python -m pytest` |
+| Tests | 603 passed, 1 skipped (604 collected) | `python -m pytest` |
 | Dashboard API routes | 3, implemented and tested | `python dashboard_contract.py` |
 | Dashboard consumes the API | yes, all three | `python dashboard_contract.py` |
 
@@ -255,7 +255,7 @@ recalling a count.
 
 **`connect-dashboard-to-data-layer` is complete.** `garmin_server.py` serves
 `/api/activities`, `/api/load` and `/api/coaching` from the canonical data layer,
-`dashboard/index.html` consumes all three, and 118 tests cover it, including 76
+`dashboard/index.html` consumes all three, and 169 tests cover it, including 91
 against a real bound HTTP server. Four briefs have asked for this work. Do not
 rebuild it. Verify with `python dashboard_contract.py`, which prints `PASS`.
 
@@ -273,6 +273,17 @@ a secure context, so over plain `http://<lan-ip>` the home-screen shortcut is
 live but offline caching is not (it activates under the https tunnel or on
 localhost). Do not ask for CORS or `0.0.0.0` by default; both were decided
 against.
+
+**Phone nutrition has a seamless path.** CalTrak writes food entries to Android
+Health Connect. The free, open-source **HC Webhook** app can read Nutrition from
+Health Connect and POST it to `POST /api/nutrition/hook` on an interval or on
+demand. That route uses a dedicated `X-Nutrition-Token`, separate from the
+dashboard login token; `GET /api/nutrition/hook-info` (behind the normal gate)
+shows the URL, header and token in the Fuel view's setup card. Configure
+Nutrition at **Daily** resolution and **Local time** so each day has one
+authoritative total. One-time setup, then no export or file picker. Manual JSON
+or CSV import remains a fallback. Do not put the token in the repository, a
+brief, a commit, or chat.
 
 **A password login now exists (added at the athlete's request).** For access
 from outside the home WiFi, `--password`/`GARMIN_DASH_PASSWORD` enables a login:

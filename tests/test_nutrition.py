@@ -285,3 +285,164 @@ def test_the_committed_template_is_still_the_schema():
         rows = list(csv.reader(fh))
     assert rows[0] == list(nutrition.FIELDS)
     assert len(rows) == 1
+
+
+# ------------------------------------------------- health connect webhook
+
+def _hc_raw(record_id, date, calories, protein=0, carbs=0, fat=0):
+    return {
+        "start_time": date + "T08:00:00-08:00",
+        "end_time": date + "T08:05:00-08:00",
+        "calories": calories,
+        "protein_grams": protein,
+        "carbs_grams": carbs,
+        "fat_grams": fat,
+        "metadata": {"id": record_id},
+    }
+
+
+def test_health_connect_daily_record_is_upserted(log_path):
+    result = nutrition.ingest_health_connect({
+        "timezone": "America/Los_Angeles",
+        "nutrition": [{
+            "start_time": "2026-11-10T00:00:00-08:00",
+            "end_time": "2026-11-11T00:00:00-08:00",
+            "calories": 2100,
+            "protein_grams": 140,
+            "carbs_grams": 220,
+            "fat_grams": 70,
+        }],
+    })
+    assert result["accepted"] == 1
+    assert result["upserted"] == 1
+    assert nutrition.read_days() == [{
+        "date": "2026-11-10", "calories": 2100, "protein": 140,
+        "carbs": 220, "fat": 70}]
+
+
+def test_health_connect_raw_records_sum_within_a_day(log_path):
+    nutrition.ingest_health_connect({"nutrition": [
+        _hc_raw("a", "2026-11-10", 300, 20, 30, 10),
+        _hc_raw("b", "2026-11-10", 250, 15, 40, 8),
+    ]})
+    assert nutrition.read_days() == [{
+        "date": "2026-11-10", "calories": 550, "protein": 35,
+        "carbs": 70, "fat": 18}]
+
+
+def test_health_connect_incremental_record_keeps_the_rest_of_the_day(log_path):
+    nutrition.ingest_health_connect({"nutrition": [
+        _hc_raw("a", "2026-11-10", 300, 20, 30, 10)]})
+    nutrition.ingest_health_connect({"nutrition": [
+        _hc_raw("b", "2026-11-10", 250, 15, 40, 8)]})
+    assert nutrition.read_days()[0]["calories"] == 550
+
+
+def test_health_connect_edit_replaces_the_same_id(log_path):
+    nutrition.ingest_health_connect({"nutrition": [
+        _hc_raw("a", "2026-11-10", 300)]})
+    nutrition.ingest_health_connect({"nutrition": [
+        _hc_raw("a", "2026-11-10", 350)]})
+    assert nutrition.read_days()[0]["calories"] == 350
+
+
+def test_health_connect_deleted_record_is_removed(log_path):
+    nutrition.ingest_health_connect({"nutrition": [
+        _hc_raw("a", "2026-11-10", 300),
+        _hc_raw("b", "2026-11-10", 250),
+    ]})
+    nutrition.ingest_health_connect({
+        "nutrition": [],
+        "deleted": [{"type": "nutrition", "id": "a"}],
+    })
+    assert nutrition.read_days()[0]["calories"] == 250
+
+
+def test_a_daily_record_supersedes_raw_records_for_that_day(log_path):
+    nutrition.ingest_health_connect({"nutrition": [
+        _hc_raw("a", "2026-11-10", 300)]})
+    nutrition.ingest_health_connect({"nutrition": [{
+        "start_time": "2026-11-10T00:00:00-08:00",
+        "end_time": "2026-11-11T00:00:00-08:00",
+        "calories": 2100,
+    }]})
+    assert nutrition.read_days()[0]["calories"] == 2100
+
+
+def test_health_connect_does_not_erase_a_manual_day(log_path):
+    nutrition.upsert_days([{"date": "2026-11-09", "calories": 100}])
+    nutrition.ingest_health_connect({"nutrition": [
+        _hc_raw("a", "2026-11-10", 300)]})
+    assert [row["date"] for row in nutrition.read_days()] == [
+        "2026-11-09", "2026-11-10"]
+
+
+def test_health_connect_rejects_a_non_object_payload(log_path):
+    with pytest.raises(nutrition.NutritionError):
+        nutrition.ingest_health_connect([])
+
+
+def test_health_connect_rejects_a_non_list_nutrition(log_path):
+    with pytest.raises(nutrition.NutritionError):
+        nutrition.ingest_health_connect({"nutrition": {}})
+
+
+# ---------------------------------------------------- CalTrak JSON backups
+
+def test_json_backup_days_shape_is_accepted():
+    days = nutrition.parse_caltrak_json(
+        '{"days": [{"date": "2026-11-10", "calories": 500}]}')
+    assert days == [{"date": "2026-11-10", "calories": 500,
+                     "protein": 0, "carbs": 0, "fat": 0}]
+
+
+def test_json_backup_nested_food_log_is_aggregated():
+    days = nutrition.parse_caltrak_json({
+        "version": 1,
+        "food_log": [
+            {"logged_at": "2026-11-10T08:00:00Z",
+             "food": {"name": "oats", "calories": 300, "protein": 20,
+                      "carbs": 30, "fat": 10}},
+            {"logged_at": "2026-11-10T12:00:00Z",
+             "food": {"name": "rice", "calories": 400, "protein": 10,
+                      "carbs": 80, "fat": 5}},
+        ],
+    })
+    assert days == [{"date": "2026-11-10", "calories": 700,
+                     "protein": 30, "carbs": 110, "fat": 15}]
+
+
+def test_json_backup_without_nutrition_is_rejected():
+    with pytest.raises(nutrition.NutritionError):
+        nutrition.parse_caltrak_json({"version": 1, "notes": []})
+
+
+def test_parse_export_detects_json_and_csv():
+    json_day = nutrition.parse_export(
+        '{"days": [{"date": "2026-11-10", "calories": 1}]}')[0]
+    csv_day = nutrition.parse_export(
+        "date,calories\n2026-11-10,1\n")[0]
+    assert json_day["date"] == "2026-11-10"
+    assert csv_day["date"] == "2026-11-10"
+
+
+# ------------------------------------------------------- phone webhook token
+
+def test_hook_token_is_stable_and_stored_next_to_the_log(log_path):
+    first = nutrition.load_or_make_hook_token()
+    second = nutrition.load_or_make_hook_token()
+    assert first == second
+    assert len(first) >= 20
+    with open(nutrition.hook_token_path(), "r", encoding="utf-8") as fh:
+        assert fh.read().strip() == first
+
+
+def test_hook_info_reports_the_last_upload(log_path):
+    nutrition.ingest_health_connect({"nutrition": [
+        _hc_raw("a", "2026-11-10", 300)]})
+    info = nutrition.hook_info()
+    assert info["path"] == "/api/nutrition/hook"
+    assert info["header"] == "X-Nutrition-Token"
+    assert info["token"]
+    assert info["last_received"]
+    assert info["managed_days"] == 1

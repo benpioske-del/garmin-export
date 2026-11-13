@@ -75,8 +75,8 @@ Docs: [`DATA_QUALITY.md`](DATA_QUALITY.md),
 | CSV export | `garmin_export.csv` | 72 activities, 31 columns |
 | Publisher | `export_publish.py` | guard, remote sync, history-safety enforcement |
 | Sync | `garmin_sync.py` | OAuth, local only |
-| Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching`; `/` serves the committed Aurora app, `/classic` the local page, `/aurora` remains an alias; `GET`/`POST /api/nutrition` read and ingest the local nutrition log; `POST /share-target` is the Android share-sheet fallback; `POST /sync` runs the Garmin download and import |
-| Nutrition | `nutrition.py` | CalTrak CSV parse/aggregate, header aliases, local daily log at `paths.data_dir()/nutrition_log.csv` |
+| Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching`; `/` serves the committed Aurora app, `/classic` the local page, `/aurora` remains an alias; `GET`/`POST /api/nutrition` read and ingest the local nutrition log; `POST /api/nutrition/hook` is the token-only Health Connect bridge endpoint and `GET /api/nutrition/hook-info` its authenticated setup envelope; `POST /share-target` is the Android share-sheet fallback; `POST /sync` runs the Garmin download and import |
+| Nutrition | `nutrition.py` | CalTrak CSV/JSON parse/aggregate, Health Connect ingestion, header aliases, local daily log at `paths.data_dir()/nutrition_log.csv` |
 | Audit | `fit_audit.py` | rewritten: hashes, parser versions, counts only |
 | Brief bridge | `brief_bridge.py` | `post` / `ingest` / `paste` / `serve` / `capture` |
 | Profile | `profile.json` | `hr_max` set to 198; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` still `null` |
@@ -295,7 +295,7 @@ download cannot leave the dashboard behind; the order and the failure reporting
 are pinned by `tests/test_sync_import.py`.
 
 Tests: `tests/test_dashboard_api.py` (42), `tests/test_dashboard_api_http.py`
-(68) and `tests/test_nutrition.py` (33). `smoke_dashboard_api.py` runs the same
+(91) and `tests/test_nutrition.py` (48). `smoke_dashboard_api.py` runs the same
 paths against the live database and is deliberately not part of pytest.
 
 `/` serves the committed `flow_outputs/aurora_dashboard.html` behind the same
@@ -339,20 +339,43 @@ daily total per date. It accepts the same header aliases the app's importer uses
 (`date`/`day`, `calories`/`kcal`/`energy`, `protein`, `carbs`/`carbohydrates`/
 `carb`, `fat`), normalises `YYYY-MM-DD`, `YYYY/MM/DD`, `M/D/YYYY` and `M/D/YY`,
 treats empty numeric cells as zero, and rejects a missing date column,
-unparseable dates, and negative or non-numeric values.
+unparseable dates, and negative or non-numeric values. `parse_caltrak_json()`
+accepts a CalTrak JSON backup with no published schema by walking it for dated
+nutrition objects, and `parse_export()` auto-detects CSV versus JSON.
 
 - `GET /api/nutrition` returns `{days, count, fields, source, storage}` behind
   the token/login gate. Unknown query parameters are a `400`.
-- `POST /api/nutrition` accepts `{"days": [...]}` or `{"csv": "..."}`. The CSV
+- `POST /api/nutrition` accepts `{"days": [...]}`, `{"csv": "..."}`,
+  `{"json": ...}`, `{"backup": ...}`, or a raw CalTrak backup object. The CSV
   form is what makes aggregation a server responsibility rather than a browser
   one. Repeating a date upserts that day's row; it never appends a duplicate.
   It returns `{"accepted": n, "upserted": m, "total_days": k}`.
+- `POST /api/nutrition/hook` is the phone bridge endpoint and sits above the
+  browser gate. It requires a dedicated `X-Nutrition-Token` (or `Authorization:
+  Bearer`) that is separate from the dashboard login token, accepts up to 8 MB
+  of Health Connect JSON, and returns the same counts plus `source:
+  "health-connect"` and `last_received`. `GET /api/nutrition/hook-info` is
+  behind the normal gate and returns the path, header name, token, last upload
+  time and managed-day count for the Fuel view's setup card. The token is
+  stored beside the local log as `nutrition_log.hook-token`.
+- Health Connect ingestion (`ingest_health_connect()`) keeps raw
+  NutritionRecords by `metadata.id` in `nutrition_log.records.json`, so an
+  incremental sync adds one entry without losing the rest of that day. A
+  Daily-resolution record (interval ≥ 20 h, no id) is authoritative for its
+  date and supersedes raw records; deletions are applied by id; dates managed
+  by the webhook are replaced wholesale while manually imported dates survive.
+- **Seamless Android path.** CalTrak writes food entries to Android Health
+  Connect. The free, open-source HC Webhook app reads Nutrition on an interval
+  or on demand and POSTs it to `/api/nutrition/hook`, so no export or file
+  picker is involved after one-time setup. The setup card recommends Daily
+  resolution (one authoritative total per local day) and Local time so meals
+  land on the right date.
 - Rows are written to `paths.data_dir()/nutrition_log.csv`, not the committed
   template, so athlete nutrition is never published. `GARMIN_NUTRITION_FILE`
   overrides the path (tests use it). The committed `nutrition_log.csv` remains
   the schema of record and is still headers-only.
 - The Aurora live layer (served at `/` and `/aurora`) replaces `NUTRITION` from `GET /api/nutrition` and
-  overrides `window.importCSV` to POST the raw CSV, so the FUEL tab and the run
+  overrides `window.importCSV` to POST the raw file, so the FUEL tab and the run
   detail's "Fuel that day" card show stored totals rather than localStorage.
   The committed view reads `kcal`, so the live layer maps `calories` to `kcal`
   at that seam. It exposes `window.auroraReloadAll` and
@@ -365,7 +388,7 @@ unparseable dates, and negative or non-numeric values.
   service worker intercepts the POST and forwards `{csv: text}` to
   `/api/nutrition`; `POST /share-target` is the server fallback for the first
   share before the worker is active. `multipart_file_text()` parses the body
-  (Python 3.13 removed `cgi`), and both paths call `parse_caltrak_csv()` and
+  (Python 3.13 removed `cgi`), and both paths call `parse_export()` and
   redirect to `/?shared=ok|empty|error`.
 - **One-tap Garmin sync.** The home view's `Sync Garmin now` button POSTs
   `/sync`, which runs `garmin_sync.py` and then `trainloop.py bootstrap`, and

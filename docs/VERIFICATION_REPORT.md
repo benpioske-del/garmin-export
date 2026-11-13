@@ -17,11 +17,11 @@ were imported. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-573 passed, 1 skipped (574 collected)
+603 passed, 1 skipped (604 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `544 passed, 30 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `588 passed, 16 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`, so CI fails only on a real defect. `ruff check .` is clean.
 
@@ -38,8 +38,8 @@ lint or tests ran.
 | `tests/test_brief_bridge.py` | 62 |
 | `tests/test_dashboard_api.py` | 42 |
 | `tests/test_trainloop_cli.py` | 22 |
-| `tests/test_dashboard_api_http.py` | 76 |
-| `tests/test_nutrition.py` | 33 |
+| `tests/test_dashboard_api_http.py` | 91 |
+| `tests/test_nutrition.py` | 48 |
 | `tests/test_fit_reader_elevation.py` | 21 |
 | `tests/test_splits.py` | 10 |
 | `tests/test_provenance.py` | 18 |
@@ -52,7 +52,7 @@ lint or tests ran.
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_brief_consistency.py` | 37 |
 | `tests/test_sync_import.py` | 5 |
-| **Total** | **574** (573 pass, 1 skip) |
+| **Total** | **604** (603 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -390,12 +390,13 @@ clean checkout), `/` falls back to the local page rather than returning `404`.
   charts with data (72 points on each run-based chart, 62 weeks, 16 months, 115
   heatmap days), six mile splits on the latest run, and no console errors.
   `/classic` still renders its ten canvases with no console errors.
-- Sixteen wire tests cover the routes and the mobile paths: `/` serves Aurora
-  with the live bootstrap and PWA tags, `/aurora` remains an alias, `/classic`
-  serves the local page, `/` falls back when Aurora is absent, the token gate
-  still applies, the CDN rewrite and vendored file, injection idempotence, the
-  manifest `share_target`, multipart parsing, `/share-target` ingestion, and the
-  live layer's reload hooks.
+- Wire tests cover the routes and the mobile paths: `/` serves Aurora with the
+  live bootstrap and PWA tags, `/aurora` remains an alias, `/classic` serves the
+  local page, `/` falls back when Aurora is absent, the token gate still applies,
+  the CDN rewrite and vendored file, injection idempotence, the manifest
+  `share_target`, multipart parsing, `/share-target` ingestion, the live layer's
+  reload hooks, and the token-only phone webhook (valid, missing, wrong and
+  Bearer tokens, incremental records, deletions, Daily records, JSON backups).
 - `--open` lands on `/`, the canonical dashboard; `launch_url()` no longer
   chooses between two pages.
 
@@ -408,9 +409,33 @@ a missing date column, unparseable dates, and negative or non-numeric values.
 
 - `GET /api/nutrition` is token/login-gated, rejects unknown query parameters
   with a `400`, and returns `{days, count, fields, source, storage}`.
-- `POST /api/nutrition` accepts `{"days": [...]}` or `{"csv": "..."}` and
-  upserts one row per date, returning `{accepted, upserted, total_days}`.
-  Repeating a date updates it instead of appending a duplicate.
+- `POST /api/nutrition` accepts `{"days": [...]}`, `{"csv": "..."}`,
+  `{"json": ...}`, `{"backup": ...}`, or a raw CalTrak backup object and
+  upserts one row per date, returning `{accepted, upserted, total_days}`. The
+  `csv` form auto-detects CSV or JSON. Repeating a date updates it instead of
+  appending a duplicate.
+- **Phone webhook.** `POST /api/nutrition/hook` is the only route above the
+  browser gate. It authenticates with a dedicated `X-Nutrition-Token` header
+  (or `Authorization: Bearer`) that is separate from the dashboard login token
+  and grants access to nothing else. The secret is generated once and stored
+  beside the local log as `nutrition_log.hook-token`; `GET
+  /api/nutrition/hook-info` (behind the normal gate) returns the URL path,
+  header name, token, last upload time and managed-day count for the Fuel view's
+  setup card. Payloads up to 8 MB are accepted.
+- Health Connect ingestion stores raw NutritionRecords by their `metadata.id`
+  in `nutrition_log.records.json`, so an incremental sync can add one food
+  entry without replacing the rest of that day. A Daily-resolution record
+  (interval ≥ 20 hours, no id) is treated as the authoritative total and
+  supersedes raw records for that date. Deletions are applied by id. Dates the
+  webhook manages are replaced wholesale, so a deleted record can remove a day,
+  while manually imported dates are preserved.
+- **Seamless Android path.** CalTrak writes food entries to Android Health
+  Connect. The free, open-source HC Webhook app reads Nutrition from Health
+  Connect on an interval or on demand and POSTs it to
+  `/api/nutrition/hook`. Setup is one-time: enable Nutrition at Daily
+  resolution, add the webhook URL and custom header, then use its interval,
+  widget, Quick Settings tile or broadcast trigger. No export and no file picker
+  are needed after that. The manual JSON/CSV import remains a fallback.
 - The log is stored at `paths.data_dir()/nutrition_log.csv`, never in the
   committed template, so athlete nutrition is not published.
   `GARMIN_NUTRITION_FILE` overrides the path for tests. The committed
@@ -426,11 +451,12 @@ a missing date column, unparseable dates, and negative or non-numeric values.
   `share_target` for `/share-target` (`POST`, `multipart/form-data`, one file
   field named `log` accepting `text/csv`, `text/plain`, JSON and `.csv`/`.json`).
   After the PWA is installed, CalTrak's Share Log appears in Android's share
-  sheet; choosing Coach Dashboard posts the CSV to the server, which parses and
+  sheet; choosing Coach Dashboard posts the file to the server, which parses and
   upserts it. Chrome normally routes the POST through the service worker, which
   forwards `{csv: text}` to `/api/nutrition`; the server route is the fallback
   for the first share before the worker is active. Both paths call
-  `parse_caltrak_csv()` and redirect to `/?shared=ok|empty|error`.
+  `parse_export()`, which auto-detects a CSV export or a JSON backup, and
+  redirect to `/?shared=ok|empty|error`.
 - **One-tap Garmin sync.** The home view has a `Sync Garmin now` button that
   POSTs `/sync` with the session cookie (or `?tk=`), runs `garmin_sync.py` then
   `trainloop.py bootstrap`, and reloads from the API when it finishes. The same

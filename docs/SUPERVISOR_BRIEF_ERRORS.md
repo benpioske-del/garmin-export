@@ -1068,3 +1068,83 @@ The lifting importer is still unimplemented, so the strength chart stays an
 empty state. Bodyweight and weekly-summary endpoints, queue retry semantics,
 and replacing the generated narrative panels with live text remain open. The
 `Garmin Daily Sync` scheduled task is still Disabled.
+
+# Nineteenth correction: 2026-11-12, seamless Health Connect nutrition, JSON backups
+
+## The gap
+
+The eighteenth correction made CalTrak's share sheet reach the server, but that
+still required the athlete to open CalTrak, choose Share Log, and pick Coach
+Dashboard every time. The request was for a path where none of that is
+required. The same correction also assumed CalTrak exports CSV; the app's
+backup is JSON.
+
+## What was verified before coding
+
+- CalTrak has no account or cloud API. On Android it can write food, weight and
+  body-fat entries to **Health Connect** when the athlete grants that access.
+- **HC Webhook** (`com.hcwebhook.app`) reads Health Connect and POSTs JSON to a
+  configurable URL, on an interval, on a schedule, on demand, or from a widget,
+  Quick Settings tile or broadcast. It supports Nutrition fields
+  (`calories`, `protein_grams`, `carbs_grams`, `fat_grams`, etc.), custom
+  headers, and a Daily resolution (`RESOLUTION_DAILY = -1`) that sends one
+  authoritative total per calendar day.
+- The app is a one-time purchase on the Play Store (about $14.99) and also
+  publishes a free FOSS APK on GitHub releases (v1.9.32,
+  `app-foss-release.apk`, 3,698,980 bytes). The free APK is the recommended
+  path.
+- Its default sync is incremental over a rolling 48-hour window. Keeping raw
+  records by Health Connect id is therefore necessary so a later payload with
+  one new food entry does not replace the whole day.
+- Payload timestamps must stay on **Local time**; a UTC daily record is
+  ambiguous without a zone offset.
+
+## What changed
+
+- `nutrition.py` now accepts a CalTrak JSON backup as well as CSV, via
+  `parse_caltrak_json()` and `parse_export()` auto-detection. The backup schema
+  is unpublished, so a tolerant walker finds dated nutrition objects and stops
+  at the first nutrition-bearing dict so a meal total and its child items are
+  never counted twice.
+- `POST /api/nutrition` accepts `{"days": [...]}`, `{"csv": "..."}`,
+  `{"json": ...}`, `{"backup": ...}`, or a raw backup object. `POST
+  /share-target` and the service worker's `{csv: text}` forward both go through
+  `parse_export()`, so a JSON share works too.
+- New `POST /api/nutrition/hook` is the phone bridge endpoint and sits above the
+  browser session gate. It requires a dedicated `X-Nutrition-Token` (or
+  `Authorization: Bearer`) that is separate from the dashboard login token and
+  grants access to nothing else. The secret is generated once and stored beside
+  the local log as `nutrition_log.hook-token`; it is never committed.
+- New `GET /api/nutrition/hook-info` is behind the normal gate and returns the
+  path, header name, token, last upload time and managed-day count. The Fuel
+  view has an **Automatic upload** card that shows these values, copy buttons,
+  and the one-time setup steps; the manual importer is now labelled **Import
+  backup** and accepts `.csv` or `.json`.
+- `ingest_health_connect()` keeps raw NutritionRecords by `metadata.id` in
+  `nutrition_log.records.json`. A Daily record (interval at least 20 hours, no
+  id) supersedes raw records for its date. Deletions are applied by id. Dates
+  the webhook manages are replaced wholesale, while manually imported dates are
+  preserved.
+
+## Verification
+
+- Unit tests in `tests/test_nutrition.py` cover daily and raw Health Connect
+  records, incremental sync, edits, deletions, daily-supersedes-raw, manual-day
+  preservation, JSON backups, `parse_export()`, hook-token stability and
+  `hook_info()` (48 tests).
+- Wire tests in `tests/test_dashboard_api_http.py` cover `hook-info` auth and
+  stability, valid/missing/wrong/dashboard tokens, Bearer auth, incremental
+  records, deletions, Daily records, no CORS headers, JSON `/api/nutrition`
+  forms, and a JSON `/share-target` (91 tests).
+- The live suite is **603 passed, 1 skipped** (604 collected) and the clean
+  checkout is **588 passed, 16 skipped**. `ruff check .` is clean.
+- The webhook has not yet received a live phone payload, and CalTrak's Health
+  Connect write behavior has not been confirmed on the athlete's specific
+  device. Those remain the acceptance step, not a claim.
+
+## Still not done
+
+The lifting importer is still unimplemented, so the strength chart stays an
+empty state. Bodyweight and weekly-summary endpoints, queue retry semantics,
+and replacing the generated narrative panels with live text remain open. The
+`Garmin Daily Sync` scheduled task is still Disabled.

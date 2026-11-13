@@ -978,6 +978,70 @@ AURORA_LIVE_SCRIPT = """
   }
   // The committed app imports CalTrak CSV into localStorage only. Replace that
   // handler so the server parses and stores the rows, then re-read the live log.
+  window.showNutritionHook = function () {
+    var box = document.getElementById("nutrition-hook");
+    if (!box) { return; }
+    box.hidden = false;
+    box.innerHTML = '<p class="sub">Loading setup...</p>';
+    getJSON("/api/nutrition/hook-info").then(function (info) {
+      window.__nutritionHook = info;
+      var origin = window.location.origin;
+      var local = origin.indexOf("//localhost") >= 0 ||
+        origin.indexOf("//127.0.0.1") >= 0;
+      var note = local
+        ? '<p class="sub"><b>Heads up:</b> you are viewing this on the laptop. Replace the address below with the tunnel address you use on your phone (the one shown in the start-dashboard window).</p>'
+        : "";
+      var last = info.last_received
+        ? "Last upload: <b>" + esc(info.last_received) + "</b> &middot; " +
+          esc(info.managed_days || 0) + " day(s) stored"
+        : "No uploads received yet.";
+      var inputStyle = "width:100%;margin-top:4px;padding:8px;border-radius:8px;border:1px solid #2a3038;background:#0d1014;color:#e8edf2";
+      box.innerHTML =
+        '<p class="sub">' + last + "</p>" + note +
+        '<label class="sub" style="display:block;margin-top:10px">Webhook URL' +
+          '<input id="nutrition-hook-url" value="' + esc(origin + info.path) +
+          '" style="' + inputStyle + '"></label>' +
+        '<label class="sub" style="display:block;margin-top:10px">Header name' +
+          '<input value="' + esc(info.header) + '" readonly style="' +
+          inputStyle + '"></label>' +
+        '<label class="sub" style="display:block;margin-top:10px">Header value' +
+          '<input id="nutrition-hook-token" value="' + esc(info.token) +
+          '" readonly style="' + inputStyle + '"></label>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">' +
+          '<button class="btn ghost" onclick="copyNutritionHook(\'url\')">Copy URL</button>' +
+          '<button class="btn ghost" onclick="copyNutritionHook(\'token\')">Copy token</button>' +
+        "</div>" +
+        '<ol class="sub" style="margin-top:14px;padding-left:18px;line-height:1.6">' +
+          "<li>Install <b>HC Webhook</b> (free open-source APK from GitHub releases, or the Play Store version).</li>" +
+          "<li>In HC Webhook: <b>Data Types</b> &rarr; enable <b>Nutrition</b> and grant Health Connect read access. Set its resolution to <b>Daily</b>.</li>" +
+          "<li>In HC Webhook: <b>Webhooks</b> &rarr; add a JSON webhook with the URL above and a custom header <b>" +
+            esc(info.header) + "</b> set to the token above.</li>" +
+          "<li>Set a sync interval (15 minutes is the minimum) or add its Quick Settings tile for a one-tap sync.</li>" +
+          "<li>In CalTrak: allow Health Connect to <b>write food</b> entries (Settings &rarr; Health Connect).</li>" +
+        "</ol>" +
+        '<p class="sub">Keep the bridge on <b>Local time</b> so meals land on the right day. ' +
+          "The manual import below still works as a fallback.</p>";
+    }, function (e) {
+      box.innerHTML = '<p class="sub">Could not load setup: ' +
+        esc(String(e)) + "</p>";
+    });
+  };
+  window.copyNutritionHook = function (which) {
+    var input = document.getElementById(
+      which === "url" ? "nutrition-hook-url" : "nutrition-hook-token");
+    var text = input ? input.value : "";
+    if (!text) { return; }
+    function done() {
+      if (typeof show === "function") { show("Copied"); }
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {});
+    } else if (input) {
+      input.focus();
+      input.select();
+      try { document.execCommand("copy"); done(); } catch (e) {}
+    }
+  };
   window.importCSV = function (event) {
     var file = event.target.files && event.target.files[0];
     if (!file) { return; }
@@ -1309,7 +1373,7 @@ class Handler(BaseHTTPRequestHandler):
         if not text:
             return self._redirect("/?shared=empty")
         try:
-            days = nutrition.parse_caltrak_csv(text)
+            days = nutrition.parse_export(text)
             nutrition.upsert_days(days)
         except (nutrition.NutritionError, OSError):
             return self._redirect("/?shared=error")
@@ -1341,10 +1405,18 @@ class Handler(BaseHTTPRequestHandler):
             if "csv" in body:
                 if not isinstance(body["csv"], str):
                     raise nutrition.NutritionError("'csv' must be a string")
-                days = nutrition.parse_caltrak_csv(body["csv"])
+                days = nutrition.parse_export(body["csv"])
                 result = nutrition.upsert_days(days)
+            elif "json" in body or "backup" in body:
+                days = nutrition.parse_caltrak_json(
+                    body.get("json", body.get("backup")))
+                result = nutrition.upsert_days(days)
+            elif isinstance(body.get("days"), list):
+                result = nutrition.upsert_days(body["days"])
             else:
-                result = nutrition.upsert_days(body.get("days"))
+                # A CalTrak backup POSTed directly, with no wrapper key.
+                days = nutrition.parse_caltrak_json(body)
+                result = nutrition.upsert_days(days)
         except nutrition.NutritionError as exc:
             return self._send_json(400, {
                 "error": "invalid nutrition payload",
@@ -1354,6 +1426,47 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(500, {
                 "error": "could not write nutrition log"})
         return self._send_json(200, result)
+
+    def _handle_nutrition_hook(self):
+        """POST /api/nutrition/hook - the phone bridge's token-only endpoint.
+
+        HC Webhook posts from Android with no dashboard session, so this route
+        authenticates with a dedicated secret header instead of the login
+        cookie. The secret is separate from the dashboard token: it can be
+        rotated by deleting ``nutrition_log.hook-token`` and it grants access
+        to nothing else. The body is a Health Connect JSON payload.
+        """
+        supplied = (self.headers.get("X-Nutrition-Token") or "").strip()
+        if not supplied:
+            auth = self.headers.get("Authorization", "")
+            if auth.lower().startswith("bearer "):
+                supplied = auth[7:].strip()
+        expected = nutrition.load_or_make_hook_token()
+        if not supplied or not hmac.compare_digest(supplied, expected):
+            return self._send_json(401, {
+                "error": "missing or wrong nutrition token"})
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+        except ValueError:
+            length = 0
+        if length < 1 or length > 8 * 1024 * 1024:
+            return self._send_json(413, {
+                "error": "nutrition payload must be 1..8388608 bytes"})
+        try:
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+        except Exception:
+            return self._send_json(400, {"error": "body must be JSON"})
+        try:
+            result = nutrition.ingest_health_connect(body)
+        except nutrition.NutritionError as exc:
+            return self._send_json(400, {
+                "error": "invalid health connect payload",
+                "detail": str(exc),
+            })
+        except OSError:
+            return self._send_json(500, {
+                "error": "could not write nutrition log"})
+        return self._send_json(200, {"ok": True, **result})
 
     def _deny(self, code, reason):
         try:
@@ -1586,6 +1699,18 @@ class Handler(BaseHTTPRequestHandler):
             # parameter cannot smuggle a second value past the checks below.
             raw = urllib.parse.parse_qs(parts.query)
             query = {k: v[0] for k, v in raw.items() if v}
+            if path == "/api/nutrition/hook-info":
+                if query:
+                    return self._send_json(400, {
+                        "error": "unsupported query parameter",
+                        "parameter": sorted(query)[0],
+                        "supported": [],
+                    })
+                try:
+                    return self._send_json(200, nutrition.hook_info())
+                except OSError:
+                    return self._send_json(500, {
+                        "error": "could not read the phone webhook settings"})
             if path == "/api/nutrition":
                 # Read-only daily totals. It does not need the database or an
                 # as_of window, so it is dispatched before _api() opens one.
@@ -1628,6 +1753,10 @@ class Handler(BaseHTTPRequestHandler):
             if not self._is_authed():
                 return self._redirect("/login")
             return self._handle_share_target()
+        if path == "/api/nutrition/hook":
+            # The phone bridge has no browser session; this route checks its
+            # own dedicated token and lives above the cookie/token gate.
+            return self._handle_nutrition_hook()
         if not self._is_authed():
             return self._deny(403, "missing or wrong token")
         if path == "/sync":
