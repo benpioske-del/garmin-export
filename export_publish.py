@@ -112,6 +112,7 @@ def die(msg, hint=None):
 # it here on purpose.
 PUBLISHED_MODULES = frozenset([
     "activities.py",
+    "backup_data.py",
     "brief_bridge.py",
     "brief_consistency.py",
     "capture_supervisor_brief.py",

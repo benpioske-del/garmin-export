@@ -1152,3 +1152,64 @@ The lifting importer is still unimplemented, so the strength chart stays an
 empty state. Bodyweight and weekly-summary endpoints, queue retry semantics,
 and replacing the generated narrative panels with live text remain open. The
 `Garmin Daily Sync` scheduled task is still Disabled.
+
+# Twentieth correction: 2026-11-12, local data backup and restore runbook
+
+## The gap
+
+The repository is the only offsite copy of this project, and it deliberately
+excludes the athlete data. That left one disk holding the FIT corpus,
+`trainloop.db`, the nutrition log and its Health Connect sidecar, with no copy
+anywhere else. `garmin_server.py` had a `/cloud-backup` route pointing at
+`MEGACMD_REMOTE = "/CoachDashboard"`, which made the gap look covered.
+
+## What was verified before coding
+
+- `megacmd` is not on PATH, `%USERPROFILE%\MEGA` does not exist, and both
+  `MEGAsyncSetup64.exe` and `MEGAcmdSetup64.exe` are sitting uninstalled in
+  `Downloads`. The cloud backup had never run.
+- The local data is small: 72 FIT files (4 MB) in `Downloads\garmin_fit`, and
+  `trainloop.db` (438 KB, gitignored). The whole irreplaceable set is under
+  2 MB compressed.
+- `nutrition_log.records.json` does not exist yet because no nutrition has been
+  ingested. It is still the one file that cannot be rebuilt.
+- OneDrive is present and already syncing this machine, so no new account or
+  installer is required.
+
+## What changed
+
+- `backup_data.py` writes one timestamped zip, prunes to 14 copies and records a
+  `MANIFEST.txt` with the code commit and every bundled file. It carries the FIT
+  corpus, `trainloop.db`, `dashboard/index.html` (gitignored and not rebuilt
+  from anything), the sleep/HR exports, the sync marker and the nutrition log
+  with its Health Connect sidecar. Credentials are excluded by default:
+  `.coach_dash_token`, `.coach_dash_auth`, `nutrition_log.hook-token`,
+  `garmin_tokens.json` and `.garmin_tokens/`.
+- `tests/test_backup_data.py` (17 tests) pins contents, credential exclusion,
+  the manifest line, `--include-secrets`, retention, the empty-data failure,
+  the dry run, destination order and the git marker reader.
+- `docs/RESTORE.md` is the bare-Windows runbook: clone, install, choose a data
+  directory, expand the zip, rebuild or verify the database, re-download runs,
+  start the server, and regenerate every credential.
+- `backup_data.py` was added to `PUBLISHED_MODULES` and to `py-modules`; the
+  publish-scope test fails if a root module is neither published nor scratch.
+- A scheduled task, **Coach Data Backup**, runs daily at 12:00 with
+  `StartWhenAvailable` and a 15-minute limit.
+
+## Verification
+
+- `python backup_data.py` wrote a 2.2 MB zip containing 77 files. Reopened, it
+  holds 78 entries (77 files plus the manifest), the manifest reads
+  `code commit: bc35c0f0e701`, and `dashboard/index.html` is present.
+- `Start-ScheduledTask -TaskName "Coach Data Backup"` returned
+  `LastTaskResult 0` and wrote a second copy.
+- The live suite is **622 passed, 1 skipped** (623 collected) and the clean
+  checkout is **593 passed, 30 skipped**. `ruff check .` is clean.
+
+## What this does not fix
+
+The backup protects against disk loss, not against the cloud copy being stale.
+If the laptop dies before OneDrive uploads, the newest copy is whatever uploaded
+last. Credentials are not in the archive by design, so a restore still needs a
+Garmin MFA login. Nutrition older than the newest backup remains unrecoverable,
+which is the strongest argument for keeping the daily task running.

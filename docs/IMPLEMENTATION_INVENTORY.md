@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 605 passed, 1 skipped (Windows symlink case) |
+| Tests | 622 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -92,7 +92,7 @@ profile as empty is reading an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 605 passed, 1 skipped. |
+| `python -m pytest` | Works. 622 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -105,7 +105,7 @@ profile as empty is reading an out-of-date copy of this document.
 | Database vs export parity | **Verified 2026-11-11.** FIT directory, `garmin_export.csv` and `trainloop.db` all hold 72. Note `load` computes only; `bootstrap` is what imports. (The table drifted twice: to 58 by 2026-10-15, and to 61 by 2026-11-06 - the runs of 2026-10-13..2026-11-06 were downloaded but never imported. `bootstrap` was re-run on 2026-11-06 and imported all eight, on 2026-11-09 to import the 2026-11-08 run, and on 2026-11-11 to import the 2026-11-10 and 2026-11-11 runs.) |
 | `garmin_export.csv` provenance | Rebuilt in-process with `export_publish.build_csv()` on 2026-10-03, not committed. It picks up `2026-10-01` from the FIT directory. |
 
-Style is followed by convention rather than enforced by a tool. The 21 Python
+Style is followed by convention rather than enforced by a tool. The root Python
 modules use the existing naming and formatting, but nothing would catch a
 regression in it.
 
@@ -401,6 +401,31 @@ nutrition objects, and `parse_export()` auto-detects CSV versus JSON.
 hand-entered athlete data, so the panel markup is not in version control. It is
 appended as a self-contained IIFE that reads its own token from the URL and
 exposes `window.refreshApiPanel()`.
+
+## Backup and restore
+
+| Component | Path | Notes |
+| --- | --- | --- |
+| Backup tool | `backup_data.py` | Zips local-only athlete data, prunes to 14 copies, writes `MANIFEST.txt` |
+| Restore runbook | `docs/RESTORE.md` | Bare Windows to working dashboard, including credential regeneration |
+| Destination | `%OneDrive%\CoachDashboardBackups` | Falls back to `%USERPROFILE%\Documents\CoachDashboardBackups` |
+| Schedule | Task **Coach Data Backup** | Daily 12:00, `StartWhenAvailable`, 15-minute limit |
+
+Bundled: `garmin_fit/*.fit`, `trainloop.db`, `dashboard/index.html`,
+`garmin_sleep.csv`, `garmin_hr.csv`, `garmin_last_sync.json`, and, once
+nutrition has been ingested, `nutrition_log.csv` and
+`nutrition_log.records.json`.
+
+Excluded by default: `.coach_dash_token`, `.coach_dash_auth`,
+`nutrition_log.hook-token`, `garmin_tokens.json` and `.garmin_tokens/`. Each is
+recreated after a restore, so the archive that lands in cloud storage does not
+carry credentials.
+
+The gap this closes: only the nutrition log and its Health Connect sidecar
+cannot be rebuilt after a total loss. Runs come back from Garmin Connect through
+the marker-based sync; `trainloop.db` comes back from `trainloop bootstrap`;
+`dashboard/index.html` is gitignored and not rebuilt from anything, so the
+backup is its only copy.
 
 ## Privacy posture
 

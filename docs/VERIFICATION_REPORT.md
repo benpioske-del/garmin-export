@@ -1,7 +1,7 @@
 # Verification report
 
 Supervisor brief Task 10. Everything below was run in the working tree on
-2026-11-07 and refreshed on 2026-11-11 after the 2026-11-10 and 2026-11-11 runs
+2026-11-07 and refreshed on 2026-11-12 after the 2026-11-10 and 2026-11-11 runs
 were imported. Commands and results are reproduced as observed.
 
 ## Environment
@@ -17,13 +17,15 @@ were imported. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-605 passed, 1 skipped (606 collected)
+622 passed, 1 skipped (623 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `590 passed, 16 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `593 passed, 30 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
-`tests/conftest.py`, so CI fails only on a real defect. `ruff check .` is clean.
+`tests/conftest.py`; the dashboard-contract and brief checks that read the
+gitignored page skip when it is absent; one symlink case skips on Windows. CI
+fails only on a real defect. `ruff check .` is clean.
 
 CI runs the suite on Python 3.12 and 3.13. `garminconnect>=0.3.13` declares
 `Requires-Python >=3.12`, so `requires-python` is now `>=3.12` and the old 3.10
@@ -52,7 +54,8 @@ lint or tests ran.
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_brief_consistency.py` | 37 |
 | `tests/test_sync_import.py` | 5 |
-| **Total** | **606** (605 pass, 1 skip) |
+| `tests/test_backup_data.py` | 17 |
+| **Total** | **623** (622 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -466,6 +469,50 @@ a missing date column, unparseable dates, and negative or non-numeric values.
 - Verified in-browser with a synthetic two-day log: the FUEL tab listed both
   days (`Calories 2100 · Protein 150g`) and the run detail showed
   `1950 kcal · 140g protein · 200g carbs`, with no console errors.
+
+## Local data backup and restore
+
+`backup_data.py` bundles the data that git does not carry: the FIT corpus,
+`trainloop.db`, `dashboard/index.html`, the sleep/HR exports, the sync marker and
+the nutrition log with its Health Connect sidecar. It writes one timestamped zip,
+prunes older copies (default 14) and writes a `MANIFEST.txt` naming the code
+commit and every file it bundled.
+
+Credentials are excluded by default: `.coach_dash_token`, `.coach_dash_auth`,
+`nutrition_log.hook-token`, `garmin_tokens.json` and `.garmin_tokens/`. All of
+them are recreated after a restore, and a zip that ends up in cloud storage
+should not carry them. `--include-secrets` exists but is documented as requiring
+an encrypted archive.
+
+Verified on this machine:
+
+```
+$ python backup_data.py --dry-run
+destination: %OneDrive%\CoachDashboardBackups
+files      : 77
+excluded   : .coach_dash_token, .coach_dash_auth, nutrition_log.hook-token,
+             .garmin_tokens/
+
+$ python backup_data.py
+backup   : %OneDrive%\CoachDashboardBackups\coach-data-2026-11-12_225431.zip
+files    : 77
+size     : 2.2 MB
+```
+
+The zip was reopened and its manifest read back: 78 entries (77 files plus the
+manifest), `dashboard/index.html` present, and the manifest naming the code
+commit the backup was taken from.
+
+A scheduled task, **Coach Data Backup**, runs it daily at 12:00 with
+`StartWhenAvailable`; a manual `Start-ScheduledTask` returned `LastTaskResult 0`
+and wrote a second copy.
+
+`tests/test_backup_data.py` (17 tests) pins the archive contents, the credential
+exclusion and its manifest line, `--include-secrets`, retention pruning, the
+empty-directory failure path, the dry run writing nothing, the OneDrive-then-
+Documents destination order, and the git marker reader.
+
+Restore steps are in [RESTORE.md](RESTORE.md).
 
 ## Privacy checks
 
