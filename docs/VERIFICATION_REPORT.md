@@ -17,11 +17,11 @@ were imported. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-603 passed, 1 skipped (604 collected)
+605 passed, 1 skipped (606 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `588 passed, 16 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `590 passed, 16 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`, so CI fails only on a real defect. `ruff check .` is clean.
 
@@ -39,7 +39,7 @@ lint or tests ran.
 | `tests/test_dashboard_api.py` | 42 |
 | `tests/test_trainloop_cli.py` | 22 |
 | `tests/test_dashboard_api_http.py` | 91 |
-| `tests/test_nutrition.py` | 48 |
+| `tests/test_nutrition.py` | 50 |
 | `tests/test_fit_reader_elevation.py` | 21 |
 | `tests/test_splits.py` | 10 |
 | `tests/test_provenance.py` | 18 |
@@ -52,7 +52,7 @@ lint or tests ran.
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_brief_consistency.py` | 37 |
 | `tests/test_sync_import.py` | 5 |
-| **Total** | **604** (603 pass, 1 skip) |
+| **Total** | **606** (605 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -424,11 +424,13 @@ a missing date column, unparseable dates, and negative or non-numeric values.
   setup card. Payloads up to 8 MB are accepted.
 - Health Connect ingestion stores raw NutritionRecords by their `metadata.id`
   in `nutrition_log.records.json`, so an incremental sync can add one food
-  entry without replacing the rest of that day. A Daily-resolution record
-  (interval ≥ 20 hours, no id) is treated as the authoritative total and
-  supersedes raw records for that date. Deletions are applied by id. Dates the
-  webhook manages are replaced wholesale, so a deleted record can remove a day,
-  while manually imported dates are preserved.
+  entry without replacing the rest of that day. A no-id record spanning an hour
+  or more is a Daily aggregate, treated as the authoritative total for its date;
+  Health Connect clamps the current day to "now" and the oldest day to the
+  48-hour window, so a 24-hour threshold would double-count a partial day. A
+  shorter no-id record is a time bucket and is summed. Deletions are applied by
+  id. Dates the webhook manages are replaced wholesale, so a deleted record can
+  remove a day, while manually imported dates are preserved.
 - **Seamless Android path.** CalTrak writes food entries to Android Health
   Connect. The free, open-source HC Webhook app reads Nutrition from Health
   Connect on an interval or on demand and POSTs it to

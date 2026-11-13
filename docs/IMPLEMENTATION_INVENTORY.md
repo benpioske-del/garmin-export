@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 603 passed, 1 skipped (Windows symlink case) |
+| Tests | 605 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -92,7 +92,7 @@ profile as empty is reading an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 603 passed, 1 skipped. |
+| `python -m pytest` | Works. 605 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -295,7 +295,7 @@ download cannot leave the dashboard behind; the order and the failure reporting
 are pinned by `tests/test_sync_import.py`.
 
 Tests: `tests/test_dashboard_api.py` (42), `tests/test_dashboard_api_http.py`
-(91) and `tests/test_nutrition.py` (48). `smoke_dashboard_api.py` runs the same
+(91) and `tests/test_nutrition.py` (50). `smoke_dashboard_api.py` runs the same
 paths against the live database and is deliberately not part of pytest.
 
 `/` serves the committed `flow_outputs/aurora_dashboard.html` behind the same
@@ -361,9 +361,12 @@ nutrition objects, and `parse_export()` auto-detects CSV versus JSON.
 - Health Connect ingestion (`ingest_health_connect()`) keeps raw
   NutritionRecords by `metadata.id` in `nutrition_log.records.json`, so an
   incremental sync adds one entry without losing the rest of that day. A
-  Daily-resolution record (interval ≥ 20 h, no id) is authoritative for its
-  date and supersedes raw records; deletions are applied by id; dates managed
-  by the webhook are replaced wholesale while manually imported dates survive.
+  no-id record spanning an hour or more is a Daily aggregate: it is
+  authoritative for its date and supersedes raw records. Health Connect clamps
+  the current day to "now" and the oldest day to the 48-hour window, so the
+  threshold cannot be 24 hours; a shorter no-id record is a time bucket and is
+  summed. Deletions are applied by id; dates managed by the webhook are
+  replaced wholesale while manually imported dates survive.
 - **Seamless Android path.** CalTrak writes food entries to Android Health
   Connect. The free, open-source HC Webhook app reads Nutrition on an interval
   or on demand and POSTs it to `/api/nutrition/hook`, so no export or file

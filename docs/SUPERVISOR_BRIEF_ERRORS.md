@@ -1121,23 +1121,27 @@ backup is JSON.
   and the one-time setup steps; the manual importer is now labelled **Import
   backup** and accepts `.csv` or `.json`.
 - `ingest_health_connect()` keeps raw NutritionRecords by `metadata.id` in
-  `nutrition_log.records.json`. A Daily record (interval at least 20 hours, no
-  id) supersedes raw records for its date. Deletions are applied by id. Dates
-  the webhook manages are replaced wholesale, while manually imported dates are
-  preserved.
+  `nutrition_log.records.json`. A no-id record spanning an hour or more is a
+  Daily aggregate and supersedes raw records for its date; a shorter no-id
+  record is a time bucket and is summed. The hour threshold exists because
+  Health Connect clamps the current day to "now" and the oldest day to the
+  48-hour window, so a 24-hour test would double-count a partial day. Deletions
+  are applied by id. Dates the webhook manages are replaced wholesale, while
+  manually imported dates are preserved.
 
 ## Verification
 
 - Unit tests in `tests/test_nutrition.py` cover daily and raw Health Connect
-  records, incremental sync, edits, deletions, daily-supersedes-raw, manual-day
-  preservation, JSON backups, `parse_export()`, hook-token stability and
-  `hook_info()` (48 tests).
+  records, a partial current-day daily record replacing the earlier one, short
+  no-id buckets summing, incremental sync, edits, deletions, daily-supersedes-
+  raw, manual-day preservation, JSON backups, `parse_export()`, hook-token
+  stability and `hook_info()` (50 tests).
 - Wire tests in `tests/test_dashboard_api_http.py` cover `hook-info` auth and
   stability, valid/missing/wrong/dashboard tokens, Bearer auth, incremental
   records, deletions, Daily records, no CORS headers, JSON `/api/nutrition`
   forms, and a JSON `/share-target` (91 tests).
-- The live suite is **603 passed, 1 skipped** (604 collected) and the clean
-  checkout is **588 passed, 16 skipped**. `ruff check .` is clean.
+- The live suite is **605 passed, 1 skipped** (606 collected) and the clean
+  checkout is **590 passed, 16 skipped**. `ruff check .` is clean.
 - The webhook has not yet received a live phone payload, and CalTrak's Health
   Connect write behavior has not been confirmed on the athlete's specific
   device. Those remain the acceptance step, not a claim.

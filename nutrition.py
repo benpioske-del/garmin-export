@@ -25,6 +25,12 @@ import paths
 FIELDS = ("date", "calories", "protein", "carbs", "fat")
 NUMERIC = ("calories", "protein", "carbs", "fat")
 
+# A Health Connect record with no metadata id is a merged aggregate, not a raw
+# food entry. Daily aggregates span the local day (clamped to "now" for the
+# current day and to the sync window for the oldest one), while the bridge's
+# N-minute buckets are short. An hour cleanly separates the two.
+DAILY_MIN_SECONDS = 3600
+
 # CalTrak and hand-exported headers vary. Match the same aliases the committed
 # Aurora app uses, so the server and the browser cannot disagree about a column.
 ALIASES = {
@@ -176,9 +182,10 @@ def _hc_date(record, where):
     """Return the local date a Health Connect nutrition record belongs to.
 
     The payload's start_time is formatted in the bridge app's chosen timezone.
-    With the default "Local time" setting the date prefix is already the local
-    day. When the bridge is set to UTC, the record metadata still carries the
-    original zone offset, so apply it before taking the date.
+    With the recommended "Local time" setting the date prefix is already the
+    local day. If the bridge is set to UTC, a meal near local midnight can land
+    on the neighbouring date; the setup card therefore says Local time. Numeric
+    epoch timestamps are read as UTC.
     """
     for key in HC_DATE_KEYS:
         raw = record.get(key)
@@ -526,12 +533,20 @@ def ingest_health_connect(payload, path=None):
         if record_id:
             raw[str(record_id)] = dict(date=date, **values)
             daily.pop(date, None)
-        elif (_interval_seconds(record) or 0) >= 20 * 3600:
+        elif (_interval_seconds(record) or 0) >= DAILY_MIN_SECONDS:
             # A merged Daily record is the authoritative total for that day.
+            # Health Connect's daily merge has no metadata id and spans the
+            # local day, but the current day is clamped to "now" and the
+            # oldest day to the 48-hour window edge, so it can be much shorter
+            # than 24 hours. Anything an hour or longer is a day total, not a
+            # bucket; treating an 8-hour partial day as a raw record would
+            # double-count it when the next sync sends a longer one.
             daily[date] = values
             raw = {key: value for key, value in raw.items()
                    if value.get("date") != date}
         else:
+            # A short no-id record is a time bucket (the bridge's N-minute
+            # resolution) or an old raw record without metadata. Sum it.
             raw[_synthetic_id(date, record, values)] = dict(
                 date=date, **values)
             daily.pop(date, None)

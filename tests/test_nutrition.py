@@ -369,6 +369,38 @@ def test_a_daily_record_supersedes_raw_records_for_that_day(log_path):
     assert nutrition.read_days()[0]["calories"] == 2100
 
 
+def test_a_partial_current_day_daily_record_replaces_the_earlier_one(log_path):
+    """The bridge clamps today's Daily record to "now", so it starts short.
+
+    A 30-minute record from an early sync must not survive as a bucket and add
+    to the 6-hour record sent later the same day.
+    """
+    nutrition.ingest_health_connect({"nutrition": [{
+        "start_time": "2026-11-10T00:00:00-08:00",
+        "end_time": "2026-11-10T00:30:00-08:00",
+        "calories": 100,
+    }]})
+    nutrition.ingest_health_connect({"nutrition": [{
+        "start_time": "2026-11-10T00:00:00-08:00",
+        "end_time": "2026-11-10T06:00:00-08:00",
+        "calories": 900,
+    }]})
+    assert nutrition.read_days()[0]["calories"] == 900
+
+
+def test_short_no_id_buckets_are_summed(log_path):
+    nutrition.ingest_health_connect({"nutrition": [{
+        "start_time": "2026-11-10T08:00:00-08:00",
+        "end_time": "2026-11-10T08:15:00-08:00",
+        "calories": 200,
+    }, {
+        "start_time": "2026-11-10T12:00:00-08:00",
+        "end_time": "2026-11-10T12:15:00-08:00",
+        "calories": 300,
+    }]})
+    assert nutrition.read_days()[0]["calories"] == 500
+
+
 def test_health_connect_does_not_erase_a_manual_day(log_path):
     nutrition.upsert_days([{"date": "2026-11-09", "calories": 100}])
     nutrition.ingest_health_connect({"nutrition": [
