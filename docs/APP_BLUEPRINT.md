@@ -578,20 +578,22 @@ Source URLs:
 
 ### Direct APK distribution
 
-Requirement: MUST for the local-first distribution option.
+Requirement: NOT PERMITTED for this athlete.
 
-A signed APK may be distributed directly. The athlete must:
+The athlete has explicitly rejected sideloading: apps are installed only from
+the Play Store or an equivalent store. Direct APK distribution must not be
+offered as an option in any plan, install guide or brief. This section is kept
+as a record of the rejected path, not as an instruction.
 
-1. Receive the signed APK.
-2. Enable installation from the source application.
-3. Approve the installation warning.
-4. Install the APK.
-5. Grant required runtime permissions.
-6. Keep the release signing key available for future updates.
+For the record, direct distribution would require receiving a signed APK,
+enabling installation from an unknown source, approving the install warning,
+granting runtime permissions, and preserving the release signing key for future
+updates. It also provides no automatic updates. None of that is acceptable
+here.
 
-Direct APK distribution does not provide automatic updates. Future updates must use the same signing key.
-
-Current developer-verification requirements and regional enforcement are subject to the Android rollout. The developer should check whether Android Developer Console or limited-distribution registration applies.
+The accepted distribution path is Google Play. If Play review is not viable for
+a feature, the fallback is a browser-based flow (the dashboard's own web UI or a
+store-installed bridge such as HC Webhook), never a sideloaded build.
 
 Source URLs:
 
@@ -683,7 +685,7 @@ Acceptance checks:
 - Build tool versions are documented.
 - Release signing is configured without committing keys or passwords.
 
-Athlete action: enable USB debugging or approve direct APK installation.
+Athlete action: install the Play build, or test the web UI on the phone. USB debugging and direct APK installation are out of scope.
 
 ### `app-local-store-and-sync`
 
@@ -884,7 +886,7 @@ Athlete action: choose export storage and retention.
 Before installation:
 
 - Have an Android phone available.
-- Confirm the phone can install an APK from the chosen source.
+- Confirm the phone can install the app from the Play Store (no sideloading).
 - Enable or install Health Connect as required by the Android version.
 - Configure the laptop server.
 - Test a network route to the laptop.

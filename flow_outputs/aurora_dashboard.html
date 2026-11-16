@@ -10,17 +10,182 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <style>
 :root{--bg:#050810;--card:rgba(255,255,255,.055);--line:rgba(255,255,255,.1);--muted:#91a0b7;--text:#f4f7fb;--cyan:#00f5ff;--violet:#7c3aed;--green:#10ffa0;--amber:#ffb300;--red:#ff3d5a}
-*{box-sizing:border-box}html{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}body{margin:0;min-height:100vh;background:radial-gradient(circle at 10% 0%,#24114c 0,transparent 35%),radial-gradient(circle at 100% 20%,#073d4a 0,transparent 30%),#050810}body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E")}a{color:inherit;text-decoration:none}button,input,select{font:inherit}button{border:0;color:inherit;cursor:pointer}.app{max-width:1180px;margin:auto;padding:18px 16px 100px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.brand{font-weight:900;letter-spacing:-.06em;font-size:22px}.brand i{font-style:normal;background:linear-gradient(90deg,var(--violet),var(--cyan));color:transparent;background-clip:text}.status{font-size:11px;color:var(--green);border:1px solid #10ffa055;border-radius:20px;padding:7px 10px}.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;backdrop-filter:blur(20px);margin:12px 0;animation:up .45s both}.hero{padding:24px;background:linear-gradient(135deg,#21104a99,#052f3d77);border-color:#8b5cf655}.grid{display:grid;gap:12px}.g2{grid-template-columns:repeat(2,minmax(0,1fr))}.g3{grid-template-columns:repeat(3,minmax(0,1fr))}.stat{font-size:28px;font-weight:900;letter-spacing:-.06em;font-variant-numeric:tabular-nums;background:linear-gradient(90deg,#fff,var(--cyan));color:transparent;background-clip:text}.label,.muted{color:var(--muted);font-size:12px}.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--cyan);font-weight:800}.title{font-size:27px;font-weight:900;letter-spacing:-.06em;margin:4px 0 10px}.h2{font-size:18px;font-weight:800;margin:2px 0 12px}.row{display:flex;align-items:center;justify-content:space-between;gap:10px}.chip{display:inline-flex;padding:6px 9px;border:1px solid var(--line);border-radius:99px;color:var(--muted);font-size:11px}.good{color:var(--green)}.warn{color:var(--amber)}.risk{color:var(--red)}.btn{background:linear-gradient(90deg,var(--violet),#2563eb);padding:12px 15px;border-radius:12px;font-weight:800;min-height:44px}.btn.secondary{background:#ffffff10;border:1px solid var(--line)}.fab{position:fixed;right:20px;bottom:76px;width:56px;height:56px;border-radius:50%;font-size:27px;background:linear-gradient(135deg,var(--violet),var(--cyan));z-index:4;box-shadow:0 10px 35px #00f5ff44}.tabs{position:fixed;z-index:3;bottom:0;left:0;right:0;background:#080d18eF;border-top:1px solid var(--line);display:flex;justify-content:center;padding:9px 5px calc(9px + env(safe-area-inset-bottom));backdrop-filter:blur(20px)}.tabs a{font-size:10px;color:var(--muted);padding:7px 12px;text-align:center}.tabs a.active{color:var(--cyan)}.tabs b{display:block;font-size:17px;margin-bottom:2px}.run{transition:.2s}.run:hover{border-color:#00f5ff66;transform:translateY(-2px)}canvas{max-height:280px}.chartbox{height:270px}.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:14px}table{border-collapse:collapse;width:100%;font-size:11px;min-width:650px}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{color:var(--cyan);position:sticky;top:0;background:#0b1120}.empty{padding:24px;text-align:center;border:1px dashed #ffffff2b;border-radius:16px;color:var(--muted)}.form{display:grid;gap:12px}.form label{font-size:12px;color:var(--muted)}.form input,.form select,.form textarea{width:100%;background:#ffffff09;border:1px solid var(--line);border-radius:11px;color:var(--text);padding:12px;outline:0}.sheet{position:fixed;inset:auto 0 0;background:#0b1120;border:1px solid var(--line);border-radius:24px 24px 0 0;padding:22px;z-index:10;display:none}.sheet.open{display:block}.sheet button{display:block;width:100%;margin:8px 0;text-align:left;background:#ffffff09;padding:15px;border-radius:12px}.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-100px);background:#162238;border:1px solid #ffffff22;border-radius:99px;padding:12px 18px;z-index:20;transition:.3s}.toast.show{transform:translateX(-50%) translateY(0)}.bar{height:8px;background:#ffffff12;border-radius:9px;overflow:hidden}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--violet),var(--cyan));border-radius:9px}.notice{border-left:3px solid var(--red);padding-left:12px}.list{display:grid;gap:9px}.list p{margin:0}.report p{color:#c5cfdd;line-height:1.6;font-size:13px}.report h3{margin-top:22px}.modalback{position:fixed;inset:0;background:#0009;z-index:9;display:none}.modalback.open{display:block}@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@media(min-width:760px){.app{padding-bottom:30px}.tabs{position:static;background:none;border:0;justify-content:flex-start;padding:0;margin-bottom:20px}.tabs a{font-size:12px}.tabs b{display:inline;margin-right:5px}.fab{bottom:25px}.grid.g4{grid-template-columns:repeat(4,1fr)}}
+*{box-sizing:border-box}
+html{background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 10% 0%,#24114c 0,transparent 35%),radial-gradient(circle at 100% 20%,#073d4a 0,transparent 30%),#050810}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.035;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E")}
+a{color:inherit;text-decoration:none}
+button,input,select{font:inherit}
+button{border:0;color:inherit;cursor:pointer}
+.app{max-width:1180px;margin:auto;padding:18px 16px 100px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.brand{font-weight:900;letter-spacing:-.06em;font-size:22px}
+.brand i{font-style:normal;background:linear-gradient(90deg,var(--violet),var(--cyan));color:transparent;background-clip:text}
+.status{font-size:11px;color:var(--green);border:1px solid #10ffa055;border-radius:20px;padding:7px 10px}
+.status:before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;margin-right:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px;backdrop-filter:blur(20px);margin:12px 0;animation:up .45s both}
+.hero{padding:24px;background:linear-gradient(135deg,#21104a99,#052f3d77);border-color:#8b5cf655}
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.stat{font-size:28px;font-weight:900;letter-spacing:-.06em;font-variant-numeric:tabular-nums;background:linear-gradient(90deg,#fff,var(--cyan));color:transparent;background-clip:text}
+.label,.muted{color:var(--muted);font-size:12px}
+.eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--cyan);font-weight:800}
+.title{font-size:27px;font-weight:900;letter-spacing:-.06em;margin:4px 0 10px}
+.h2{font-size:18px;font-weight:800;margin:2px 0 12px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.chip{display:inline-flex;padding:6px 9px;border:1px solid var(--line);border-radius:99px;color:var(--muted);font-size:11px}
+.good{color:var(--green)}
+.warn{color:var(--amber)}
+.risk{color:var(--red)}
+.btn{background:linear-gradient(90deg,var(--violet),#2563eb);padding:12px 15px;border-radius:12px;font-weight:800;min-height:44px}
+.btn.secondary{background:#ffffff10;border:1px solid var(--line)}
+.fab{position:fixed;right:20px;bottom:76px;width:56px;height:56px;border-radius:50%;font-size:27px;background:linear-gradient(135deg,var(--violet),var(--cyan));z-index:4;box-shadow:0 10px 35px #00f5ff44}
+.tabs{position:fixed;z-index:3;bottom:0;left:0;right:0;background:#080d18ef;border-top:1px solid var(--line);display:flex;justify-content:center;padding:9px 5px calc(9px + env(safe-area-inset-bottom));backdrop-filter:blur(20px)}
+.tabs a{font-size:10px;color:var(--muted);padding:7px 12px;text-align:center}
+.tabs a.active{color:var(--cyan)}
+.tabs b{display:block;font-size:17px;margin-bottom:2px}
+.run{transition:.2s}
+.run:hover{border-color:#00f5ff66;transform:translateY(-2px)}
+canvas{max-height:280px}
+.chartbox{height:270px;position:relative}
+.tablewrap{overflow:auto;border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;font-size:11px;min-width:650px}
+th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--cyan);position:sticky;top:0;background:#0b1120}
+.empty{padding:24px;text-align:center;border:1px dashed #ffffff2b;border-radius:16px;color:var(--muted)}
+.empty strong{display:block;color:var(--text);margin-bottom:8px}
+.form{display:grid;gap:12px}
+.form label{font-size:12px;color:var(--muted)}
+.form input,.form select,.form textarea{width:100%;background:#ffffff09;border:1px solid var(--line);border-radius:11px;color:var(--text);padding:12px;outline:0}
+.sheet{position:fixed;inset:auto 0 0;background:#0b1120;border:1px solid var(--line);border-radius:24px 24px 0 0;padding:22px;z-index:10;display:none}
+.sheet.open{display:block}
+.sheet button{display:block;width:100%;margin:8px 0;text-align:left;background:#ffffff09;padding:15px;border-radius:12px}
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%) translateY(-100px);background:#162238;border:1px solid #ffffff22;border-radius:99px;padding:12px 18px;z-index:20;transition:.3s}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.bar{height:8px;background:#ffffff12;border-radius:9px;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--violet),var(--cyan));border-radius:9px}
+.notice{border-left:3px solid var(--red);padding-left:12px}
+.list{display:grid;gap:9px}
+.list p{margin:0}
+.report p{color:#c5cfdd;line-height:1.6;font-size:13px}
+.report h3{margin-top:22px}
+.modalback{position:fixed;inset:0;background:#0009;z-index:9;display:none}
+.modalback.open{display:block}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@media(min-width:760px){.app{padding-bottom:30px}.tabs{position:static;background:none;border:0;justify-content:flex-start;padding:0;margin-bottom:20px}.tabs a{font-size:12px}.tabs b{display:inline;margin-right:5px}.fab{bottom:25px}}
+/* Feature styles ported from the live Aurora dashboard. */
+.signal{border-color:#00f5ff44}
+.sync{display:flex;flex-wrap:wrap;align-items:center;gap:14px;background:#ffffff06;border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:14px;color:var(--muted);font-size:12px}
+.sync b{color:var(--text)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.stats>div{background:#ffffff05;border:1px solid var(--line);border-radius:12px;padding:10px}
+.stats .value{font-size:20px;font-weight:900;font-variant-numeric:tabular-nums;margin-top:4px}
+@media(max-width:640px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,11px);gap:3px;overflow-x:auto;padding:6px 0}
+.heat i{display:block;width:11px;height:11px;border-radius:2px;background:#ffffff0d}
+.heat i.h1{background:#10ffa044}
+.heat i.h2{background:#10ffa088}
+.heat i.h3{background:#10ffa0bb}
+.heat i.h4{background:#10ffa0}
+.group{margin:22px 0 2px}
+.pill{display:inline-block;padding:6px 10px;border-radius:99px;background:#ffffff0b;color:var(--muted);font-size:11px}
+.run-card{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:9px 0;padding:15px;border:1px solid var(--line);border-radius:16px;background:#ffffff04}
+.run-card:hover{border-color:#00f5ff88}
 </style>
 </head>
 <body>
 <div id="toast" class="toast"></div><div id="modalback" class="modalback"></div>
-<div class="app"><header class="top"><a class="brand" href="#home">AURORA <i>PERFORMANCE</i></a><span class="status" id="status">● CACHED</span></header><nav class="tabs" id="tabs"></nav><main id="app"></main></div>
+<div class="app">
+<header class="top"><a class="brand" href="#home">AURORA <i>PERFORMANCE</i></a><span class="status" id="status">SNAPSHOT</span></header>
+<nav class="tabs" id="tabs"></nav>
+<main id="app"></main>
+</div>
 <button class="fab" id="fab">+</button>
-<div class="sheet" id="sheet"><div class="h2">Quick actions</div><button onclick="go('#log/run')">🏃 Log a run</button><button onclick="go('#lift')">🏋 Start a lift session</button><button onclick="document.getElementById('csv').click()">🥗 Import CalTrak CSV</button><input id="csv" type="file" accept=".csv,text/csv" hidden></div>
+<div class="sheet" id="sheet">
+<div class="h2">Quick actions</div>
+<button onclick="go('#log/run')">Log a run</button>
+<button onclick="go('#lift')">Start a lift session</button>
+<button onclick="go('#fuel')">Fuel and nutrition</button>
+<button onclick="document.getElementById('csv').click()">Import CalTrak backup</button>
+<input id="csv" type="file" accept=".csv,.json,text/csv,application/json" hidden onchange="importCSV(event)">
+</div>
 <script>
-const RUNS=[];
-const raw=`2026-04-14|13.1|1:59:46|167|89|9:09|1540|1030|8:35,8:51,8:51,8:51,9:22,9:16,9:52,9:47,9:47,9:44,9:07,8:13,8:36
+const SUMMARY={total_runs:72,total_miles:587.77,latest_run_date:"2026-11-11",latest_run_distance:6.48,this_week_miles:16.73,acwr:null,injury_risk_level:null};
+const COACH={acwr:null,risk:null,grades:{SHORT:["B","Good short-distance pace and generally stable execution."],MEDIUM:["B-","Useful aerobic fitness with increasing variability."],LONG:["D","Long-run pace is substantially slower and fades under fatigue."]}};
+const rawMeta=`2026-04-14|13.1|1:59:46|167|182|89|9:09|8:13|1030|1184|1540|14
+2026-04-16|7.01|1:06:45|169|178|90|9:31|9:04|571|784|858|8
+2026-04-20|7.01|1:01:59|167|180|93|8:51|8:20|531|545|799|8
+2026-04-22|8.17|1:27:14|169|194|82|10:40|8:13|883|873|1033|9
+2026-04-24|13.1|1:59:02|166|177|91|9:05|8:44|915|938|1507|14
+2026-05-01|13.1|2:05:21|161|175|92|9:34|8:45|1030|994|1517|14
+2026-05-03|6.92|1:03:25|166|183|93|9:10|8:23|646|614|810|8
+2026-05-05|7.56|1:10:36|162|178|93|9:21|8:54|495|535|884|8
+2026-05-08|13.58|2:08:52|167|181|90|9:29|8:34|991|1010|1635|14
+2026-05-11|7.01|1:04:57|174|188|92|9:16|8:53|817|725|859|8
+2026-05-15|15.15|2:44:32|165|186|86|10:52|9:15|1604|1647|1875|16
+2026-05-21|6.52|0:57:24|171|195|92|8:48|8:17|499|525|756|7
+2026-05-25|4.12|0:37:41|179|194|90|9:09|7:58|305|331|508|5
+2026-05-28|10.32|1:46:31|170|184|88|10:19|9:14|876|892|1298|16
+2026-05-31|19.03|3:11:54|162|176|90|10:05|8:58|1847|1844|2217|20
+2026-06-02|3.58|0:31:03|168|189|94|8:40|8:38|574|505|407|4
+2026-06-04|7.54|1:11:36|171|190|92|9:30|9:06|699|659|924|8
+2026-06-07|17.29|3:43:05|150|182|76|12:54|9:21|1768|1795|2051|18
+2026-06-13|9.35|1:31:33|174|188|90|9:47|9:16|725|804|1167|10
+2026-06-16|4.89|0:38:43|175|195|92|7:55|7:49|367|367|540|5
+2026-06-21|14.79|2:50:28|162|180|82|11:32|9:37|1371|1375|1808|15
+2026-06-23|3.89|0:38:09|160|181|92|9:49|9:47|466|413|470|4
+2026-06-26|7.01|1:06:04|172|189|90|9:25|9:06|449|574|841|12
+2026-07-05|4.49|0:45:54|179|192|85|10:13|9:12|482|413|603|7
+2026-07-07|4.74|0:44:52|174|190|89|9:28|9:07|410|413|579|5
+2026-07-09|4.03|0:37:46|166|181|89|9:22|9:01|932|564|467|5
+2026-07-12|4.42|0:42:50|172|190|88|9:42|9:16|404|492|539|5
+2026-07-14|4.02|0:37:55|171|188|88|9:27|9:06|420|367|479|5
+2026-07-18|4.04|0:36:28|174|188|89|9:02|8:24|351|420|473|5
+2026-07-21|12.0|2:05:08|171|185|87|10:25|9:44|925|817|1470|13
+2026-07-23|7.33|1:11:06|171|184|88|9:42|9:34|830|1010|890|8
+2026-07-25|4.91|0:45:19|172|183|88|9:14|8:35|515|397|579|5
+2026-07-26|4.89|0:47:12|175|183|88|9:39|8:58|466|430|583|5
+2026-07-31|6.91|1:05:52|168|187|88|9:32|9:17|712|781|828|7
+2026-08-02|4.0|0:33:40|174|189|90|8:25|8:14|351|387|449|5
+2026-08-04|13.12|2:07:06|172|189|88|9:41|9:10|758|732|1569|14
+2026-08-07|7.56|1:09:18|174|191|89|9:10|8:38|577|538|896|8
+2026-08-09|4.03|0:33:06|175|192|90|8:13|7:53|381|390|450|5
+2026-08-11|5.35|0:55:23|163|192|89|10:21|9:55|709|472|651|6
+2026-08-13|8.01|1:16:36|168|187|88|9:34|8:50|830|810|955|9
+2026-08-16|4.01|0:34:04|174|190|91|8:30|8:14|620|446|451|5
+2026-08-18|7.95|1:16:27|174|191|89|9:37|8:46|669|879|964|8
+2026-08-20|4.89|0:44:21|165|177|90|9:04|9:00|253|358|559|5
+2026-08-26|4.89|0:43:53|174|191|89|8:58|8:40|449|404|572|5
+2026-08-28|7.48|1:08:01|174|188|89|9:06|8:58|413|656|878|8
+2026-09-01|12.02|1:56:31|168|184|86|9:42|8:09|1204|1220|1418|13
+2026-09-03|8.01|1:19:45|167|182|87|9:58|9:20|899|1010|962|9
+2026-09-07|5.03|0:44:40|175|189|89|8:53|8:34|236|545|579|6
+2026-09-09|16.73|3:29:43|152|184|76|12:32|8:53|2169|2133|1975|17
+2026-09-11|7.88|1:11:51|174|187|89|9:07|8:45|587|682|920|8
+2026-09-13|4.01|0:34:56|163|180|91|8:42|8:13|295|335|438|5
+2026-09-15|8.01|1:15:47|163|180|89|9:28|8:32|627|889|918|9
+2026-09-20|4.01|0:33:17|167|186|91|8:18|7:54|272|374|429|5
+2026-09-22|6.47|0:56:43|170|189|91|8:46|8:08|404|417|734|7
+2026-09-24|16.0|3:01:13|156|177|81|11:19|9:08|1765|1759|1860|17
+2026-09-26|9.0|1:24:21|161|173|88|9:22|8:56|696|791|1021|10
+2026-09-29|5.0|0:45:11|168|184|89|9:02|8:34|495|289|587|6
+2026-10-01|17.01|4:00:02|137|179|72|14:07|9:28|1900|2057|1917|18
+2026-10-06|6.21|0:58:23|176|187|88|9:24|8:59|449|679|751|7
+2026-10-08|13.11|1:57:33|169|180|89|8:58|8:40|925|1079|1487|14
+2026-10-10|5.01|0:48:17|165|178|88|9:38|9:25|171|663|591|6
+2026-10-13|10.24|1:37:10|160|170|89|9:29|8:57|1014|833|1157|11
+2026-10-17|6.03|0:55:25|165|178|90|9:11|9:04|390|768|689|7
+2026-10-20|10.0|1:32:33|163|174|89|9:15|8:56|1066|974|1138|11
+2026-10-22|15.6|2:32:36|162|175|88|9:47|8:59|1437|1480|1796|16
+2026-10-24|6.46|0:55:08|168|187|91|8:32|8:07|384|417|718|7
+2026-10-27|5.0|0:47:08|160|169|90|9:25|9:12|341|351|584|6
+2026-10-29|12.0|1:50:45|163|177|90|9:14|8:34|925|850|1350|13
+2026-11-06|4.03|0:37:19|160|171|90|9:15|9:00|568|443|468|5
+2026-11-08|5.06|0:45:06|164|173|90|8:55|8:34|246|600|569|6
+2026-11-10|10.25|1:36:42|162|178|89|9:26|8:29|945|896|1182|11
+2026-11-11|6.48|1:00:24|155|163|90|9:19|9:07|715|833|726|7`;
+const rawSplits=`2026-04-14|13.1|1:59:46|167|89|9:09|1540|1030|8:35,8:51,8:51,8:51,9:22,9:16,9:52,9:47,9:47,9:44,9:07,8:13,8:36
 2026-04-16|7.01|1:06:45|169|90|9:31|858|571|9:05,9:25,9:04,9:30,9:37,9:56,10:01
 2026-04-20|7.01|1:01:59|167|93|8:51|799|531|8:44,8:44,8:53,9:09,8:58,9:09,8:20
 2026-04-22|8.17|1:27:14|169|82|10:40|1033|883|8:27,8:13,8:42,9:18,9:42,12:29,13:23,13:18
@@ -91,30 +256,476 @@ const raw=`2026-04-14|13.1|1:59:46|167|89|9:09|1540|1030|8:35,8:51,8:51,8:51,9:2
 2026-11-06|4.03|0:37:19|160|90|9:15|468|568|9:00,9:20,9:28,9:13
 2026-11-08|5.06|0:45:06|164|90|8:55|569|246|8:59,9:02,9:02,8:58,8:34
 2026-11-10|10.25|1:36:42|162|89|9:26|1182|945|9:12,9:27,9:34,9:50,9:57,9:38,9:37,9:37,9:17,8:29
-2026-11-11|6.48|1:00:24|155|90|9:19|726|715|9:12,9:07,9:07,9:30,9:37,9:26`;raw.trim().split('\n').forEach(x=>{let[a,d,t,hr,cad,p,cal,asc,s]=x.split('|');RUNS.push({date:a,distance:+d,time:t,avgHR:+hr,cadence:+cad,pace:p,calories:+cal,ascent:+asc,splits:s.split(','),maxHR:null,descent:null})});
-const SUMMARY={total_runs:72,total_miles:587.77,latest_run_date:"2026-11-11",latest_run_distance:6.48,this_week_miles:0,acwr:1.71,injury_risk_level:"High"};
-const NUTRITION=JSON.parse(localStorage.aurora_nutrition||'[]'),LIFTS=JSON.parse(localStorage.aurora_lifts||'[]');let charts=[];
-const fmtP=s=>s||'not recorded', sec=s=>{let a=s.split(':').map(Number);return a.length===3?a[0]*3600+a[1]*60+a[2]:a[0]*60+a[1]}, paceSec=s=>{let[a,b]=s.split(':').map(Number);return a*60+b}, pstr=n=>`${Math.floor(n/60)}:${String(Math.round(n%60)).padStart(2,'0')}`, band=d=>d<5?'SHORT':d<=9?'MEDIUM':'LONG', last=()=>RUNS[RUNS.length-1];
-function go(h){location.hash=h;render()}function toast(s){let e=document.getElementById('toast');e.textContent=s;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2500)}
-function nav(){let h=location.hash||'#home',links=[['#home','⌂','HOME'],['#runs','◒','RUNS'],['#lift','＋','LIFT'],['#fuel','◉','FUEL'],['#analysis','⌁','ANALYSIS'],['#data','▦','DATA']];document.getElementById('tabs').innerHTML=links.map(x=>`<a class="${h.startsWith(x[0])?'active':''}" href="${x[0]}"><b>${x[1]}</b>${x[2]}</a>`).join('')}
-function chart(id,type,data,opts={}){let c=document.getElementById(id);if(!c)return;charts.push(new Chart(c,{type,data,options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#aab6c8',font:{size:10}}}},scales:{x:{ticks:{color:'#91a0b7',maxTicksLimit:8},grid:{color:'#ffffff08'}},y:{ticks:{color:'#91a0b7'},grid:{color:'#ffffff08'}}},...opts}}))}
-function card(x){return`<section class="card">${x}</section>`}
-function home(){let r=last(), miles=RUNS.slice(-7).reduce((a,x)=>a+x.distance,0), long=RUNS.filter(x=>x.distance>9).slice(-1)[0];return `<div class="eyebrow">Tuesday · 16 November 2026</div><h1 class="title">Your training, illuminated.</h1>${card(`<div class="row"><div><div class="eyebrow">Latest sync</div><div class="stat">${SUMMARY.total_runs} runs</div><div class="muted">${SUMMARY.latest_run_date} · ${SUMMARY.latest_run_distance} mi picked up</div></div><span class="chip good">AUDITED</span></div>`)}${card(`<div class="eyebrow">Today's call</div><div class="title">REST / EASY</div><p class="muted">ACWR is 1.71 from coaching analysis and the latest training week is compressed. Hold intensity until recovery is confirmed.</p><span class="chip risk">HIGH LOAD</span>`)}${card(`<a href="#runs/${r.date}"><div class="eyebrow">Latest run · analysed</div><div class="row"><div><div class="title">${r.date}</div><div class="muted">${r.distance} mi · ${r.pace}/mi · ${band(r.distance)}</div></div><div class="stat">${r.avgHR}<small class="label"> bpm</small></div></div><div class="bar"><i style="width:${Math.min(100,r.avgHR/1.98)}%"></i></div><p class="muted">Breakdown analysis is estimated from lap splits. Tap for full report.</p></a>`)}<div class="grid g2">${card(`<div class="eyebrow">This week</div><div class="stat">${miles.toFixed(2)}</div><div class="muted">miles · ${RUNS.slice(-7).length} runs</div>`)}${card(`<div class="eyebrow">ACWR · official</div><div class="stat">1.71</div><div class="muted">from coaching analysis</div>`)}</div>${card(`<div class="eyebrow">Your weak spot</div><div class="h2">Long-run durability</div><p class="muted">12 of 23 long runs broke down, with a median breakdown at 7.80 miles.</p><a class="chip" href="#analysis/struggle">Open analysis →</a>`)}${card(`<div class="eyebrow">Needs your attention</div><div class="list"><p class="risk">• Critical workload risk: ACWR is 1.71.</p><p class="risk">• Recurring long-run breakdown requires intervention.</p><p class="warn">• Breakdown values are estimated; segment export could not be fetched.</p><p class="muted">• Lifting, nutrition and recovery sources returned no data.</p></div>`)}${card(`<div class="eyebrow">Fuel today</div><div class="empty">NO DATA: nutrition_log_url returned nothing</div>`)}<div class="grid g3">${[['28-day mileage',RUNS.filter(x=>(Date.now()-new Date(x.date))/864e5<28).reduce((a,x)=>a+x.distance,0).toFixed(1)+' mi'],['Longest run','19.03 mi'],['Rest days','not recorded']].map(x=>card(`<div class="label">${x[0]}</div><div class="stat">${x[1]}</div>`)).join('')}</div>`}
-function runs(){return `<div class="row"><div><div class="eyebrow">Activity feed</div><h1 class="title">Every run, ready.</h1></div><a class="btn" href="#log/run">Log run</a></div>${RUNS.slice().reverse().map(r=>card(`<a class="run" href="#runs/${r.date}"><div class="row"><div><b>${r.date}</b><div class="muted">${r.distance} mi · ${band(r.distance)} · ${r.pace}/mi</div></div><div><b>${r.avgHR}</b><div class="muted">bpm</div></div></div><div class="row" style="margin-top:12px"><span class="chip">${r.splits.length} laps</span><span class="chip ${r.distance>9?'warn':'good'}">${r.distance>9?'long':'steady'}</span><span class="muted">estimated breakdown →</span></div></a>`)).join('')}`}
-function report(date){let r=RUNS.find(x=>x.date===date)||last(),vals=r.splits.map(paceSec),base=vals.slice(0,Math.max(1,Math.floor(vals.length/3))).sort((a,b)=>a-b)[Math.floor(Math.max(1,Math.floor(vals.length/3))/2)],idx=vals.findIndex((v,i)=>i>1&&v>base+20);let br=idx<0?'NONE':(idx+1).toFixed(2);return `<div class="row"><a class="chip" href="#runs">← Runs</a><span class="chip">ESTIMATED</span></div>${card(`<div class="eyebrow">${band(r.distance)} RUN</div><h1 class="title">${r.date}</h1><div class="grid g3"><div><div class="stat">${r.distance}</div><div class="label">miles</div></div><div><div class="stat">${r.pace}</div><div class="label">pace / mi</div></div><div><div class="stat">${r.avgHR}</div><div class="label">avg HR</div></div></div><p class="muted">Score computed from pace, heart rate and consistency. Cadence, weather and fueling are not recorded.</p>`)}${card(`<div class="row"><div><div class="eyebrow">Lap profile</div><div class="h2">${br==='NONE'?'Held pace all the way':`Breaks at mile ${br}`}</div></div><span class="chip ${br==='NONE'?'good':'risk'}">${br==='NONE'?'NO BREAKDOWN':'ESTIMATED'}</span></div><div class="chartbox"><canvas id="split"></canvas></div><p class="muted">Baseline band is computed from the first third of supplied lap splits. Slow laps remain visible and are not corrected.</p>`)}${card(`<div class="eyebrow">Context</div><div class="grid g2"><span class="chip">Climb / mi: ${(r.ascent/r.distance).toFixed(1)} ft</span><span class="chip">HR: ${r.avgHR}/198</span><span class="chip">Fast start: not recorded</span><span class="chip">Prior 7d: not recorded</span><span class="chip">Calories: ${r.calories}</span><span class="chip">Fuel: not recorded</span></div>`)}${card(`<div class="eyebrow">Written coaching report</div><div class="report"><h3>Run summary</h3><p>This ${r.distance}-mile ${band(r.distance).toLowerCase()} run averaged ${r.pace}/mi at ${r.avgHR} bpm. The lap profile is preserved exactly from the audited Garmin activity. Breakdown status is estimated because the segment export could not be fetched.</p><h3>Next 48 hours</h3><p>Keep the next session easy and avoid adding intensity while the official ACWR remains 1.71.</p></div>`)}<div class="row"><a class="btn secondary" href="#runs/${RUNS[Math.max(0,RUNS.indexOf(r)-1)].date}">← Previous</a><a class="btn secondary" href="#runs/${RUNS[Math.min(RUNS.length-1,RUNS.indexOf(r)+1)].date}">Next →</a></div>`}
-function log(){return `${card(`<div class="eyebrow">Quick log</div><h1 class="title">Capture the effort.</h1><form id="runform" class="form"><label>Date<input name="date" type="date" value="${new Date().toISOString().slice(0,10)}" required></label><label>Distance, miles<input name="distance" type="number" step=".01" required></label><label>Time<input name="time" placeholder="45:00" required></label><label>Average HR<input name="hr" type="number" required></label><label>RPE <input name="rpe" type="range" min="1" max="10" value="5"></label><button class="btn">Save and view report</button></form>`)}
-function fuel(date){return `${card(`<div class="row"><div><div class="eyebrow">Fuel</div><h1 class="title">${date||'Today'}</h1></div><label class="btn">Import CSV<input id="fuelcsv" type="file" accept=".csv,text/csv" hidden></label></div>`)}${NUTRITION.length?NUTRITION.map(x=>card(`${x.date} · ${x.kcal||'not recorded'} kcal`)).join(''):card('<div class="empty">NO DATA: nutrition_log_url returned nothing. Import a CalTrak CSV to begin.</div>')}`}
-// Remaining rows are retained in the embedded activity source above; all charts are generated from RUNS.
-function analysis(){let long=RUNS.filter(x=>x.distance>9),weeks={};RUNS.forEach(r=>{let d=new Date(r.date),m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));let k=m.toISOString().slice(0,10);weeks[k]=(weeks[k]||0)+r.distance});return `<div class="eyebrow">Analysis</div><h1 class="title">Find the signal.</h1>${card(`<div class="row"><div><div class="h2">Where you struggle</div><p class="muted">12 of 23 long runs broke down. Median breakdown: 7.80 mi.</p></div><span class="chip risk">HIGH RISK</span></div><p class="muted">SOURCE: ESTIMATED. The lap-splits segment export could not be fetched; exact breakdown points need human review.</p>`)}${card(`<div class="h2">Weekly load</div><div class="chartbox"><canvas id="load"></canvas></div><p class="muted">Weekly miles computed from the embedded activity rows.</p>`)}${card(`<div class="h2">Pace and heart rate</div><div class="chartbox"><canvas id="scatter"></canvas></div><p class="muted">Shorter pace is faster; each dot is one audited run.</p>`)}${card(`<div class="h2">Coaching directives</div><div class="list"><p>1. Restore safe workload balance.</p><p>2. Improve long-run pace durability.</p><p>3. Replace irregular spikes with repeatable weeks.</p></div>`)}${card(`<div class="empty">Lifting: NO DATA — lifting_log_url returned nothing and audit found no lifting sessions.</div>`)}${card(`<div class="empty">Nutrition: NO DATA — nutrition_log_url returned nothing.</div>`)}`}
-function data(){return `${card(`<div class="row"><div><div class="eyebrow">Data vault</div><h1 class="title">Source of truth.</h1></div><button class="btn secondary" onclick="downloadCSV()">Export CSV</button></div><p class="muted">${RUNS.length} activity rows retained. Optional Garmin fields not present in the source are shown as not recorded.</p>`)}${card(`<div class="tablewrap"><table><thead><tr><th>Date</th><th>Distance</th><th>Time</th><th>Pace</th><th>HR</th><th>Cadence</th><th>Calories</th><th>Ascent</th><th>Laps</th></tr></thead><tbody>${RUNS.map(r=>`<tr onclick="go('#runs/${r.date}')"><td>${r.date}</td><td>${r.distance}</td><td>${r.time}</td><td>${r.pace}</td><td>${r.avgHR}</td><td>${r.cadence}</td><td>${r.calories}</td><td>${r.ascent}</td><td>${r.splits.length}</td></tr>`).join('')}</tbody></table></div>`)}${card(`<div class="h2">Audit notes</div><p class="muted">72/72 records retained; no duplicates or corrections. Title, stride length, Training Stress Score and Steps were blank. Weather fields were not present. The 2026-07-26 local/file date corresponds to UTC 2026-07-27.</p>`)}`}
-function lift(){return card(`<div class="eyebrow">Strength</div><h1 class="title">Start a session.</h1><div class="empty">NO DATA: lifting_log_url returned nothing and audit found no lifting sessions. Your own sessions can be logged here.</div><form id="liftform" class="form" style="margin-top:15px"><label>Bodyweight, lb<input name="bw" type="number" placeholder="not recorded"></label><label>Exercise<input name="ex" placeholder="Exercise name"></label><label>Reps<input name="reps" type="number" value="5"></label><label>Added weight, lb<input name="weight" type="number" value="0"></label><button class="btn">END SESSION</button></form>`)}
-function render(){nav();charts.forEach(c=>c.destroy());charts=[];let h=location.hash||'#home',view=h==='#home'?home():h==='#runs'?runs():h==='#log/run'?log():h==='#analysis'||h.startsWith('#analysis/')?analysis():h==='#data'?data():h==='#lift'?lift():h.startsWith('#fuel')?fuel(h.split('/')[1]):h.startsWith('#runs/')?report(h.split('/')[1]):home();document.getElementById('app').innerHTML=view;requestAnimationFrame(()=>{if(h.startsWith('#runs/')){let r=RUNS.find(x=>x.date===h.split('/')[1])||last();chart('split','line',{labels:r.splits.map((_,i)=>i+1),datasets:[{label:'pace sec/mi',data:r.splits.map(paceSec),borderColor:'#00f5ff',backgroundColor:'#00f5ff22',fill:true,tension:.3}]},{scales:{y:{reverse:true}}})}if(h==='#analysis'||h.startsWith('#analysis/')){let w={};RUNS.forEach(r=>{let d=new Date(r.date),m=new Date(d);m.setDate(d.getDate()-((d.getDay()+6)%7));let k=m.toISOString().slice(5,10);w[k]=(w[k]||0)+r.distance});chart('load','bar',{labels:Object.keys(w),datasets:[{label:'miles',data:Object.values(w),backgroundColor:'#7c3aed'}]});chart('scatter','scatter',{datasets:[{label:'runs',data:RUNS.map(r=>({x:r.avgHR,y:paceSec(r.pace)})),backgroundColor:'#00f5ff'}]},{scales:{y:{reverse:true,title:{display:true,text:'pace seconds'}}})}})})}
-document.getElementById('runform')?.addEventListener('submit',e=>{e.preventDefault();let f=new FormData(e.target),d=f.get('date'),t=f.get('time'),r={date:d,distance:+f.get('distance'),time:t,avgHR:+f.get('hr'),cadence:null,pace:pstr(sec(t)/(+f.get('distance'))),calories:null,ascent:null,splits:[],maxHR:null,descent:null};let i=RUNS.findIndex(x=>x.date===d);i>=0?RUNS[i]=r:RUNS.push(r);localStorage.aurora_last_seen_run=d;toast('Run saved');go('#runs/'+d)});
-document.getElementById('liftform')?.addEventListener('submit',e=>{e.preventDefault();let f=new FormData(e.target),x={date:new Date().toISOString().slice(0,10),bodyweight:f.get('bw')||null,exercise:f.get('ex')||'not recorded',reps:+f.get('reps'),weight:+f.get('weight')};LIFTS.push(x);localStorage.aurora_lifts=JSON.stringify(LIFTS);toast('Session saved');go('#lift')});
-document.getElementById('fab').onclick=()=>{document.getElementById('sheet').classList.toggle('open');document.getElementById('modalback').classList.toggle('open')};document.getElementById('modalback').onclick=()=>{document.getElementById('sheet').classList.remove('open');document.getElementById('modalback').classList.remove('open')};
-document.getElementById('csv').onchange=e=>{let f=e.target.files[0];if(!f)return;let rd=new FileReader;rd.onload=()=>{let lines=rd.result.trim().split(/\r?\n/),head=lines.shift().split(',').map(x=>x.toLowerCase()),di=head.findIndex(x=>/date|day/.test(x)),ki=head.findIndex(x=>/calories|kcal|energy/.test(x)),pi=head.findIndex(x=>x==='protein'),ci=head.findIndex(x=>/carb/.test(x)),fi=head.findIndex(x=>x==='fat');lines.forEach(l=>{let a=l.split(',');if(a[di])NUTRITION.push({date:a[di],kcal:+a[ki]||null,protein:+a[pi]||null,carbs:+a[ci]||null,fat:+a[fi]||null})});localStorage.aurora_nutrition=JSON.stringify(NUTRITION);toast('CalTrak import saved');go('#fuel/'+(NUTRITION.at(-1)?.date||''))};rd.readAsText(f)};
-function downloadCSV(){let s='Date,Distance,Time,Avg HR,Cadence,Pace,Calories,Ascent,Lap Splits\n'+RUNS.map(r=>[r.date,r.distance,r.time,r.avgHR,r.cadence,r.pace,r.calories,r.ascent,r.splits.join(' | ')].join(',')).join('\n'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([s],{type:'text/csv'}));a.download='activity.csv';a.click()}
-window.addEventListener('hashchange',render);render();
+2026-11-11|6.48|1:00:24|155|90|9:19|726|715|9:12,9:07,9:07,9:30,9:37,9:26`;
+const NUTRITION=JSON.parse(localStorage.getItem("aurora_nutrition")||"[]");
+const LIFTS=JSON.parse(localStorage.getItem("aurora_lifts")||"[]");
+let charts=[];
+
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function paceSec(p){if(p==null)return NaN;if(typeof p==="number")return p;var a=String(p).split(":").map(Number);return a.length===3?a[0]*3600+a[1]*60+a[2]:a[0]*60+a[1]}
+function pstr(n){if(!isFinite(n)||n<=0)return "not recorded";return Math.floor(n/60)+":"+String(Math.round(n%60)).padStart(2,"0")}
+function sec(s){if(s==null)return 0;var a=String(s).split(":").map(Number);return a.length===3?a[0]*3600+a[1]*60+a[2]:a[0]*60+(a[1]||0)}
+function band(d){return d<5?"SHORT":d<=9?"MEDIUM":"LONG"}
+function last(){return RUNS[RUNS.length-1]}
+function avg(a,k){var x=a.map(function(r){return r[k]}).filter(Number.isFinite);return x.length?x.reduce(function(p,v){return p+v},0)/x.length:null}
+function fmt(n,d){d=d==null?1:d;return n==null?"not recorded":Number(n).toFixed(d)}
+function bandColor(b){return b==="SHORT"?"#10ffa0":b==="LONG"?"#7c3aed":"#00f5ff"}
+function show(s){toast(s)}
+function toast(s){var e=document.getElementById("toast");if(!e)return;e.textContent=s;e.classList.add("show");setTimeout(function(){e.classList.remove("show")},2500)}
+function go(h){location.hash=h;render()}
+function navigate(h){go(h)}
+function card(x,cls){return '<section class="card'+(cls?" "+cls:"")+'">'+x+"</section>"}
+
+function normalizeRun(r){
+  if(!r)return r;
+  var distance=Number(r.distance)||0;
+  var pace=r.pace||r.avgPace||null;
+  if(!pace&&r.time&&distance){pace=pstr(sec(r.time)/distance)}
+  var splits=r.splits;
+  if(Array.isArray(splits)){splits=splits.map(function(s){return typeof s==="number"?pstr(s):String(s)})}
+  else{splits=[]}
+  return {
+    date:r.date,
+    distance:distance,
+    time:r.time==null?null:r.time,
+    avgHR:r.avgHR==null?null:Number(r.avgHR),
+    maxHR:r.maxHR==null?null:Number(r.maxHR),
+    cadence:r.cadence==null?null:Number(r.cadence),
+    maxCadence:r.maxCadence==null?null:Number(r.maxCadence),
+    pace:pace,
+    bestPace:r.bestPace==null?null:r.bestPace,
+    best5k:r.best5k==null?null:r.best5k,
+    tss:r.tss==null?null:Number(r.tss),
+    splits:splits,
+    ascent:r.ascent==null?null:Number(r.ascent),
+    descent:r.descent==null?null:Number(r.descent),
+    calories:r.calories==null?null:Number(r.calories),
+    laps:r.laps==null?splits.length:Number(r.laps),
+    source:r.source||null,
+    band:r.band||band(distance)
+  };
+}
+
+const RUNS=[];
+(function(){
+  var splitMap={};
+  rawSplits.trim().split("\n").forEach(function(line){
+    var p=line.split("|");
+    if(!p.length)return;
+    splitMap[p[0]]=p[p.length-1]?p[p.length-1].split(","):[];
+  });
+  rawMeta.trim().split("\n").forEach(function(line){
+    var p=line.split("|");
+    if(p.length<12)return;
+    RUNS.push(normalizeRun({
+      date:p[0],distance:+p[1],time:p[2],avgHR:+p[3],maxHR:+p[4],
+      cadence:+p[5],pace:p[6],bestPace:p[7],ascent:+p[8],descent:+p[9],
+      calories:+p[10],laps:+p[11],splits:splitMap[p[0]]||[],
+      source:p[0]+"_Garmin.fit"
+    }));
+  });
+  RUNS.sort(function(a,b){return a.date.localeCompare(b.date)});
+})();
+
+function chart(id,type,data,opts){
+  var c=document.getElementById(id);if(!c)return;
+  if(typeof Chart==="undefined"){
+    var box=c.parentNode;
+    if(box){box.innerHTML='<div class="empty"><strong>Chart library unavailable</strong>The vendored Chart.js file did not load.</div>'}
+    return;
+  }
+  charts.push(new Chart(c,{type:type,data:data,options:Object.assign({responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:"#aab6c8",font:{size:10}}}},scales:{x:{ticks:{color:"#91a0b7",maxTicksLimit:8},grid:{color:"#ffffff08"}},y:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff08"}}}},opts||{})}));
+}
+function chartOrEmpty(id,type,data,opts,message){
+  var c=document.getElementById(id);if(!c)return;
+  var n=(data.datasets||[]).reduce(function(s,d){return s+((d.data&&d.data.length)||0)},0);
+  if(!n){c.parentNode.innerHTML='<div class="empty"><strong>No data yet</strong>'+esc(message||"This chart needs data that has not been recorded.")+"</div>";return}
+  chart(id,type,data,opts);
+}
+
+function weeklyBars(runs){
+  var m={};
+  runs.forEach(function(r){
+    var d=new Date(r.date+"T00:00:00");
+    d.setDate(d.getDate()-((d.getDay()+6)%7));
+    var k=d.toISOString().slice(0,10);
+    if(!m[k]){m[k]={miles:0,runs:0}}
+    m[k].miles+=r.distance||0;m[k].runs+=1;
+  });
+  var keys=Object.keys(m).sort();
+  return {labels:keys.map(function(k){return k.slice(5)}),miles:keys.map(function(k){return Math.round(m[k].miles*100)/100}),runs:keys.map(function(k){return m[k].runs})};
+}
+function monthlyBars(runs){
+  var m={};
+  runs.forEach(function(r){
+    var k=String(r.date).slice(0,7);
+    if(!m[k]){m[k]={miles:0,runs:0}}
+    m[k].miles+=r.distance||0;m[k].runs+=1;
+  });
+  var keys=Object.keys(m).sort();
+  return {labels:keys,miles:keys.map(function(k){return Math.round(m[k].miles*100)/100}),runs:keys.map(function(k){return m[k].runs})};
+}
+function cumulativeMiles(runs){var total=0;return runs.map(function(r){total+=r.distance||0;return Math.round(total*100)/100})}
+function paceBuckets(runs){
+  var buckets={};
+  runs.forEach(function(r){
+    var s=paceSec(r.pace);
+    if(!isFinite(s)||s<=0)return;
+    var lo=Math.floor(s/30)*30;
+    buckets[lo]=(buckets[lo]||0)+1;
+  });
+  var keys=Object.keys(buckets).map(Number).sort(function(a,b){return a-b});
+  return {labels:keys.map(function(k){return Math.floor(k/60)+":"+String(k%60).padStart(2,"0")}),counts:keys.map(function(k){return buckets[k]})};
+}
+function daysBetween(runs){
+  var out=[];
+  for(var i=1;i<runs.length;i++){
+    var a=new Date(runs[i-1].date+"T00:00:00"),b=new Date(runs[i].date+"T00:00:00");
+    out.push({date:runs[i].date,gap:Math.round((b-a)/864e5)});
+  }
+  return out;
+}
+function isoOf(d){var m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return d.getFullYear()+"-"+m+"-"+day}
+function heatmap(runs){
+  if(!runs.length)return "";
+  var byDate={};
+  runs.forEach(function(r){byDate[r.date]=(byDate[r.date]||0)+1});
+  var end=new Date(runs[runs.length-1].date+"T00:00:00");
+  var start=new Date(end);start.setDate(start.getDate()-111);
+  start.setDate(start.getDate()-((start.getDay()+6)%7));
+  var cells=[],d=new Date(start);
+  while(d<=end){
+    var k=isoOf(d),n=byDate[k]||0;
+    var cls=n===0?"":n===1?"h1":n===2?"h2":n===3?"h3":"h4";
+    cells.push('<i class="'+cls+'" title="'+k+(n?" - "+n+" run"+(n>1?"s":""):"")+'"></i>');
+    d.setDate(d.getDate()+1);
+  }
+  return '<div class="heat">'+cells.join("")+"</div>";
+}
+function groupHead(title,sub){return '<div class="group"><div class="eyebrow">'+title+"</div>"+(sub?'<p class="muted">'+sub+"</p>":"")+"</div>"}
+function fadePct(splits){
+  if(!splits||splits.length<2)return null;
+  var vals=splits.map(paceSec).filter(Number.isFinite);
+  if(vals.length<2)return null;
+  var half=Math.floor(vals.length/2);
+  var first=vals.slice(0,half),second=vals.slice(vals.length-half);
+  var a=first.reduce(function(p,v){return p+v},0)/first.length;
+  var b=second.reduce(function(p,v){return p+v},0)/second.length;
+  if(!a)return null;
+  return Math.round((b-a)/a*1000)/10;
+}
+function e1rmData(){
+  var out=[];
+  LIFTS.forEach(function(s){
+    if(+s.weight>0&&+s.reps>0){out.push({date:s.date,value:Math.round(+s.weight*(1+(+s.reps)/30))})}
+  });
+  return out;
+}
+function bodyweightData(){
+  return LIFTS.filter(function(s){return s.bodyweight!=null&&isFinite(+s.bodyweight)}).map(function(s){return {date:s.date,value:+s.bodyweight}});
+}
+
+async function syncGarmin(btn){
+  if(btn){btn.dataset.label=btn.textContent;btn.disabled=true;btn.textContent="Syncing..."}
+  show("Syncing with Garmin - usually 15 to 90 seconds");
+  try{
+    var tk=new URLSearchParams(location.search).get("tk")||"";
+    var h={"Content-Type":"application/json"};if(tk)h["X-Dash-Token"]=tk;
+    var r=await fetch("/sync",{method:"POST",headers:h,credentials:"same-origin"});
+    var res=await r.json().catch(function(){return{}});
+    if(!r.ok||!res.ok){var tail=(res&&res.output)?String(res.output).trim().split("\n").slice(-1)[0]:("HTTP "+r.status);throw new Error(tail)}
+    show("Garmin sync complete");
+    if(window.auroraReloadAll){await window.auroraReloadAll()}else{location.reload()}
+  }catch(e){show("Sync failed: "+(e&&e.message?e.message:e))}
+  finally{if(btn){btn.disabled=false;btn.textContent=btn.dataset.label||"Sync Garmin now"}}
+}
+
+function parseNutritionCSV(text){
+  var lines=String(text||"").trim().split(/\r?\n/);
+  if(!lines.length)return[];
+  var head=lines.shift().split(",").map(function(x){return x.trim().toLowerCase()});
+  var di=head.findIndex(function(x){return /date|day/.test(x)});
+  var ki=head.findIndex(function(x){return /calories|kcal|energy/.test(x)});
+  var pi=head.findIndex(function(x){return x==="protein"});
+  var ci=head.findIndex(function(x){return /carb/.test(x)});
+  var fi=head.findIndex(function(x){return x==="fat"});
+  var out=[];
+  lines.forEach(function(line){
+    if(!line.trim())return;
+    var a=line.split(",");
+    if(di<0||!a[di])return;
+    out.push({date:a[di].trim(),kcal:ki>=0?(+a[ki]||null):null,protein:pi>=0?(+a[pi]||null):null,carbs:ci>=0?(+a[ci]||null):null,fat:fi>=0?(+a[fi]||null):null});
+  });
+  return out;
+}
+function importCSV(e){
+  var f=e.target.files&&e.target.files[0];if(!f)return;
+  var rd=new FileReader();
+  rd.onload=function(){
+    var text=String(rd.result||"");
+    var rows=parseNutritionCSV(text);
+    if(!rows.length){toast("No readable nutrition rows");return}
+    rows.forEach(function(row){
+      var i=NUTRITION.findIndex(function(x){return x.date===row.date});
+      if(i>=0){NUTRITION[i]=row}else{NUTRITION.push(row)}
+    });
+    NUTRITION.sort(function(a,b){return String(a.date).localeCompare(String(b.date))});
+    localStorage.setItem("aurora_nutrition",JSON.stringify(NUTRITION));
+    toast("Imported "+rows.length+" day(s) locally");
+    go("#fuel/"+rows[rows.length-1].date);
+  };
+  rd.readAsText(f);
+}
+function showNutritionHook(){
+  var box=document.getElementById("nutrition-hook");
+  if(!box)return;
+  box.hidden=false;
+  box.innerHTML='<p class="muted">Open this page from the dashboard server to configure automatic Health Connect upload.</p>';
+}
+
+function nav(){
+  var h=location.hash||"#home";
+  var links=[["#home","H","HOME"],["#runs","R","RUNS"],["#lift","L","LIFT"],["#fuel","F","FUEL"],["#analysis","A","ANALYSIS"],["#data","D","DATA"]];
+  document.getElementById("tabs").innerHTML=links.map(function(x){
+    return '<a class="'+(h.indexOf(x[0])===0?"active":"")+'" href="'+x[0]+'"><b>'+x[1]+"</b>"+x[2]+"</a>";
+  }).join("");
+}
+
+function home(){
+  var r=last()||{date:"not recorded",distance:0,pace:"not recorded",avgHR:null,splits:[]};
+  var miles=SUMMARY.this_week_miles!=null?SUMMARY.this_week_miles:RUNS.slice(-7).reduce(function(a,x){return a+(x.distance||0)},0);
+  var acwr=COACH.acwr!=null?Number(COACH.acwr).toFixed(2):"unavailable";
+  var today=new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+  return '<div class="sync"><span><b>'+SUMMARY.total_runs+'</b> runs synced</span><span><b>'+esc(SUMMARY.latest_run_date)+'</b> latest</span><span><b>'+SUMMARY.latest_run_distance+' mi</b> latest distance</span><button class="btn secondary" style="margin-left:auto;min-height:36px;padding:8px 12px" onclick="syncGarmin(this)">Sync Garmin now</button></div>'
+    +'<div class="eyebrow">'+esc(today)+'</div><h1 class="title">Your training, illuminated.</h1>'
+    +card('<div class="row"><div><div class="eyebrow">Latest sync</div><div class="stat">'+SUMMARY.total_runs+' runs</div><div class="muted">'+esc(SUMMARY.latest_run_date)+' &middot; '+SUMMARY.latest_run_distance+' mi picked up</div></div><span class="chip good">AUDITED</span></div>')
+    +card('<div class="eyebrow">Training signal</div><div class="h2">Signal unavailable</div><p class="muted">Open this page from the dashboard server to read live coaching.</p><span class="pill">live /api/coaching</span>',"signal")
+    +card('<a href="#runs/'+esc(r.date)+'"><div class="eyebrow">Latest run &middot; analysed</div><div class="row"><div><div class="title">'+esc(r.date)+'</div><div class="muted">'+r.distance+' mi &middot; '+esc(r.pace)+'/mi &middot; '+band(r.distance)+'</div></div><div class="stat">'+(r.avgHR==null?"--":r.avgHR)+'<small class="label"> bpm</small></div></div><div class="bar"><i style="width:'+Math.min(100,(r.avgHR||0)/1.98)+'%"></i></div><p class="muted">Breakdown analysis is estimated from lap splits. Tap for full report.</p></a>')
+    +'<div class="grid g2">'
+    +card('<div class="eyebrow">This week</div><div class="stat">'+Number(miles).toFixed(2)+'</div><div class="muted">miles &middot; '+RUNS.slice(-7).length+' runs</div>')
+    +card('<div class="eyebrow">ACWR &middot; official</div><div class="stat">'+acwr+'</div><div class="muted">from coaching analysis</div>')
+    +'</div>'
+    +card('<div class="eyebrow">Your weak spot</div><div class="h2">Long-run durability</div><p class="muted">Long runs fade in the final third. Open Analysis for the full breakdown.</p><a class="chip" href="#analysis">Open analysis &rarr;</a>')
+    +card('<div class="eyebrow">Needs your attention</div><div class="list"><p class="risk">&bull; ACWR is '+acwr+'.</p><p class="risk">&bull; Long-run durability needs review.</p><p class="risk">&bull; Lifting and nutrition logs are incomplete.</p></div>');
+}
+
+function runs(){
+  return '<div class="row"><div><div class="eyebrow">Activity feed</div><h1 class="title">Every run, ready.</h1></div><a class="btn" href="#log/run">Log run</a></div>'
+    +(RUNS.length?RUNS.slice().reverse().map(function(r){
+      return card('<a class="run" href="#runs/'+esc(r.date)+'"><div class="row"><div><b>'+esc(r.date)+'</b><div class="muted">'+r.distance+' mi &middot; '+band(r.distance)+' &middot; '+esc(r.pace)+'/mi</div></div><div><b>'+(r.avgHR==null?"--":r.avgHR)+'</b><div class="muted">bpm</div></div></div><div class="row" style="margin-top:12px"><span class="chip">'+r.splits.length+' laps</span><span class="chip '+(r.distance>9?"warn":"good")+'">'+(r.distance>9?"long":"steady")+'</span><span class="muted">estimated breakdown</span></div></a>');
+    }).join(""):card('<div class="empty"><strong>No runs yet</strong>Run a Garmin sync to load activities.</div>'));
+}
+
+function report(date){
+  var r=RUNS.find(function(x){return x.date===date})||last();
+  if(!r){return card('<div class="empty"><strong>Run not found</strong>That date is not in the activity log.</div>')}
+  var vals=r.splits.map(paceSec).filter(Number.isFinite);
+  var br="NONE";
+  if(vals.length){
+    var n=Math.max(1,Math.floor(vals.length/3));
+    var base=vals.slice(0,n).slice().sort(function(a,b){return a-b})[Math.floor(n/2)];
+    var idx=vals.findIndex(function(v,i){return i>1&&v>base+20});
+    if(idx>=0){br=(idx+1).toFixed(2)}
+  }
+  return '<div class="row"><a class="chip" href="#runs">&larr; Runs</a><span class="chip">ESTIMATED</span></div>'
+    +card('<div class="eyebrow">'+band(r.distance)+' RUN</div><h1 class="title">'+esc(r.date)+'</h1><div class="grid g3"><div><div class="stat">'+r.distance+'</div><div class="label">miles</div></div><div><div class="stat">'+esc(r.pace)+'</div><div class="label">pace / mi</div></div><div><div class="stat">'+(r.avgHR==null?"--":r.avgHR)+'</div><div class="label">avg HR</div></div></div><p class="muted">Score computed from pace, heart rate and consistency. Cadence, weather and fueling are not recorded.</p>')
+    +card('<div class="row"><div><div class="eyebrow">Lap profile</div><div class="h2">'+(br==="NONE"?"Held pace all the way":"Breaks at mile "+br)+'</div></div><span class="chip '+(br==="NONE"?"good":"risk")+'">'+(br==="NONE"?"NO BREAKDOWN":"ESTIMATED")+'</span></div>'+(r.splits.length?'<div class="chartbox"><canvas id="split"></canvas></div>':'<div class="empty"><strong>Splits not recorded</strong>This activity source did not provide lap splits.</div>')+'<p class="muted">Baseline band is computed from the first third of supplied lap splits. Slow laps remain visible and are not corrected.</p>')
+    +card('<div class="eyebrow">Context</div><div class="grid g2"><span class="chip">Climb / mi: '+(r.ascent!=null&&r.distance?fmt(r.ascent/r.distance):"not recorded")+' ft</span><span class="chip">HR: '+(r.avgHR==null?"not recorded":r.avgHR+"/198")+'</span><span class="chip">Max HR: '+(r.maxHR==null?"not recorded":r.maxHR)+'</span><span class="chip">Cadence: '+(r.cadence==null?"not recorded":r.cadence)+'</span><span class="chip">Calories: '+(r.calories==null?"not recorded":r.calories)+'</span><span class="chip">Laps: '+(r.laps==null?"not recorded":r.laps)+'</span></div>')
+    +card('<div class="eyebrow">Written coaching report</div><div class="report"><h3>Run summary</h3><p>This '+r.distance+'-mile '+band(r.distance).toLowerCase()+' run averaged '+esc(r.pace)+'/mi at '+(r.avgHR==null?"an unrecorded heart rate":r.avgHR+" bpm")+'. The lap profile is preserved exactly from the audited Garmin activity.</p></div>');
+}
+
+function log(){
+  return card('<div class="eyebrow">Quick log</div><h1 class="title">Capture the effort.</h1><form id="runform" class="form" onsubmit="saveRun(event)"><label>Date<input name="date" type="date" value="'+new Date().toISOString().slice(0,10)+'" required></label><label>Distance, miles<input name="distance" type="number" step=".01" required></label><label>Time<input name="time" placeholder="45:00" required></label><label>Average HR<input name="hr" type="number" required></label><label>RPE <input name="rpe" type="range" min="1" max="10" value="5"></label><button class="btn">Save and view report</button></form><p class="muted">Quick logs stay in this browser until the next Garmin sync replaces them.</p>');
+}
+function saveRun(e){
+  e.preventDefault();
+  var f=new FormData(e.target);
+  var date=f.get("date"),t=f.get("time")||"0:00",dist=+f.get("distance")||0;
+  var r=normalizeRun({date:date,distance:dist,time:t,avgHR:+f.get("hr"),pace:pstr(sec(t)/(dist||1)),splits:[],source:"Quick log - pending Garmin sync"});
+  var i=RUNS.findIndex(function(x){return x.date===date});
+  if(i>=0){RUNS[i]=r}else{RUNS.push(r)}
+  RUNS.sort(function(a,b){return a.date.localeCompare(b.date)});
+  localStorage.setItem("aurora_last_seen_run",date);
+  toast("Run saved - pending Garmin sync");
+  go("#runs/"+date);
+}
+
+function fuel(date){
+  var rows=NUTRITION.filter(function(x){return !date||x.date===date});
+  return card('<div class="row"><div><div class="eyebrow">Fuel</div><h1 class="title">'+esc(date||"Today")+'</h1></div><label class="btn secondary">Import backup<input id="fuelcsv" type="file" accept=".csv,.json,text/csv,application/json" hidden onchange="importCSV(event)"></label></div>')
+    +(rows.length?rows.map(function(x){
+      return card('<a class="run-card" href="#fuel/'+esc(x.date)+'"><div><b>'+esc(x.date)+'</b><div class="muted">Calories '+(x.kcal==null?"not recorded":x.kcal)+' &middot; Protein '+(x.protein==null?"not recorded":x.protein)+'g</div></div><div class="stat">'+(x.carbs==null?"--":x.carbs)+'<small class="label"> g carbs</small></div></a>');
+    }).join(""):card('<div class="empty"><strong>Nutrition unavailable</strong>No nutrition days yet. Set up automatic phone upload below, or import a CalTrak backup.</div>'))
+    +card('<div class="eyebrow">Automatic upload</div><h2 class="h2">Health Connect &rarr; dashboard</h2><p class="muted">CalTrak writes your food to Health Connect. A bridge app can forward it here automatically - no export and no file picker.</p><button class="btn" onclick="showNutritionHook(this)">Set up automatic upload</button><div id="nutrition-hook" hidden style="margin-top:14px"></div>')
+    +card('<div class="eyebrow">Manual fallback</div><p class="muted">You can still export a CalTrak backup (JSON) or CSV and choose it above. Missing columns remain not recorded.</p>');
+}
+
+function analysis(){
+  return '<div class="eyebrow">Analysis</div><h1 class="title">Find the signal.</h1>'
+    +groupHead("Volume","How much you ran, and how it accumulated.")
+    +card('<div class="eyebrow">Training load</div><div class="chartbox"><canvas id="load"></canvas></div><p class="muted">Miles per run across the full retained history.</p>')
+    +card('<div class="eyebrow">Weekly mileage</div><div class="chartbox"><canvas id="weekly"></canvas></div><p class="muted">Miles and run count by week.</p>')
+    +card('<div class="eyebrow">Monthly mileage</div><div class="chartbox"><canvas id="monthly"></canvas></div><p class="muted">Miles and run count by calendar month.</p>')
+    +card('<div class="eyebrow">Cumulative mileage</div><div class="chartbox"><canvas id="cumulative"></canvas></div><p class="muted">Total miles banked since the first retained run.</p>')
+    +card('<div class="eyebrow">Distance by run</div><div class="chartbox"><canvas id="dist"></canvas></div><p class="muted">Each bar is a run in chronological order, coloured by distance band.</p>')
+    +groupHead("Intensity &amp; effort","Heart rate, training stress and the cost of each run.")
+    +card('<div class="eyebrow">Pace and heart rate</div><div class="chartbox"><canvas id="pacehr"></canvas></div><p class="muted">Average pace and average heart rate over time.</p>')
+    +card('<div class="eyebrow">Training stress score</div><div class="chartbox"><canvas id="tss"></canvas></div><p class="muted">Per-run TSS as reported by the live activity API.</p>')
+    +card('<div class="eyebrow">Calories per run</div><div class="chartbox"><canvas id="calories"></canvas></div><p class="muted">Energy recorded by the watch for each run.</p>')
+    +card('<div class="eyebrow">Average vs maximum HR</div><div class="chartbox"><canvas id="hrmax"></canvas></div><p class="muted">How much headroom each run left between average and peak effort.</p>')
+    +card('<div class="eyebrow">Climbing cost</div><div class="chartbox"><canvas id="ascentpace"></canvas></div><p class="muted">Ascent against pace. Points above the cloud are slower for the same climbing.</p>')
+    +groupHead("Mechanics &amp; terrain","Cadence, elevation and the shape of the ground.")
+    +card('<div class="eyebrow">Cadence</div><div class="chartbox"><canvas id="cadence"></canvas></div><p class="muted">Average steps per minute, with maximum cadence where recorded.</p>')
+    +card('<div class="eyebrow">Elevation gain</div><div class="chartbox"><canvas id="elevation"></canvas></div><p class="muted">Total ascent per run in feet.</p>')
+    +groupHead("Performance &amp; pacing","Fitness, fade and how pace is distributed.")
+    +card('<div class="eyebrow">Fitness trend</div><div class="chartbox"><canvas id="fit"></canvas></div><p class="muted">Recorded pace against average heart rate.</p>')
+    +card('<div class="eyebrow">Run bubbles</div><div class="chartbox"><canvas id="bubble"></canvas></div><p class="muted">Sequence, pace and distance at a glance.</p>')
+    +card('<div class="eyebrow">Pacing fade</div><div class="chartbox"><canvas id="fade"></canvas></div><p class="muted">Second-half pace vs first-half pace, per run with splits. Below zero is a negative split.</p>')
+    +card('<div class="eyebrow">Pace distribution</div><div class="chartbox"><canvas id="pacedist"></canvas></div><p class="muted">How many runs landed in each 30-second pace bucket.</p>')
+    +card('<div class="eyebrow">Best 5K trend</div><div class="chartbox"><canvas id="best5k"></canvas></div><p class="muted">Fastest 5K within each run, from the live split data.</p>')
+    +card('<div class="eyebrow">Latest run splits</div><div class="chartbox"><canvas id="latesplits"></canvas></div><p class="muted">Per-mile splits for the most recent run that has them.</p>')
+    +groupHead("Consistency","Whether the training actually happened.")
+    +card('<div class="eyebrow">Training calendar</div>'+heatmap(RUNS)+'<p class="muted">Every day in the last 16 weeks. Brighter cells hold more runs.</p>')
+    +card('<div class="eyebrow">Days between runs</div><div class="chartbox"><canvas id="gaps"></canvas></div><p class="muted">Rest days between consecutive runs. Tall bars are layoffs.</p>')
+    +card('<div class="eyebrow">Runs per month</div><div class="chartbox"><canvas id="monthruns"></canvas></div><p class="muted">Run count by calendar month, isolated from mileage.</p>')
+    +groupHead("Body &amp; strength","Load the watch cannot see.")
+    +card('<div class="eyebrow">Bodyweight</div><div class="chartbox"><canvas id="bodyweight"></canvas></div><p class="muted">Bodyweight from logged lift sessions.</p>')
+    +card('<div class="eyebrow">Strength 1RM</div><div class="chartbox"><canvas id="e1rm"></canvas></div><p class="muted">Estimated 1RM (Epley) from logged sets.</p>')
+    +groupHead("Coaching","The current read and the plan.")
+    +card('<div class="eyebrow">Distance bands</div><div class="stats">'+Object.keys(COACH.grades).map(function(k){var g=COACH.grades[k];return '<div><div class="label">'+k+'</div><div class="value">'+g[0]+'</div><p class="muted">'+g[1]+'</p></div>'}).join("")+'</div>')
+    +card('<div class="eyebrow">Injury risk</div><h2 class="warn">'+(COACH.risk||"unavailable")+'</h2><p class="muted">The official ACWR is '+(COACH.acwr!=null?Number(COACH.acwr).toFixed(2):"unavailable")+'. The critical threshold is 1.5.</p>')
+    +card('<div class="eyebrow">Four-week plan</div><p class="muted"><b>Week 1:</b> 20-22 mi, recovery and stabilization.<br><b>Week 2:</b> 22-24 mi, controlled tempo.<br><b>Week 3:</b> 24-26 mi, moderate build.<br><b>Week 4:</b> 20-22 mi, deload.</p>');
+}
+
+function data(){
+  return card('<div class="row"><div><div class="eyebrow">Data vault</div><h1 class="title">Source of truth.</h1></div><button class="btn secondary" onclick="downloadCSV()">Export CSV</button></div><p class="muted">'+RUNS.length+' activity rows retained. Optional Garmin fields not present in the source are shown as not recorded.</p>')
+    +card('<div class="row"><div class="h2">Activity log</div><input id="search" placeholder="Search date or band" oninput="filterRows()" style="max-width:240px;background:#ffffff09;border:1px solid var(--line);border-radius:11px;color:var(--text);padding:10px"></div><div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Distance</th><th>Pace</th><th>HR</th><th>Cadence</th><th>Ascent</th><th>Calories</th></tr></thead><tbody id="rows">'+RUNS.slice().reverse().map(row).join("")+'</tbody></table></div>')
+    +card('<div class="eyebrow">Audit and data quality</div><p class="muted">'+RUNS.length+' records retained. No duplicates or corrections. Title, average stride length, training stress score and steps may be blank in the source. No weather fields were present.</p><p class="muted">Review required: the 2026-07-26 local activity date and filename versus the 2026-07-27 UTC timestamp.</p>')
+    +card('<div class="eyebrow">Lifting data</div>'+(LIFTS.length?'<p class="muted">'+LIFTS.length+' local lift session(s) stored in this browser.</p>':'<div class="empty"><strong>NO DATA: lifting_log_url returned nothing.</strong>Audit returned no lifting sessions. Start a lift session to begin tracking.</div>'));
+}
+function row(r){
+  return "<tr onclick=\"go('#runs/"+esc(r.date)+"')\"><td>"+esc(r.date)+"</td><td>"+r.distance+"</td><td>"+esc(r.pace)+"</td><td>"+(r.avgHR==null?"not recorded":r.avgHR)+"</td><td>"+(r.cadence==null?"not recorded":r.cadence)+"</td><td>"+(r.ascent==null?"not recorded":r.ascent)+"</td><td>"+(r.calories==null?"not recorded":r.calories)+"</td></tr>";
+}
+function filterRows(){
+  var q=((document.getElementById("search")||{}).value||"").toLowerCase();
+  var body=document.getElementById("rows");
+  if(!body)return;
+  body.innerHTML=RUNS.slice().reverse().filter(function(r){return (r.date+" "+band(r.distance)).toLowerCase().indexOf(q)>=0}).map(row).join("");
+}
+
+function lift(){
+  var rows=LIFTS.map(function(s){
+    return card('<div class="row"><div><b>'+esc(s.date)+'</b><div class="muted">'+esc(s.exercise||"not recorded")+' &middot; '+s.reps+' reps &middot; '+(s.weight||0)+' lb</div></div><div class="muted">BW '+(s.bodyweight||"not recorded")+'</div></div>');
+  }).join("");
+  return card('<div class="eyebrow">Strength</div><h1 class="title">Start a session.</h1><form id="liftform" class="form" onsubmit="saveLift(event)"><label>Bodyweight, lb<input name="bw" type="number" placeholder="not recorded"></label><label>Exercise<input name="ex" placeholder="Exercise name"></label><label>Reps<input name="reps" type="number" value="5"></label><label>Added weight, lb<input name="weight" type="number" value="0"></label><button class="btn">END SESSION</button></form><p class="muted">Sessions stay in this browser. They are not uploaded to the server.</p>')
+    +(rows||card('<div class="empty"><strong>NO DATA: lifting_log_url returned nothing.</strong>Audit returned no lifting sessions. Your own sessions can be logged here.</div>'));
+}
+function saveLift(e){
+  e.preventDefault();
+  var f=new FormData(e.target);
+  LIFTS.push({date:new Date().toISOString().slice(0,10),bodyweight:f.get("bw")||null,exercise:f.get("ex")||"not recorded",reps:+f.get("reps"),weight:+f.get("weight")});
+  localStorage.setItem("aurora_lifts",JSON.stringify(LIFTS));
+  toast("Session saved");
+  go("#lift");
+}
+
+function downloadCSV(){
+  var s="Date,Distance,Time,Avg HR,Cadence,Pace,Calories,Ascent,Lap Splits\n"+RUNS.map(function(r){
+    return [r.date,r.distance,r.time,r.avgHR,r.cadence,r.pace,r.calories,r.ascent,(r.splits||[]).join(" | ")].join(",");
+  }).join("\n");
+  var a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([s],{type:"text/csv"}));
+  a.download="activity.csv";a.click();
+}
+
+function drawSplit(date){
+  var r=RUNS.find(function(x){return x.date===date})||last();
+  if(!r||!r.splits||!r.splits.length)return;
+  chart("split","line",{labels:r.splits.map(function(_,i){return i+1}),datasets:[{label:"pace sec/mi",data:r.splits.map(paceSec),borderColor:"#00f5ff",backgroundColor:"#00f5ff22",fill:true,tension:.3}]},{scales:{y:{reverse:true}}});
+}
+
+function drawAnalysis(){
+  var tick={ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"}};
+  var yAxis={beginAtZero:true,ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"}};
+  var ySoft={beginAtZero:false,ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"}};
+  var dates=RUNS.map(function(r){return r.date.slice(5)});
+  chartOrEmpty("load","line",{labels:dates,datasets:[{label:"Miles",data:RUNS.map(function(r){return r.distance}),borderColor:"#00f5ff",backgroundColor:"#00f5ff22",fill:true,tension:.3}]},{scales:{x:tick,y:tick}},"Run a Garmin sync to load activities.");
+  var w=weeklyBars(RUNS);
+  chartOrEmpty("weekly","bar",{labels:w.labels,datasets:[{label:"Miles",data:w.miles,backgroundColor:"#7c3aed"},{label:"Runs",data:w.runs,type:"line",borderColor:"#10ffa0",backgroundColor:"#10ffa0",yAxisID:"y1",tension:.3}]},{scales:{x:tick,y:{beginAtZero:true,ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Miles",color:"#91a0b7"}},y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},ticks:{color:"#91a0b7"},title:{display:true,text:"Runs",color:"#91a0b7"}}}},"No weekly history yet.");
+  var mo=monthlyBars(RUNS);
+  chartOrEmpty("monthly","bar",{labels:mo.labels,datasets:[{label:"Miles",data:mo.miles,backgroundColor:"#7c3aed"},{label:"Runs",data:mo.runs,type:"line",borderColor:"#10ffa0",backgroundColor:"#10ffa0",yAxisID:"y1",tension:.3}]},{scales:{x:tick,y:{beginAtZero:true,ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Miles",color:"#91a0b7"}},y1:{beginAtZero:true,position:"right",grid:{drawOnChartArea:false},ticks:{color:"#91a0b7"},title:{display:true,text:"Runs",color:"#91a0b7"}}}},"No monthly history yet.");
+  chartOrEmpty("cumulative","line",{labels:dates,datasets:[{label:"Cumulative miles",data:cumulativeMiles(RUNS),borderColor:"#10ffa0",backgroundColor:"#10ffa022",fill:true,tension:.25}]},{scales:{x:tick,y:yAxis}},"No mileage yet.");
+  chartOrEmpty("dist","bar",{labels:dates,datasets:[{label:"Distance",data:RUNS.map(function(r){return r.distance}),backgroundColor:RUNS.map(function(r){return bandColor(r.band)})}]},{scales:{x:tick,y:{beginAtZero:true,ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Miles",color:"#91a0b7"}}}},"No distance history yet.");
+  chartOrEmpty("pacehr","line",{labels:dates,datasets:[{label:"Pace s/mi",data:RUNS.map(function(r){return paceSec(r.pace)}),borderColor:"#00f5ff",backgroundColor:"#00f5ff22",yAxisID:"y",tension:.3},{label:"Avg HR",data:RUNS.map(function(r){return r.avgHR}),borderColor:"#ff3d5a",backgroundColor:"#ff3d5a22",yAxisID:"y1",tension:.3}]},{scales:{x:tick,y:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Pace s/mi",color:"#91a0b7"}},y1:{position:"right",grid:{drawOnChartArea:false},ticks:{color:"#91a0b7"},title:{display:true,text:"HR",color:"#91a0b7"}}}},"No pace or heart-rate history yet.");
+  var tss=RUNS.filter(function(r){return r.tss!=null});
+  chartOrEmpty("tss","bar",{labels:tss.map(function(r){return r.date.slice(5)}),datasets:[{label:"TSS",data:tss.map(function(r){return r.tss}),backgroundColor:"#ffb300"}]},{scales:{x:tick,y:yAxis}},"Training stress score appears once the live activity API supplies it.");
+  chartOrEmpty("calories","bar",{labels:dates,datasets:[{label:"Calories",data:RUNS.map(function(r){return r.calories}),backgroundColor:"#ff3d5a"}]},{scales:{x:tick,y:yAxis}},"Calories were not recorded.");
+  chartOrEmpty("hrmax","line",{labels:dates,datasets:[{label:"Avg HR",data:RUNS.map(function(r){return r.avgHR}),borderColor:"#00f5ff",backgroundColor:"#00f5ff22",tension:.3},{label:"Max HR",data:RUNS.map(function(r){return r.maxHR}),borderColor:"#ff3d5a",backgroundColor:"#ff3d5a22",tension:.3}]},{scales:{x:tick,y:ySoft}},"Max heart rate appears with the live activity API.");
+  chartOrEmpty("ascentpace","scatter",{datasets:[{label:"Runs",data:RUNS.filter(function(r){return r.ascent!=null&&isFinite(paceSec(r.pace))}).map(function(r){return {x:r.ascent,y:paceSec(r.pace)}}),backgroundColor:"#7c3aed"}]},{scales:{x:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Ascent (ft)",color:"#91a0b7"}},y:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Pace s/mi",color:"#91a0b7"}}}},"Ascent and pace are needed.");
+  chartOrEmpty("cadence","bar",{labels:dates,datasets:[{label:"Avg cadence",data:RUNS.map(function(r){return r.cadence}),backgroundColor:"#00f5ff"},{label:"Max cadence",data:RUNS.map(function(r){return r.maxCadence}),type:"line",borderColor:"#ffb300",backgroundColor:"#ffb300",tension:.3}]},{scales:{x:tick,y:ySoft}},"Cadence was not recorded.");
+  chartOrEmpty("elevation","bar",{labels:dates,datasets:[{label:"Ascent (ft)",data:RUNS.map(function(r){return r.ascent}),backgroundColor:"#10ffa0"}]},{scales:{x:tick,y:yAxis}},"Elevation was not recorded.");
+  chartOrEmpty("fit","scatter",{datasets:[{label:"Runs",data:RUNS.map(function(r){return {x:paceSec(r.pace),y:r.avgHR}}).filter(function(p){return isFinite(p.x)&&isFinite(p.y)}),backgroundColor:"#10ffa0"}]},{scales:{x:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Pace seconds/mi",color:"#91a0b7"}},y:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Average HR",color:"#91a0b7"}}}},"Pace and heart rate are needed.");
+  chartOrEmpty("bubble","bubble",{datasets:[{label:"Runs",data:RUNS.map(function(r,i){return {x:i+1,y:paceSec(r.pace),r:Math.max(3,r.distance)}}).filter(function(p){return isFinite(p.y)}),backgroundColor:"#7c3aed99"}]},{scales:{x:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Run sequence",color:"#91a0b7"}},y:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Pace s/mi",color:"#91a0b7"}}}},"No runs yet.");
+  var fades=RUNS.map(function(r){return {date:r.date,pct:fadePct(r.splits)}}).filter(function(x){return x.pct!==null});
+  chartOrEmpty("fade","line",{labels:fades.map(function(x){return x.date.slice(5)}),datasets:[{label:"Fade %",data:fades.map(function(x){return x.pct}),borderColor:"#ffb300",backgroundColor:"#ffb30022",fill:true,tension:.3,pointBackgroundColor:fades.map(function(x){return x.pct>0?"#ff3d5a":"#10ffa0"})}]},{scales:{x:tick,y:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Second half vs first half %",color:"#91a0b7"}}}},"Pacing fade needs per-mile splits, which appear with the live split data.");
+  var pb=paceBuckets(RUNS);
+  chartOrEmpty("pacedist","bar",{labels:pb.labels,datasets:[{label:"Runs",data:pb.counts,backgroundColor:"#00f5ff"}]},{scales:{x:tick,y:yAxis}},"No pace distribution yet.");
+  var b5=RUNS.filter(function(r){return r.best5k!=null&&isFinite(paceSec(r.best5k))});
+  chartOrEmpty("best5k","line",{labels:b5.map(function(r){return r.date.slice(5)}),datasets:[{label:"Best 5K pace",data:b5.map(function(r){return paceSec(r.best5k)}),borderColor:"#10ffa0",backgroundColor:"#10ffa022",fill:true,tension:.3}]},{scales:{x:tick,y:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Seconds per mile",color:"#91a0b7"}}}},"Best 5K pace appears once the live split data is available.");
+  var splitRun=RUNS.slice().reverse().find(function(r){return r.splits&&r.splits.length});
+  var splitData=splitRun?splitRun.splits.map(paceSec):[];
+  chartOrEmpty("latesplits","bar",{labels:splitData.map(function(_,i){return "Mile "+(i+1)}),datasets:[{label:"Seconds",data:splitData,backgroundColor:"#7c3aed"}]},{scales:{x:tick,y:ySoft}},"Per-mile splits appear once the live split data is available.");
+  var gaps=daysBetween(RUNS);
+  chartOrEmpty("gaps","bar",{labels:gaps.map(function(g){return g.date.slice(5)}),datasets:[{label:"Days since previous run",data:gaps.map(function(g){return g.gap}),backgroundColor:"#ffb300"}]},{scales:{x:tick,y:yAxis}},"No run gaps yet.");
+  chartOrEmpty("monthruns","bar",{labels:mo.labels,datasets:[{label:"Runs",data:mo.runs,backgroundColor:"#7c3aed"}]},{scales:{x:tick,y:yAxis}},"No monthly runs yet.");
+  var bw=bodyweightData();
+  chartOrEmpty("bodyweight","line",{labels:bw.map(function(x){return x.date.slice(5)}),datasets:[{label:"Bodyweight (lb)",data:bw.map(function(x){return x.value}),borderColor:"#00f5ff",backgroundColor:"#00f5ff22",fill:true,tension:.3}]},{scales:{x:tick,y:ySoft}},"No bodyweight recorded. Add a weight measurement to a lift session to plot the trend.");
+  var rm=e1rmData();
+  chartOrEmpty("e1rm","line",{labels:rm.map(function(x){return x.date.slice(5)}),datasets:[{label:"Estimated 1RM (lb)",data:rm.map(function(x){return x.value}),borderColor:"#10ffa0",backgroundColor:"#10ffa022",fill:true,tension:.3}]},{scales:{x:tick,y:yAxis}},"No strength sessions. Log a session in LIFT to plot estimated 1RM.");
+}
+
+function render(){
+  charts.forEach(function(c){c.destroy()});
+  charts=[];
+  for(var i=0;i<RUNS.length;i++){RUNS[i]=normalizeRun(RUNS[i])}
+  nav();
+  var h=location.hash||"#home";
+  var view=h==="#home"?home()
+    :h==="#runs"?runs()
+    :h==="#log/run"?log()
+    :(h==="#analysis"||h.indexOf("#analysis/")===0)?analysis()
+    :h==="#data"?data()
+    :h==="#lift"?lift()
+    :h.indexOf("#fuel")===0?fuel(h.split("/")[1])
+    :h.indexOf("#runs/")===0?report(h.split("/")[1])
+    :home();
+  document.getElementById("app").innerHTML=view;
+  var status=document.getElementById("status");
+  if(status){status.textContent=window.__AURORA_LIVE__?"LIVE":"SNAPSHOT"}
+  // Draw synchronously: the chart boxes have a fixed height, so layout is
+  // available immediately. A requestAnimationFrame here silently skipped every
+  // chart when the tab was not visible (background tab, restored PWA).
+  if(h.indexOf("#runs/")===0){drawSplit(h.split("/")[1])}
+  if(h==="#analysis"||h.indexOf("#analysis/")===0){drawAnalysis()}
+}
+
+document.getElementById("fab").onclick=function(){
+  document.getElementById("sheet").classList.toggle("open");
+  document.getElementById("modalback").classList.toggle("open");
+};
+document.getElementById("modalback").onclick=function(){
+  document.getElementById("sheet").classList.remove("open");
+  document.getElementById("modalback").classList.remove("open");
+};
+window.addEventListener("hashchange",render);
+render();
+(function(){
+  var s=new URLSearchParams(location.search).get("shared");
+  if(!s)return;
+  var msg=s==="ok"?"CalTrak log imported from the share sheet":s==="empty"?"The shared file had no readable rows":"The shared file could not be read as CalTrak CSV";
+  setTimeout(function(){toast(msg)},300);
+  if(s==="ok"){setTimeout(function(){go("#fuel")},500)}
+})();
 </script>
 </body>
 </html>

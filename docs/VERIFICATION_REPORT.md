@@ -1,8 +1,8 @@
 # Verification report
 
 Supervisor brief Task 10. Everything below was run in the working tree on
-2026-11-07 and refreshed on 2026-11-12 after the 2026-11-10 and 2026-11-11 runs
-were imported. Commands and results are reproduced as observed.
+2026-11-07 and refreshed on 2026-11-16 after the CrewAI dashboard rewrite was
+merged and re-wired. Commands and results are reproduced as observed.
 
 ## Environment
 
@@ -17,11 +17,11 @@ were imported. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-622 passed, 1 skipped (623 collected)
+647 passed, 1 skipped (648 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `593 passed, 30 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `618 passed, 30 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`; the dashboard-contract and brief checks that read the
 gitignored page skip when it is absent; one symlink case skips on Windows. CI
@@ -55,7 +55,8 @@ lint or tests ran.
 | `tests/test_brief_consistency.py` | 37 |
 | `tests/test_sync_import.py` | 5 |
 | `tests/test_backup_data.py` | 17 |
-| **Total** | **623** (622 pass, 1 skip) |
+| `tests/test_aurora_template.py` | 25 |
+| **Total** | **648** (647 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV

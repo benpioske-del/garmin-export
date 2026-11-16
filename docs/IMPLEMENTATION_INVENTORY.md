@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 622 passed, 1 skipped (Windows symlink case) |
+| Tests | 647 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -92,7 +92,7 @@ profile as empty is reading an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 622 passed, 1 skipped. |
+| `python -m pytest` | Works. 647 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -295,8 +295,9 @@ download cannot leave the dashboard behind; the order and the failure reporting
 are pinned by `tests/test_sync_import.py`.
 
 Tests: `tests/test_dashboard_api.py` (42), `tests/test_dashboard_api_http.py`
-(91) and `tests/test_nutrition.py` (50). `smoke_dashboard_api.py` runs the same
-paths against the live database and is deliberately not part of pytest.
+(91), `tests/test_nutrition.py` (50) and `tests/test_aurora_template.py` (25).
+`smoke_dashboard_api.py` runs the same paths against the live database and is
+deliberately not part of pytest.
 
 `/` serves the committed `flow_outputs/aurora_dashboard.html` behind the same
 gate; `/classic` serves the local `dashboard/index.html`, and `/aurora` remains
@@ -324,6 +325,15 @@ no data at all. Chart.js v4.4.4 is vendored at
 artifact's `cdn.jsdelivr.net` URL to `/vendor/chart.umd.min.js`, which the server
 serves above the token gate. Chart creation is synchronous, because the original
 `requestAnimationFrame` never ran in a background tab and left blank canvases.
+
+The CrewAI flow rewrote this artifact as a static snapshot in `60baa53` and
+`b43d125`, dropping live data, Garmin sync, the upload card, server-side import
+and every analysis chart while the server kept injecting the live bootstrap. The
+committed file keeps the new visual design and re-wires all of it; both committed
+data snapshots are injected at build time and `normalizeRun()` accepts the
+snapshot and live `/api/activities` schemas. `tests/test_aurora_template.py` (25
+tests) pins the hooks, chart slots, synchronous draw, inline form binding and
+importer shapes so a future rewrite cannot silently drop them again.
 
 `GET /api/activities` also carries the device summary fields the charts read
 (`title`, `calories`, `avg_cadence`, `max_cadence`, `avg_pace_s_per_mi`,

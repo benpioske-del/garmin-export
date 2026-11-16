@@ -1091,8 +1091,9 @@ backup is JSON.
   authoritative total per calendar day.
 - The app is a one-time purchase on the Play Store (about $14.99) and also
   publishes a free FOSS APK on GitHub releases (v1.9.32,
-  `app-foss-release.apk`, 3,698,980 bytes). The free APK is the recommended
-  path.
+  `app-foss-release.apk`, 3,698,980 bytes). **Correction (2026-11-16):** the
+  athlete rejects sideloading, so the Play Store purchase is the only path and
+  the free APK is not an option.
 - Its default sync is incremental over a rolling 48-hour window. Keeping raw
   records by Health Connect id is therefore necessary so a later payload with
   one new food entry does not replace the whole day.
@@ -1213,3 +1214,67 @@ If the laptop dies before OneDrive uploads, the newest copy is whatever uploaded
 last. Credentials are not in the archive by design, so a restore still needs a
 Garmin MFA login. Nutrition older than the newest backup remains unrecoverable,
 which is the strongest argument for keeping the daily task running.
+
+# Twenty-first correction: 2026-11-16, CrewAI static-dashboard regression
+
+## The gap
+
+CrewAI commits `60baa53` and `b43d125` rewrote
+`flow_outputs/aurora_dashboard.html`. The replacement was 120 lines and 28 KB,
+down from 407 lines and 53 KB, and it was a static snapshot: a hardcoded
+`const raw` block, no `fetch`, no Garmin sync, no Fuel automatic-upload card, no
+server-side import, and no heatmap, 1RM or TSS charts. The `COACH` global and
+the `#app .card.signal` and `#nutrition-hook` targets were gone too.
+
+The server still injects `AURORA_LIVE_SCRIPT` into whatever template it serves.
+That script reads `COACH`, repaints `.card.signal` and opens `#nutrition-hook`.
+Against the new file it would render the stale snapshot and then throw partway
+through, so the page never switched to live data. The new file's run and lift
+forms also attached their listeners before `render()` created them, so the
+quick-log forms silently did nothing.
+
+Nothing in CI caught any of this: the committed template was not covered by a
+test, and the injection tests used a synthetic stub.
+
+## What changed
+
+- The new visual design is kept, and the lost features are re-wired: Garmin
+  sync, the Fuel automatic-upload card, server-side CSV/JSON import, all 19
+  run charts plus the heatmap, TSS, bodyweight and 1RM, and the live coaching
+  signal. The two committed data snapshots are injected programmatically, so no
+  activity row was retyped.
+- `normalizeRun()` accepts both the snapshot schema and the live
+  `/api/activities` schema, including numeric lap splits in seconds.
+- Charts now draw synchronously after `render()` instead of inside
+  `requestAnimationFrame`, which silently skipped every chart in a hidden or
+  restored tab.
+- `importNutritionCsv` posts `{"json": text}` for a JSON backup and
+  `{"csv": text}` otherwise, matching the server's parser.
+- The live bootstrap's `failures` array is module-scoped. It was referenced
+  inside `loadNutrition` but declared only as a `collect` parameter, so a
+  nutrition fetch failure threw a `ReferenceError` and skipped the refresh.
+- The hook setup now says the Play Store only; it no longer offers the GitHub
+  APK.
+- `docs/APP_BLUEPRINT.md` records that direct APK distribution is not
+  permitted, replacing the sideload steps and the two athlete-action lines that
+  assumed them.
+- `tests/test_aurora_template.py` (25 tests) pins the template's live hooks,
+  chart slots, synchronous draw, inline form binding, importer shapes and the
+  no-sideload wording, and checks that injection is idempotent.
+
+## Verification
+
+- Browser pass at `http://127.0.0.1:8799` with zero console errors: 72 runs
+  parsed with merged metadata and splits, Analysis draws 18 charts with 4 honest
+  empty states, the run-detail split chart draws, and the runs, fuel, lift,
+  log-run, data and home views all render. Quick-log and lift submissions save;
+  search filters the activity table.
+- Injection keeps the `aurora-live-v1` marker and rewrites the Chart.js CDN to
+  the vendored file.
+
+## What this does not fix
+
+The phone nutrition upload still needs HC Webhook from the Play Store, and no
+live phone payload has arrived yet. Quick logs still live only in the browser
+until the next Garmin sync. The lifting importer is still unimplemented, so the
+1RM chart stays an empty state.

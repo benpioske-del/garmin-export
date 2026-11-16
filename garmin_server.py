@@ -907,6 +907,7 @@ AURORA_LIVE_SCRIPT = """
     });
   }
   var LIVE = { activities: false, load: null, coaching: null, nutrition: false };
+  var failures = [];
   function paintSignal() {
     var card = document.querySelector("#app .card.signal");
     if (!card || !LIVE.coaching) { return; }
@@ -951,11 +952,22 @@ AURORA_LIVE_SCRIPT = """
       var headers = { "Content-Type": "application/json" };
       var t = token();
       if (t) { headers["X-Dash-Token"] = t; }
+      var text = String(reader.result || "");
+      // CalTrak exports arrive as either CSV or a JSON backup. Send the shape
+      // the server expects so it parses and aggregates instead of storing a
+      // JSON document as if it were CSV.
+      var payload;
+      try {
+        JSON.parse(text);
+        payload = { json: text };
+      } catch (e) {
+        payload = { csv: text };
+      }
       fetch("/api/nutrition", {
         method: "POST",
         headers: headers,
         credentials: "same-origin",
-        body: JSON.stringify({ csv: String(reader.result) })
+        body: JSON.stringify(payload)
       }).then(function (r) {
         if (!r.ok) { throw new Error("HTTP " + r.status); }
         return r.json();
@@ -1012,7 +1024,7 @@ AURORA_LIVE_SCRIPT = """
           '<button class="btn ghost" onclick="copyNutritionHook(\'token\')">Copy token</button>' +
         "</div>" +
         '<ol class="sub" style="margin-top:14px;padding-left:18px;line-height:1.6">' +
-          "<li>Install <b>HC Webhook</b> (free open-source APK from GitHub releases, or the Play Store version).</li>" +
+          "<li>Install <b>HC Webhook</b> from the Play Store (about $14.99, one-time). There is no free store listing, and sideloading an APK is not required or recommended.</li>" +
           "<li>In HC Webhook: <b>Data Types</b> &rarr; enable <b>Nutrition</b> and grant Health Connect read access. Set its resolution to <b>Daily</b>.</li>" +
           "<li>In HC Webhook: <b>Webhooks</b> &rarr; add a JSON webhook with the URL above and a custom header <b>" +
             esc(info.header) + "</b> set to the token above.</li>" +
@@ -1048,7 +1060,8 @@ AURORA_LIVE_SCRIPT = """
     importNutritionCsv(file);
   };
   badge("connecting", "");
-  function collect(failures) {
+  function collect() {
+    failures = [];
     return Promise.all([
       getJSON("/api/activities").then(function (p) {
         LIVE.activities = applyActivities(p);
@@ -1064,7 +1077,7 @@ AURORA_LIVE_SCRIPT = """
       loadNutrition()
     ]);
   }
-  function announce(failures) {
+  function announce() {
     var missing = [];
     if (!LIVE.activities) { missing.push("activities"); }
     if (!LIVE.load) { missing.push("load"); }
@@ -1083,9 +1096,8 @@ AURORA_LIVE_SCRIPT = """
     return loadNutrition().then(function () { refresh(); });
   };
   window.auroraReloadAll = function () {
-    var failures = [];
-    return collect(failures).then(function () {
-      announce(failures);
+    return collect().then(function () {
+      announce();
       refresh();
     });
   };
