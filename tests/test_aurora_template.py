@@ -127,6 +127,26 @@ def test_sync_reports_a_missing_token_instead_of_a_bare_status(template):
     assert "dashboard token missing" in template
 
 
+def test_sync_keeps_a_persistent_status_line(template):
+    """A 2.5 s toast cannot cover a 15-90 s sync.
+
+    The button silently returned to its old label, so a finished sync looked
+    like nothing had happened and the athlete pressed it again.
+    """
+    assert 'id="syncstatus"' in template
+    assert "function setSyncStatus" in template
+    assert "setSyncStatus(" in template
+    assert "Syncing - this usually takes" in template
+    assert "Sync failed: " in template
+
+
+def test_sync_status_names_the_run_count(template):
+    """The success line must say what the sync did, not just "complete"."""
+    assert "new_runs" in template
+    assert '"Synced "' in template
+    assert 'bits.push(SUMMARY.total_runs+" total")' in template
+
+
 def test_importer_sends_the_shape_the_server_parses():
     """JSON backups must post ``json``; CSV exports must post ``csv``."""
     assert "{ json: text }" in G.AURORA_LIVE_SCRIPT

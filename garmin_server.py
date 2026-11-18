@@ -469,13 +469,20 @@ def _run_sync():
     output = "== Garmin sync ==\n%s\n\n== Database import ==\n%s" % (
         download["output"] or "(no output)",
         imported["output"] or "(no output)")
-    return {
+    result = {
         "ok": download["ok"] and imported["ok"],
         "exit": imported["exit"] if download["ok"] else download["exit"],
         "output": output[-4000:],
         "download_ok": download["ok"],
         "import_ok": imported["ok"],
     }
+    # garmin_sync.py reports "Done: N new run(s) downloaded, M already current."
+    # The page needs that number to say what the sync did: "complete" alone left
+    # the athlete unable to tell a working sync from a no-op.
+    m = re.search(r"Done:\s*(\d+)\s+new run", download["output"] or "")
+    if m:
+        result["new_runs"] = int(m.group(1))
+    return result
 
 
 def fit_names():

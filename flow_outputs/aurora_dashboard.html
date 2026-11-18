@@ -428,8 +428,18 @@ function bodyweightData(){
   return LIFTS.filter(function(s){return s.bodyweight!=null&&isFinite(+s.bodyweight)}).map(function(s){return {date:s.date,value:+s.bodyweight}});
 }
 
+var SYNC_STATUS="";
+function setSyncStatus(s){
+  SYNC_STATUS=s||"";
+  var e=document.getElementById("syncstatus");
+  if(e){e.textContent=SYNC_STATUS}
+}
 async function syncGarmin(btn){
   if(btn){btn.dataset.label=btn.textContent;btn.disabled=true;btn.textContent="Syncing..."}
+  // A toast lasts 2.5 seconds and a sync takes 15-90, so the bar carries the
+  // state. Without this the button silently returned to its old label and a
+  // finished sync looked like nothing had happened.
+  setSyncStatus("Syncing - this usually takes 15 to 90 seconds");
   show("Syncing with Garmin - usually 15 to 90 seconds");
   try{
     var tk=new URLSearchParams(location.search).get("tk")||"";
@@ -438,9 +448,24 @@ async function syncGarmin(btn){
     var res=await r.json().catch(function(){return{}});
     if(r.status===401||r.status===403){throw new Error("dashboard token missing - reload the page from the link the server printed")}
     if(!r.ok||!res.ok){var tail=(res&&res.output)?String(res.output).trim().split("\n").slice(-1)[0]:("HTTP "+r.status);throw new Error(tail)}
+    var newBit=res.new_runs==null?null:(res.new_runs+" new run"+(res.new_runs===1?"":"s"));
+    var stamp=new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"});
+    setSyncStatus("Synced "+stamp+(newBit?" - "+newBit:"")+" - refreshing");
+    var refreshErr=null;
+    try{
+      if(window.auroraReloadAll){await window.auroraReloadAll()}else{location.reload()}
+    }catch(e){refreshErr=e}
+    var bits=[];
+    if(newBit){bits.push(newBit)}
+    if(SUMMARY&&SUMMARY.total_runs!=null){bits.push(SUMMARY.total_runs+" total")}
+    setSyncStatus("Synced "+stamp+(bits.length?" - "+bits.join(", "):"")
+      +(refreshErr?" (page refresh failed: "+(refreshErr&&refreshErr.message?refreshErr.message:refreshErr)+")":""));
     show("Garmin sync complete");
-    if(window.auroraReloadAll){await window.auroraReloadAll()}else{location.reload()}
-  }catch(e){show("Sync failed: "+(e&&e.message?e.message:e))}
+  }catch(e){
+    var msg=(e&&e.message?e.message:e);
+    setSyncStatus("Sync failed: "+msg);
+    show("Sync failed: "+msg)
+  }
   finally{if(btn){btn.disabled=false;btn.textContent=btn.dataset.label||"Sync Garmin now"}}
 }
 
@@ -500,9 +525,9 @@ function home(){
   var miles=SUMMARY.this_week_miles!=null?SUMMARY.this_week_miles:RUNS.slice(-7).reduce(function(a,x){return a+(x.distance||0)},0);
   var acwr=COACH.acwr!=null?Number(COACH.acwr).toFixed(2):"unavailable";
   var today=new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  return '<div class="sync"><span><b>'+SUMMARY.total_runs+'</b> runs tracked</span><span><b>'+esc(SUMMARY.latest_run_date)+'</b> latest</span><span><b>'+SUMMARY.latest_run_distance+' mi</b> latest distance</span><button class="btn secondary" style="margin-left:auto;min-height:36px;padding:8px 12px" onclick="syncGarmin(this)">Sync Garmin now</button></div>'
+  return '<div class="sync"><span><b>'+SUMMARY.total_runs+'</b> runs tracked</span><span><b>'+esc(SUMMARY.latest_run_date)+'</b> latest</span><span><b>'+SUMMARY.latest_run_distance+' mi</b> latest distance</span><span id="syncstatus" class="muted" style="flex:1 1 160px;text-align:right">'+esc(SYNC_STATUS)+'</span><button class="btn secondary" style="min-height:36px;padding:8px 12px" onclick="syncGarmin(this)">Sync Garmin now</button></div>'
     +'<div class="eyebrow">'+esc(today)+'</div><h1 class="title">Your training, illuminated.</h1>'
-    +card('<div class="row"><div><div class="eyebrow">Latest sync</div><div class="stat">'+SUMMARY.total_runs+' runs</div><div class="muted">'+esc(SUMMARY.latest_run_date)+' &middot; '+SUMMARY.latest_run_distance+' mi picked up</div></div><span class="chip good">AUDITED</span></div>')
+    +card('<div class="row"><div><div class="eyebrow">Latest run</div><div class="stat">'+SUMMARY.total_runs+' runs</div><div class="muted">'+esc(SUMMARY.latest_run_date)+' &middot; '+SUMMARY.latest_run_distance+' mi picked up</div></div><span class="chip good">AUDITED</span></div>')
     +card('<div class="eyebrow">Training signal</div><div class="h2">Signal unavailable</div><p class="muted">Open this page from the dashboard server to read live coaching.</p><span class="pill">live /api/coaching</span>',"signal")
     +card('<a href="#runs/'+esc(r.date)+'"><div class="eyebrow">Latest run &middot; analysed</div><div class="row"><div><div class="title">'+esc(r.date)+'</div><div class="muted">'+r.distance+' mi &middot; '+esc(r.pace)+'/mi &middot; '+band(r.distance)+'</div></div><div class="stat">'+(r.avgHR==null?"--":r.avgHR)+'<small class="label"> bpm</small></div></div><div class="bar"><i style="width:'+Math.min(100,(r.avgHR||0)/1.98)+'%"></i></div><p class="muted">Breakdown analysis is estimated from lap splits. Tap for full report.</p></a>')
     +'<div class="grid g2">'

@@ -1373,3 +1373,60 @@ live phone payload has arrived yet. The lifting importer is still unimplemented,
 so the 1RM chart stays an empty state, and typed lifts are still browser-only.
 A manual run has no splits, cadence or elevation, because those only exist in a
 FIT file; it is a record that a run happened, not a substitute for the watch.
+
+# Twenty-third correction: 2026-11-17, the sync that worked but said nothing
+
+## The gap
+
+The athlete reported: "Sync now says syncing then nothing happens and then sync
+again."
+
+The sync itself was not broken. `garmin_sync.log` records a real run started at
+`2026-11-17T20:53:52`, ending `Done: 0 new run(s) downloaded, 74 already
+current.` The button posted `/sync`, the download ran, the import ran, and the
+page reloaded from the API. What failed was the page telling the athlete any of
+that.
+
+`syncGarmin()` set the button to `Syncing...` and called `show(...)`, a toast
+that hides itself after 2.5 seconds. A sync takes 15 to 90 seconds. When the
+toast was gone the only remaining signal was the button text, and the `finally`
+block restored `Sync Garmin now` whether the sync had succeeded, failed, or was
+still running. On success the page called `auroraReloadAll()`, which repainted
+the data but left the sync bar unchanged. A quiet day (0 new runs) therefore
+looked exactly like a dead button, and pressing it again was the rational
+response.
+
+## What changed
+
+- **A persistent status line.** The sync bar carries `<span id="syncstatus">`.
+  `SYNC_STATUS` holds the text and `setSyncStatus()` writes it, so the message
+  survives the repaint instead of riding a 2.5-second toast.
+- **It says what is happening.** `Syncing - this usually takes 15 to 90 seconds`
+  is set before the fetch. Success becomes `Synced HH:MM - N new runs, M total`.
+  Failure becomes `Sync failed: <reason>`, and a refresh failure is named
+  separately rather than swallowed.
+- **The count comes from the sync.** `_run_sync()` parses
+  `Done: N new run(s) downloaded` from `garmin_sync.py` and returns `new_runs`.
+  The key is omitted when the download fails, so a login error cannot be
+  reported as "0 new runs". A quiet sync now says `0 new runs`, which is a
+  result, not silence.
+- **One wrong label fixed.** The home card said `Latest sync` but displayed the
+  latest *run* date. It now says `Latest run`.
+
+## Verification
+
+- `tests/test_sync_import.py` (8 tests) pins `new_runs` for a normal sync, a
+  quiet day and a failed download.
+- `tests/test_aurora_template.py` (30 tests) pins `id="syncstatus"`,
+  `setSyncStatus(`, the running text, the failure prefix and the
+  `N new runs, M total` success line.
+- Full suite: **697 passed, 1 skipped (698 collected)**. Clean checkout with no
+  FIT files, no `trainloop.db` and no `dashboard/index.html`: **668 passed, 30
+  skipped**. `ruff check .` is clean.
+
+## What this does not fix
+
+The toast still exists and still lasts 2.5 seconds; it is now a secondary
+signal, not the only one. The status line is page state, so a hard reload clears
+it. A sync still takes 15 to 90 seconds and still occupies the button while it
+runs; the status line makes that wait visible, it does not shorten it.

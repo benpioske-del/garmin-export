@@ -37,7 +37,7 @@ data-layer-and-provenance | 4051291 | migrations 001-006
 fit-audit-and-guard | evidence from SUPERVISOR_BRIEF.md | 0 parse failures, 74/74 GPS, guard verified
 formalize-continuity-review-without-synthetic-activities | evidence from docs/VERIFICATION_REPORT.md | 1 open activity_gap; no synthetic activities may be created; accepted corpus is 74 activities
 make-coaching-rationales-deterministic-and-auditable | evidence from docs/IMPLEMENTATION_INVENTORY.md | tests/recommend_snapshots.py pins every reachable coaching branch to golden JSON with fixed as_of and supplied hr_max
-harden-bridge-and-release-quality-gates | evidence from docs/VERIFICATION_REPORT.md | 692 passed, 1 skipped; facts gate, rejected-brief staging, content-derived idempotency, and publish protections are tested
+harden-bridge-and-release-quality-gates | evidence from docs/VERIFICATION_REPORT.md | 697 passed, 1 skipped; facts gate, rejected-brief staging, content-derived idempotency, and publish protections are tested
 connect-dashboard-to-data-layer | evidence from docs/IMPLEMENTATION_INVENTORY.md and docs/VERIFICATION_REPORT.md | GET /api/activities, GET /api/load, and GET /api/coaching are served on the same origin and the dashboard fetches them
 caltrak-nutrition-ingestion | evidence from docs/VERIFICATION_REPORT.md and docs/IMPLEMENTATION_INVENTORY.md | nutrition.py parses and aggregates CalTrak CSV; GET/POST /api/nutrition serve and upsert daily totals; the FUEL tab consumes live nutrition data
 
@@ -59,7 +59,7 @@ establish-authenticated-athlete-ownership | BLOCKED / PARKED AND DEMOTED | Authe
 - FIT file count: 74. Source: docs/VERIFICATION_REPORT.md, "files inspected           : 74".
 - Activity count: 74. Source: docs/VERIFICATION_REPORT.md, `{"activities": 74, "open_reviews": 3}`.
 - Open review count: 3. Source: docs/VERIFICATION_REPORT.md, `{"activities": 74, "open_reviews": 3}`.
-- Test result: 692 passed, 1 skipped. Source: docs/VERIFICATION_REPORT.md, "692 passed, 1 skipped (693 collected)".
+- Test result: 697 passed, 1 skipped. Source: docs/VERIFICATION_REPORT.md, "697 passed, 1 skipped (698 collected)".
 - Parse failures: 0. Source: docs/VERIFICATION_REPORT.md, "parse failures            : 0".
 - Files with GPS: 74. Source: docs/VERIFICATION_REPORT.md, "files with GPS            : 74".
 - Open timezone_uncertain reviews: 2. Source: docs/VERIFICATION_REPORT.md, "2 open `timezone_uncertain` reviews".

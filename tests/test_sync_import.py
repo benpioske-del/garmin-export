@@ -116,3 +116,46 @@ def test_a_missing_import_script_fails_before_downloading(monkeypatch, tmp_path)
     assert res["ok"] is False
     assert "trainloop.py not found" in res["output"]
     assert called == []
+
+
+def test_sync_reports_how_many_runs_arrived(monkeypatch):
+    """"Sync complete" alone cannot tell a working sync from a no-op.
+
+    garmin_sync.py prints ``Done: N new run(s) downloaded, M already current.``
+    The page repeats N so a sync that found nothing says so instead of looking
+    like the button did nothing.
+    """
+    _record(monkeypatch, [
+        _Result(stdout="Done: 2 new run(s) downloaded, 72 already current.\n"),
+        _Result(stdout='{"inserted": 2, "unchanged": 72}\n'),
+    ])
+
+    res = G._run_sync()
+
+    assert res["ok"] is True
+    assert res["new_runs"] == 2
+
+
+def test_sync_reports_zero_new_runs_on_a_quiet_day(monkeypatch):
+    _record(monkeypatch, [
+        _Result(stdout="Done: 0 new run(s) downloaded, 74 already current.\n"),
+        _Result(stdout='{"inserted": 0, "unchanged": 74}\n'),
+    ])
+
+    res = G._run_sync()
+
+    assert res["ok"] is True
+    assert res["new_runs"] == 0
+
+
+def test_a_failed_download_reports_no_run_count(monkeypatch):
+    """A login failure must not surface a stale count as if runs arrived."""
+    _record(monkeypatch, [
+        _Result(returncode=1, stdout="login failed\n"),
+        _Result(stdout="imported\n"),
+    ])
+
+    res = G._run_sync()
+
+    assert res["ok"] is False
+    assert "new_runs" not in res

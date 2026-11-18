@@ -1,7 +1,7 @@
 # Verification report
 
 Supervisor brief Task 10. Everything below was run in the working tree on
-2026-11-07 and refreshed on 2026-11-16 after the CrewAI dashboard rewrite was
+2026-11-07 and refreshed on 2026-11-17 after the CrewAI dashboard rewrite was
 merged and re-wired. Commands and results are reproduced as observed.
 
 ## Environment
@@ -17,11 +17,11 @@ merged and re-wired. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-692 passed, 1 skipped (693 collected)
+697 passed, 1 skipped (698 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `663 passed, 30 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `668 passed, 30 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`; the dashboard-contract and brief checks that read the
 gitignored page skip when it is absent; one symlink case skips on Windows. CI
@@ -39,10 +39,11 @@ lint or tests ran.
 | `tests/test_nutrition.py` | 50 |
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_dashboard_api.py` | 42 |
+| `tests/test_dashboard_api_http.py` | 102 |
 | `tests/test_brief_consistency.py` | 37 |
 | `tests/test_dashboard_contract.py` | 36 |
 | `tests/test_manual_runs.py` | 30 |
-| `tests/test_aurora_template.py` | 28 |
+| `tests/test_aurora_template.py` | 30 |
 | `tests/test_recommend_snapshots.py` | 25 |
 | `tests/test_trainloop_cli.py` | 22 |
 | `tests/test_fit_reader_elevation.py` | 21 |
@@ -54,9 +55,9 @@ lint or tests ran.
 | `tests/test_gps_guard.py` | 13 |
 | `tests/test_splits.py` | 10 |
 | `tests/test_paths_and_guards.py` | 9 |
-| `tests/test_sync_import.py` | 5 |
+| `tests/test_sync_import.py` | 8 |
 | `tests/test_history_safety.py` | 2 |
-| **Total** | **693** (692 pass, 1 skip) |
+| **Total** | **698** (697 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -526,6 +527,14 @@ a missing date column, unparseable dates, and negative or non-numeric values.
   POSTs `/sync` with the session cookie (or `?tk=`), runs `garmin_sync.py` then
   `trainloop.py bootstrap`, and reloads from the API when it finishes. The same
   button works on the phone and the laptop.
+- **Sync feedback is a persistent status line.** A 2.5-second toast could not
+  outlive a 15-90 second sync, so the button snapped back to `Sync Garmin now`
+  and a finished sync looked like nothing had happened. The sync bar now carries
+  `#syncstatus`: `Syncing - this usually takes 15 to 90 seconds` while it runs,
+  then `Synced HH:MM - N new runs, M total`, or `Sync failed: <reason>`. The
+  server parses the count from `garmin_sync.py`'s
+  `Done: N new run(s) downloaded` line and returns it as `new_runs`, so a quiet
+  day says `0 new runs` instead of looking like a no-op.
 - Verified in-browser with a synthetic two-day log: the FUEL tab listed both
   days (`Calories 2100 · Protein 150g`) and the run detail showed
   `1950 kcal · 140g protein · 200g carbs`, with no console errors.
