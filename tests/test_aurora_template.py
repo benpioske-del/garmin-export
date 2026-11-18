@@ -13,6 +13,9 @@ pixels: a new visual design is welcome as long as the features survive.
 
 import io
 import os
+import shutil
+import subprocess
+import tempfile
 
 import pytest
 
@@ -145,6 +148,42 @@ def test_sync_status_names_the_run_count(template):
     assert "new_runs" in template
     assert '"Synced "' in template
     assert 'bits.push(SUMMARY.total_runs+" total")' in template
+
+
+def test_nutrition_hook_buttons_do_not_terminate_the_script_early():
+    """onclick="f('url')" inside a single-quoted JS string is a syntax error.
+
+    A single stray quote here broke the whole injected bootstrap: the page
+    stayed on the committed SNAPSHOT (72 runs, ACWR "unavailable") while the
+    separate template script kept the Sync button working, so a sync looked
+    like a no-op. The quotes are HTML-encoded instead of backslash-escaped.
+    """
+    script = G.AURORA_LIVE_SCRIPT
+    assert "copyNutritionHook(&apos;url&apos;)" in script
+    assert "copyNutritionHook(&apos;token&apos;)" in script
+    assert "copyNutritionHook('url')" not in script
+    assert "copyNutritionHook('token')" not in script
+
+
+def test_injected_live_script_is_valid_javascript():
+    """Parse the injected script with node when it is available.
+
+    The marker tests cannot see a syntax error, and one bad quote disables
+    every live feature at once. GitHub's runners ship node, so CI catches it;
+    a machine without node skips rather than fails.
+    """
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed; JavaScript syntax check unavailable")
+    body = G.AURORA_LIVE_SCRIPT.split("<script>", 1)[1]
+    body = body.rsplit("</script>", 1)[0]
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "live.js")
+        with io.open(path, "w", encoding="utf-8") as fh:
+            fh.write(body)
+        proc = subprocess.run([node, "--check", path],
+                              capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr or proc.stdout
 
 
 def test_importer_sends_the_shape_the_server_parses():

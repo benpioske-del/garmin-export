@@ -1430,3 +1430,114 @@ The toast still exists and still lasts 2.5 seconds; it is now a secondary
 signal, not the only one. The status line is page state, so a hard reload clears
 it. A sync still takes 15 to 90 seconds and still occupies the button while it
 runs; the status line makes that wait visible, it does not shorten it.
+
+# Twenty-fourth correction: 2026-11-17, the one quote that disabled every live feature
+
+## The gap
+
+After the twenty-third correction the athlete pressed Sync, saw the new status
+line, and reported that the page still looked wrong *below* it:
+
+> It did the same thing also below
+>
+> ACWR - official
+> unavailable
+> from coaching analysis
+
+The twenty-third correction had blamed silence only. It was half right. The
+status line was a real fix, but the page was never running its live-data
+bootstrap at all, so the ACWR card had nothing to show and the run count was
+still the committed snapshot's 72, not the database's 74.
+
+## The cause
+
+The injected bootstrap (`AURORA_LIVE_SCRIPT`) builds the nutrition-hook setup
+card as a single-quoted JavaScript string. Two buttons inside that string were
+written as:
+
+    '<button class="btn ghost" onclick="copyNutritionHook('url')">Copy URL</button>'
+
+The `'` before `url` closes the JavaScript string, so the browser sees
+`url` as an identifier and throws:
+
+    SyntaxError: Unexpected identifier 'url'
+    at / (line 1031, column 66)
+
+One stray quote. The entire injected `<script>` failed to parse, which means
+nothing in it ran: no `/api/activities` fetch, no `/api/load` fetch, no
+`/api/coaching` fetch, no nutrition fetch, no badge update, no repaint. The page
+rendered the committed `SNAPSHOT` constants and stayed there.
+
+The Sync button still worked because it lives in the committed template's own
+`<script>` block, which is separate and parsed fine. That is exactly what made
+the symptom so misleading: the one control the athlete was told to press kept
+responding, while every number on the page was stale. "Sync then nothing" and
+"ACWR unavailable" had the same root cause, and it was not the sync.
+
+The escaped form was written as `\'url\'` in a Python single-quoted literal,
+which produces a bare `'` in the emitted HTML attribute, not an escaped one. The
+attribute needs `&apos;` so it survives both the Python literal and the
+JavaScript string.
+
+## What changed
+
+- **The attribute quotes are HTML-encoded.** Both buttons now render
+  `onclick="copyNutritionHook(&apos;url&apos;)"` and
+  `copyNutritionHook(&apos;token&apos;)`.
+- **A regression test pins the exact strings.** `tests/test_aurora_template.py`
+  asserts the encoded form is present and the bare form is absent, so the
+  escaping cannot silently revert.
+- **A syntax test parses the script.** The same file extracts the injected
+  `<script>` body and runs `node --check` on it where node is installed. Marker
+  assertions cannot see a syntax error; a parser can. The test skips on a
+  machine without node and runs on GitHub's runners, so CI catches this class of
+  bug even though the laptop cannot.
+- **A refusal is delivered, not reset.** While reproducing this, an
+  unauthenticated POST occasionally surfaced as
+  `ConnectionAbortedError [WinError 10053]` instead of the intended `403`:
+  Windows sends RST when a socket closes with unread request bytes. The handler
+  now drains a bounded body (`_drain_body()`) before answering `403` on the host
+  check, `/share-target`, and the auth gate. A 32 KiB unauthenticated POST is
+  pinned to a readable `403`.
+
+## Verification
+
+Checked in a real browser against a temporary copy of the live database on
+port 24568 (non-password mode), before and after the fix.
+
+| Signal | Before | After |
+| --- | --- | --- |
+| Console errors | `SyntaxError: Unexpected identifier 'url'` at line 1031 | none |
+| Badge | `SNAPSHOT` | `LIVE DATA - live activity, load, coaching and nutrition data` |
+| Runs | 72 | **74** |
+| Latest run | 2026-11-11 | **2026-11-17** |
+| ACWR card | `unavailable` | **0.96** |
+| Training signal | `unavailable` | `DATA INSUFFICIENT / 2 recent activities are awaiting confirmation` |
+
+The load behind 0.96 is 689.0 over 7 days and 2867.9 over 28 days, so
+`689.0 / (2867.9 / 4) = 0.96`, computed in the page from `/api/load`. Pressing
+Sync showed `Syncing - this usually takes 15 to 90 seconds` and held it for
+90+ seconds with the button disabled, which is the intended running state; the
+temp server was then stopped, so this run did not observe the success line. The
+athlete's own sync at `2026-11-17T21:44:38` had already logged
+`Done: 0 new run(s) downloaded, 74 already current.`
+
+- `tests/test_aurora_template.py` (32 tests) pins the encoded quotes, the sync
+  status line, and parses the injected script with node where available.
+- `tests/test_sync_import.py` (8 tests) pins `new_runs` for a normal sync, a
+  quiet day and a failed download.
+- `tests/test_dashboard_api_http.py` (103 tests) pins the large-body `403`.
+- Full suite: **699 passed, 2 skipped (701 collected)**. Clean checkout with no
+  FIT files, no `trainloop.db` and no `dashboard/index.html`: **670 passed, 31
+  skipped**. `ruff check .` is clean. These replace the twenty-third
+  correction's 697/1 and 668/30.
+
+## What this does not fix
+
+The quote bug is fixed, not the class of bug. The injected script is still
+assembled from Python string literals, and the local machine has no `node`, so
+the syntax check that would have caught this runs only in CI. The ACWR card
+still says `from coaching analysis` even though the number now comes from
+`/api/load`; the label is misleading but was left unchanged. The training
+signal still refuses with `DATA INSUFFICIENT` while two activities await
+confirmation, which is correct refusal behaviour, not a missing number.

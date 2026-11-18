@@ -753,6 +753,19 @@ def test_nutrition_post_requires_the_dash_token(server, nutrition_file):
     assert status == 403
 
 
+def test_unauthenticated_post_gets_a_readable_403_not_a_reset(
+        server, nutrition_file):
+    """An unread request body makes Windows reset the connection.
+
+    The refusal must reach the client as a 403 so the page can say "dashboard
+    token missing" instead of surfacing a bare network error. A large body
+    makes the reset deterministic when the handler does not drain it.
+    """
+    payload = {"days": [], "padding": "x" * 32768}
+    status, _, _ = _post_json(server, "/api/nutrition", payload, token=None)
+    assert status == 403
+
+
 def test_nutrition_post_rejects_a_malformed_payload(server, nutrition_file):
     status, _, payload = _post_json(server, "/api/nutrition",
                                     {"days": [{"date": "nope"}]})

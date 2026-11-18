@@ -17,15 +17,17 @@ merged and re-wired. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-697 passed, 1 skipped (698 collected)
+699 passed, 2 skipped (701 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `668 passed, 30 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `670 passed, 31 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`; the dashboard-contract and brief checks that read the
-gitignored page skip when it is absent; one symlink case skips on Windows. CI
-fails only on a real defect. `ruff check .` is clean.
+gitignored page skip when it is absent; one symlink case skips on Windows; the
+JavaScript syntax check skips where `node` is not installed (GitHub's runners
+have it, so CI still parses the injected script). CI fails only on a real
+defect. `ruff check .` is clean.
 
 CI runs the suite on Python 3.12 and 3.13. `garminconnect>=0.3.13` declares
 `Requires-Python >=3.12`, so `requires-python` is now `>=3.12` and the old 3.10
@@ -39,11 +41,11 @@ lint or tests ran.
 | `tests/test_nutrition.py` | 50 |
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_dashboard_api.py` | 42 |
-| `tests/test_dashboard_api_http.py` | 102 |
+| `tests/test_dashboard_api_http.py` | 103 |
 | `tests/test_brief_consistency.py` | 37 |
 | `tests/test_dashboard_contract.py` | 36 |
 | `tests/test_manual_runs.py` | 30 |
-| `tests/test_aurora_template.py` | 30 |
+| `tests/test_aurora_template.py` | 32 |
 | `tests/test_recommend_snapshots.py` | 25 |
 | `tests/test_trainloop_cli.py` | 22 |
 | `tests/test_fit_reader_elevation.py` | 21 |
@@ -57,7 +59,7 @@ lint or tests ran.
 | `tests/test_paths_and_guards.py` | 9 |
 | `tests/test_sync_import.py` | 8 |
 | `tests/test_history_safety.py` | 2 |
-| **Total** | **698** (697 pass, 1 skip) |
+| **Total** | **701** (699 pass, 2 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -535,6 +537,18 @@ a missing date column, unparseable dates, and negative or non-numeric values.
   server parses the count from `garmin_sync.py`'s
   `Done: N new run(s) downloaded` line and returns it as `new_runs`, so a quiet
   day says `0 new runs` instead of looking like a no-op.
+- **A quote bug in the injected bootstrap.** The nutrition-hook setup rendered
+  `onclick="copyNutritionHook('url')"` inside a single-quoted JavaScript
+  string, which terminated the string early. The whole injected script failed
+  to parse, so the page stayed on the committed SNAPSHOT: 72 runs, a
+  `SNAPSHOT` badge, and `ACWR unavailable`. The Sync button lives in a separate
+  script block and kept working, which made the page look like a sync problem.
+  The attribute quotes are now HTML-encoded (`&apos;`), and a test parses the
+  injected script with `node --check` where node is available.
+- **A refusal is delivered, not reset.** The server now drains a small request
+  body before answering `403`, so Windows does not answer with a connection
+  reset that the page reports as a bare network error. A 32 KiB unauthenticated
+  POST is pinned to a readable `403`.
 - Verified in-browser with a synthetic two-day log: the FUEL tab listed both
   days (`Calories 2100 · Protein 150g`) and the run detail showed
   `1950 kcal · 140g protein · 200g carbs`, with no console errors.

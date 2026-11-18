@@ -1037,8 +1037,8 @@ AURORA_LIVE_SCRIPT = """
           '<input id="nutrition-hook-token" value="' + esc(info.token) +
           '" readonly style="' + inputStyle + '"></label>' +
         '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">' +
-          '<button class="btn ghost" onclick="copyNutritionHook(\'url\')">Copy URL</button>' +
-          '<button class="btn ghost" onclick="copyNutritionHook(\'token\')">Copy token</button>' +
+          '<button class="btn ghost" onclick="copyNutritionHook(&apos;url&apos;)">Copy URL</button>' +
+          '<button class="btn ghost" onclick="copyNutritionHook(&apos;token&apos;)">Copy token</button>' +
         "</div>" +
         '<ol class="sub" style="margin-top:14px;padding-left:18px;line-height:1.6">' +
           "<li>Install <b>HC Webhook</b> from the Play Store (about $14.99, one-time). There is no free store listing, and sideloading an APK is not required or recommended.</li>" +
@@ -1602,6 +1602,28 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             pass
 
+    def _drain_body(self, cap=64 * 1024):
+        """Discard a small request body before refusing the request.
+
+        Closing a socket with unread request bytes makes Windows send RST, and
+        the client then reports a connection abort instead of the 403. That is
+        how a token refusal turned into a bare network error in the page and a
+        flaky test here. Bounded so a huge body cannot stall the handler, and
+        time-limited so a client that declares a length and sends nothing does
+        not hold a thread open.
+        """
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+        except (TypeError, ValueError):
+            return
+        if length <= 0 or length > cap:
+            return
+        try:
+            self.connection.settimeout(2)
+            self.rfile.read(length)
+        except OSError:
+            pass
+
     def _send(self, code, body, ctype, set_cookie=None):
         try:
             self.send_response(code)
@@ -1885,6 +1907,7 @@ class Handler(BaseHTTPRequestHandler):
         global last_request
         last_request = time.time()
         if not _host_ok(self.headers.get("Host", "")):
+            self._drain_body()
             return self._deny(403, "forbidden host")
         parts = urllib.parse.urlsplit(self.path)
         path = urllib.parse.unquote(parts.path)
@@ -1892,6 +1915,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._handle_login()
         if path == "/share-target":
             if not self._is_authed():
+                self._drain_body()
                 return self._redirect("/login")
             return self._handle_share_target()
         if path == "/api/nutrition/hook":
@@ -1899,6 +1923,7 @@ class Handler(BaseHTTPRequestHandler):
             # own dedicated token and lives above the cookie/token gate.
             return self._handle_nutrition_hook()
         if not self._is_authed():
+            self._drain_body()
             return self._deny(403, "missing or wrong token")
         if path == "/sync":
             if not _sync_lock.acquire(False):
