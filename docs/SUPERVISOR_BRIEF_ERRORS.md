@@ -1278,3 +1278,98 @@ The phone nutrition upload still needs HC Webhook from the Play Store, and no
 live phone payload has arrived yet. Quick logs still live only in the browser
 until the next Garmin sync. The lifting importer is still unimplemented, so the
 1RM chart stays an empty state.
+
+# Twenty-second correction: 2026-11-17, the quick log that never saved and the token that only lived in the URL
+
+## The gap
+
+The athlete reported, plainly: "when I try to log a run/sync to garmin it isn't
+working." Two separate faults produced that one sentence.
+
+**The quick log never reached the server.** `saveRun()` in the committed Aurora
+template built a run object in memory, pushed it into the `RUNS` array, wrote
+`aurora_last_seen_run` to `localStorage`, and called `toast("Run saved")`. There
+was no `fetch`, no `POST`, and no server route. The entry looked saved until the
+next reload, when it was gone; a Garmin sync never saw it, because nothing had
+been written. The twenty-first correction had claimed quick-log submissions
+"save"; they only saved to the browser tab that typed them.
+
+**The page could only authenticate through `?tk=`.** Both the Aurora bootstrap
+(`AURORA_LIVE_SCRIPT`) and the classic page read the dashboard token from the
+query string. The server hands that token out in the launch URL, but the PWA
+`start_url` is `/` and a bookmark, a restored tab or a second visit has no
+`?tk=`. On those loads every data call -- and the `Sync Garmin now` button,
+which POSTs `/sync` -- answered `403`. The page then reported `HTTP 403`, which
+reads like a Garmin failure rather than a missing token.
+
+The classic page had a third, narrower version of the same fault: `runGarminSync`
+refuses to call `/sync` at all unless `?tk=` is present, even when the request
+is already authorised by the password session cookie.
+
+## What changed
+
+- **A real quick-log route.** `POST /api/runs` (handler
+  `_handle_manual_run_post`) validates the form and stores it through the new
+  `manual_runs.py` sidecar at `paths.data_dir()/manual_runs.json`. The file is
+  written atomically, one entry per local date, so re-saving a day replaces it
+  rather than stacking a second run. Bodies are capped at 64 KB; a bad date,
+  zero distance or unparseable time is a `400` with a readable detail, not a
+  silently stored guess.
+- **Manual runs are display-only.** They are merged into `/api/activities` with
+  `source_system: "manual"`, `splits: null` (no FIT file means no laps, so an
+  empty list would lie) and `value_state: athlete_reported`. They are not rows
+  in the canonical `activities` table, so `loadcalc`, the review queue and
+  coaching never count a typed entry as a device-recorded session. When a Garmin
+  activity exists on the same local date, the typed copy is hidden, which is the
+  promise the form makes ("a Garmin sync for the same day replaces it").
+- **The page says what happened.** `saveRun` POSTs, waits for the response,
+  re-runs the live reload, and shows `Run not saved: <detail>` on failure instead
+  of a false success. `mapRun` marks manual rows and the run feed and report
+  label them "manual entry"; the run summary no longer claims a hand-typed run's
+  lap profile came from the watch.
+- **A same-site session cookie for the local page.** Serving `/` or `/classic`
+  now sets an `HttpOnly`, `SameSite=Strict` `dash_local` cookie carrying the
+  local token, so a bare `http://127.0.0.1:PORT/`, the PWA and a bookmark
+  authenticate their own fetches. `SameSite=Strict` is deliberate: a cross-site
+  POST cannot carry it, so the CSRF protection of the token gate is unchanged,
+  and `HttpOnly` keeps page script from reading the token back. In password mode
+  the signed `dash_session` cookie already covers this, so the local cookie is
+  only set when no password is configured.
+- **The classic page gets a non-secret placeholder.** When `/classic` is served
+  to an already-authenticated request that has no `?tk=`, the server injects
+  `inject_classic_session()`, which sets `tk=session` with
+  `history.replaceState`. The literal string `session` is not a credential; the
+  cookie is. A real `?tk=` URL is left untouched.
+- **The sync button names the real problem.** On `401`/`403`, Aurora now says
+  "dashboard token missing - reload the page from the link the server printed"
+  rather than echoing a bare status code.
+- `manual_runs.json` is listed in `paths.DATA_FILES` and bundled by
+  `backup_data.py`, so a laptop failure does not lose typed runs.
+- `tests/test_manual_runs.py` (30 tests) covers duration parsing, validation,
+  atomic writes, date replacement, merge, same-day dedupe, idempotence and the
+  refusal to claim device provenance. `tests/test_dashboard_api_http.py` adds
+  the cookie session, the classic placeholder and the `/api/runs` wire cases;
+  `tests/test_aurora_template.py` pins that the quick log POSTs, that manual rows
+  are labelled, and that the missing-token message exists.
+
+## Verification
+
+- `POST /api/runs` on the live server stored one entry and `/api/activities`
+  then reported `count 75, manual 1`, with the manual row carrying
+  `start_local`, `distance_mi`, `moving_time_s`, `avg_hr` and `manual: true`.
+  The probe row was deleted afterwards; no test data remains in the real store.
+- With a valid session cookie and the injected placeholder header,
+  `POST /sync` returned `{"ok": true}` and `activities: 74, open reviews: 3`.
+  The `403` is gone on a cookie-authenticated load.
+- `/classic` served with the `coach-classic-session` marker and the placeholder
+  script, and left a real `?tk=` URL unchanged.
+- The focused suites pass; the full suite result is recorded in
+  `docs/VERIFICATION_REPORT.md`.
+
+## What this does not fix
+
+The phone nutrition upload still needs HC Webhook from the Play Store, and no
+live phone payload has arrived yet. The lifting importer is still unimplemented,
+so the 1RM chart stays an empty state, and typed lifts are still browser-only.
+A manual run has no splits, cadence or elevation, because those only exist in a
+FIT file; it is a record that a run happened, not a substitute for the watch.

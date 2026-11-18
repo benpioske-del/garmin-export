@@ -256,6 +256,9 @@ def api_activities(conn):
         out.append({
             # Stable identity. Never the array index, never the FIT filename.
             "activity_id": aid,
+            # Kept so a consumer can tell a device activity from the typed
+            # quick-log rows that manual_runs.merge() appends.
+            "source_system": r["source_system"],
             "source_activity_id": r["source_activity_id"],
             "source_file": source_file,
             "sport": r["sport"],
@@ -384,7 +387,10 @@ def api_coaching(conn, hr_max, as_of=None):
 
 
 API_ROUTES = {
-    "/api/activities": lambda conn, hr, at: api_activities(conn),
+    # Manual quick-log rows are display-only: they are merged after the
+    # canonical query so loadcalc and coaching never count a typed entry as a
+    # device activity.
+    "/api/activities": lambda conn, hr, at: manual_runs.merge(api_activities(conn)),
     "/api/load": lambda conn, hr, at: api_load(conn, hr, as_of=at),
     "/api/coaching": lambda conn, hr, at: api_coaching(conn, hr, as_of=at),
 }
@@ -406,6 +412,7 @@ MEGACMD_REMOTE = "/CoachDashboard"
 # server must not grow a second parser, a second load formula or a second
 # coaching rule, or the dashboard and the CLI would drift apart.
 import loadcalc            # noqa: E402
+import manual_runs         # noqa: E402
 import nutrition           # noqa: E402
 import recommend           # noqa: E402
 import trainingdb          # noqa: E402
@@ -838,13 +845,16 @@ AURORA_LIVE_SCRIPT = """
       bestPace: a.best_pace_s_per_mi == null ? null
         : pace(Number(a.best_pace_s_per_mi)),
       best5k: a.best_5k_s == null ? null : pace(Number(a.best_5k_s)),
-      splits: Array.isArray(a.splits) ? a.splits : null,
+      splits: Array.isArray(a.splits) ? a.splits : [],
       ascent: a.total_ascent_ft == null ? null : Math.round(Number(a.total_ascent_ft)),
       descent: a.total_descent_ft == null ? null : Math.round(Number(a.total_descent_ft)),
       calories: a.calories == null ? null : Number(a.calories),
       laps: a.laps == null ? null : Number(a.laps),
       bestLap: null,
       source: a.source_file || "trainloop.db",
+      // Typed quick-log rows arrive with source_system "manual"; the feed
+      // labels them so a hand-entered run never looks device-recorded.
+      manual: a.source_system === "manual",
       band: band(mi)
     };
   }
@@ -1131,6 +1141,37 @@ def inject_aurora_live(html):
     return text.encode("utf-8")
 
 
+CLASSIC_SESSION_MARK = "coach-classic-session"
+CLASSIC_SESSION_SCRIPT = (
+    "<!-- %s -->\n"
+    "<script>(function(){try{"
+    # The classic page reads its token from ?tk= and refuses to call /sync
+    # without one, even when the login or local cookie already authorises the
+    # request. Give it a harmless placeholder in the query string instead of
+    # the real token: the server still checks the cookie, so nothing secret is
+    # written into the URL, history or a tunnel log.
+    "if(new URLSearchParams(location.search).get('tk')){return;}"
+    "var u=new URL(location.href);u.searchParams.set('tk','session');"
+    "history.replaceState(null,'',u);"
+    "}catch(e){}})();</script>\n" % CLASSIC_SESSION_MARK
+)
+
+
+def inject_classic_session(html):
+    """Let the classic page use its cookie session instead of a ?tk= secret."""
+    try:
+        text = html.decode("utf-8")
+    except UnicodeDecodeError:
+        return html
+    if CLASSIC_SESSION_MARK in text:
+        return html
+    if "</body>" in text:
+        text = text.replace("</body>", CLASSIC_SESSION_SCRIPT + "</body>", 1)
+    else:
+        text = text + CLASSIC_SESSION_SCRIPT
+    return text.encode("utf-8")
+
+
 # ---------------------------------------------------------------------------
 # Password login.
 #
@@ -1147,6 +1188,13 @@ def inject_aurora_live(html):
 AUTH_FILE = os.path.join(DATA_DIR, ".coach_dash_auth")
 SESSION_KEY_FILE = os.path.join(DATA_DIR, ".coach_dash_sessionkey")
 SESSION_COOKIE = "dash_session"
+# The dashboard is served by this server, so it can hand the browser a
+# same-site session instead of relying on the ?tk= URL surviving a bookmark,
+# a PWA launch or a restart. HttpOnly keeps it away from page scripts and
+# SameSite=Strict keeps a cross-site POST from carrying it, so the token gate
+# still blocks CSRF while a bare http://127.0.0.1:PORT/ works.
+LOCAL_COOKIE = "dash_local"
+LOCAL_COOKIE_TTL = 30 * 24 * 3600
 SESSION_TTL = 30 * 24 * 3600
 PBKDF2_ROUNDS = 200000
 LOGIN_THROTTLE_AFTER = 10
@@ -1309,11 +1357,18 @@ class Handler(BaseHTTPRequestHandler):
         return None
 
     def _is_authed(self, query=None):
-        """True for the local token (header or ?tk=) or a valid login cookie."""
+        """True for the local token (header, ?tk= or local cookie) or a login."""
         if TOKEN and self.headers.get("X-Dash-Token", None) == TOKEN:
             return True
         if TOKEN and query and query.get("tk") == TOKEN:
             return True
+        if TOKEN:
+            cookie = self._cookie_value(LOCAL_COOKIE) or ""
+            # Compare bytes so a non-ASCII Cookie header cannot raise and turn
+            # a refused request into a 500.
+            if hmac.compare_digest(cookie.encode("utf-8", "replace"),
+                                   TOKEN.encode("utf-8")):
+                return True
         if REQUIRE_LOGIN:
             value = self._cookie_value(SESSION_COOKIE)
             if value and session_valid(value):
@@ -1327,6 +1382,19 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get("X-Forwarded-Proto", "").lower() == "https":
             attrs += "; Secure"
         return attrs
+
+    def _local_cookie(self):
+        """Cookie handed to the page so a bare / can reach the token routes.
+
+        SameSite=Strict is deliberate: a cross-site POST must not carry it, so
+        the CSRF protection of the token gate survives. HttpOnly means page
+        script cannot read the token back out of the cookie.
+        """
+        attrs = ("Path=/; HttpOnly; SameSite=Strict; Max-Age=%d"
+                 % LOCAL_COOKIE_TTL)
+        if self.headers.get("X-Forwarded-Proto", "").lower() == "https":
+            attrs += "; Secure"
+        return "%s=%s; %s" % (LOCAL_COOKIE, TOKEN, attrs)
 
     def _redirect(self, location, set_cookie=None):
         try:
@@ -1439,6 +1507,39 @@ class Handler(BaseHTTPRequestHandler):
                 "error": "could not write nutrition log"})
         return self._send_json(200, result)
 
+    def _handle_manual_run_post(self):
+        """POST /api/runs - store one typed run from the quick-log form.
+
+        The quick log used to write only to localStorage, so the entry
+        disappeared on the next reload and never reached the server. It is
+        stored in the local manual-run sidecar and merged into
+        /api/activities for display; it is deliberately not a canonical
+        device activity, so load and coaching do not count it.
+        """
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+        except ValueError:
+            length = 0
+        if length < 1 or length > manual_runs.MAX_BODY:
+            return self._send_json(413, {
+                "error": "run payload must be 1..%d bytes"
+                         % manual_runs.MAX_BODY})
+        try:
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+        except Exception:
+            return self._send_json(400, {"error": "body must be JSON"})
+        try:
+            row = manual_runs.upsert(body)
+        except manual_runs.ManualRunError as exc:
+            return self._send_json(400, {
+                "error": "invalid run payload",
+                "detail": str(exc),
+            })
+        except OSError:
+            return self._send_json(500, {
+                "error": "could not write the manual run log"})
+        return self._send_json(200, {"ok": True, "activity": row})
+
     def _handle_nutrition_hook(self):
         """POST /api/nutrition/hook - the phone bridge's token-only endpoint.
 
@@ -1494,7 +1595,7 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             pass
 
-    def _send(self, code, body, ctype):
+    def _send(self, code, body, ctype, set_cookie=None):
         try:
             self.send_response(code)
             self.send_header("Content-Type", ctype)
@@ -1502,6 +1603,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Cross-Origin-Resource-Policy", "same-origin")
             self.send_header("Cache-Control", "no-store")
+            if set_cookie is not None:
+                self.send_header("Set-Cookie", set_cookie)
             self.end_headers()
             self.wfile.write(body)
         except Exception:
@@ -1636,6 +1739,13 @@ class Handler(BaseHTTPRequestHandler):
             # Aurora is the dashboard now. The local page is only a fallback
             # for a clean checkout without the committed app, so `/` never
             # 404s; the old page keeps its own address at /classic.
+            #
+            # The page is served here, so this is also where the browser gets
+            # its same-site session cookie. Without it, opening the PWA
+            # (start_url "/") or a bookmark dropped the ?tk= query and every
+            # data call, including Sync Garmin, answered 403.
+            cookie = (self._local_cookie()
+                      if TOKEN and not REQUIRE_LOGIN else None)
             src = resolve_aurora_html()
             if src:
                 try:
@@ -1643,13 +1753,15 @@ class Handler(BaseHTTPRequestHandler):
                         return self._send(
                             200,
                             inject_pwa(inject_aurora_live(fh.read())),
-                            "text/html; charset=utf-8")
+                            "text/html; charset=utf-8",
+                            set_cookie=cookie)
                 except OSError:
                     pass
             try:
                 with open(resolve_dashboard_html(), "rb") as fh:
                     return self._send(200, inject_pwa(fh.read()),
-                                      "text/html; charset=utf-8")
+                                      "text/html; charset=utf-8",
+                                      set_cookie=cookie)
             except OSError:
                 return self._deny(404, "dashboard html not found")
         if path in ("/classic", "/classic/"):
@@ -1658,10 +1770,20 @@ class Handler(BaseHTTPRequestHandler):
                      urllib.parse.parse_qs(parts.query).items() if v}
             if REQUIRE_LOGIN and not self._is_authed(query):
                 return self._redirect("/login")
+            cookie = (self._local_cookie()
+                      if TOKEN and not REQUIRE_LOGIN else None)
             try:
                 with open(resolve_dashboard_html(), "rb") as fh:
-                    return self._send(200, inject_pwa(fh.read()),
-                                      "text/html; charset=utf-8")
+                    body = fh.read()
+                # The classic page refuses /sync without a ?tk=. When this
+                # request is already authenticated, give it a non-secret
+                # placeholder so the cookie session does the work.
+                if not query.get("tk") and (not REQUIRE_LOGIN
+                                            or self._is_authed(query)):
+                    body = inject_classic_session(body)
+                return self._send(200, inject_pwa(body),
+                                  "text/html; charset=utf-8",
+                                  set_cookie=cookie)
             except OSError:
                 return self._deny(404, "dashboard html not found")
         if path in ("/aurora", "/aurora/"):
@@ -1827,6 +1949,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_zip(payload, name)
         if path == "/api/nutrition":
             return self._handle_nutrition_post()
+        if path == "/api/runs":
+            return self._handle_manual_run_post()
         return self._deny(404, "not found")
 
     def log_message(self, fmt, *args):

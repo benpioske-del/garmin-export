@@ -20,17 +20,17 @@ identical bytes under the same code.
 
 | Measure | Value |
 | --- | --- |
-| Files inspected | 56 |
+| Files inspected | 74 |
 | Parse failures | 0 |
-| Files readable | 56 |
-| Files with GPS | 56 |
+| Files readable | 74 |
+| Files with GPS | 74 |
 | Files without GPS | 0 |
-| Files with usable timestamp | 56 |
+| Files with usable timestamp | 74 |
 | Files without timestamp | 0 |
-| Session messages | 56 |
-| Lap messages | 499 |
-| Record messages | 51,653 |
-| Position points (count only) | 51,637 |
+| Session messages | 74 |
+| Lap messages | 668 |
+| Record messages | 69,293 |
+| Position points (count only) | 69,272 |
 | Position points out of range | 0 |
 | Position points at 0,0 | 0 |
 | Files missing expected fields | 0 |
@@ -39,7 +39,7 @@ Warnings: **none**.
 
 ## Per-file schema coverage
 
-Each of the 56 files carries a single session message with all 13 fields the
+Each of the 74 files carries a single session message with all 13 fields the
 reader depends on:
 
 `sport`, `start_time`, `total_distance`, `total_timer_time`,
@@ -78,8 +78,9 @@ The audit covers the files. The cross-activity view lives in
 - **1 date gap:** no activity 2026-06-26 through 2026-07-05 (8 days). Reported
   as an open `activity_gap` review item. No placeholder sessions are created.
 - **1 activity** whose UTC date and filename-derived local date differ.
-- **56 `timezone_uncertain` reviews** — one per activity, expected until the
-  athlete confirms an offset.
+- **2 `timezone_uncertain` reviews** - the two newest runs, 2026-11-14 and
+  2026-11-17, whose local date is derived from the filename and still needs
+  confirmation. Every earlier activity has a confirmed offset.
 
 ## Privacy: coordinates are counted, never decoded
 

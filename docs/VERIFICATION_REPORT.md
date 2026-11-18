@@ -17,11 +17,11 @@ merged and re-wired. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-647 passed, 1 skipped (648 collected)
+692 passed, 1 skipped (693 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `618 passed, 30 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `663 passed, 30 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`; the dashboard-contract and brief checks that read the
 gitignored page skip when it is absent; one symlink case skips on Windows. CI
@@ -34,29 +34,29 @@ lint or tests ran.
 
 | File | Tests |
 | --- | --- |
-| `tests/test_dashboard_contract.py` | 36 |
-| `tests/test_recommend_snapshots.py` | 25 |
 | `tests/test_training_data.py` | 64 |
 | `tests/test_brief_bridge.py` | 62 |
-| `tests/test_dashboard_api.py` | 42 |
-| `tests/test_trainloop_cli.py` | 22 |
-| `tests/test_dashboard_api_http.py` | 91 |
 | `tests/test_nutrition.py` | 50 |
+| `tests/test_publish_flow.py` | 50 |
+| `tests/test_dashboard_api.py` | 42 |
+| `tests/test_brief_consistency.py` | 37 |
+| `tests/test_dashboard_contract.py` | 36 |
+| `tests/test_manual_runs.py` | 30 |
+| `tests/test_aurora_template.py` | 28 |
+| `tests/test_recommend_snapshots.py` | 25 |
+| `tests/test_trainloop_cli.py` | 22 |
 | `tests/test_fit_reader_elevation.py` | 21 |
-| `tests/test_splits.py` | 10 |
 | `tests/test_provenance.py` | 18 |
+| `tests/test_backup_data.py` | 18 |
+| `tests/test_publish_scope.py` | 17 |
 | `tests/test_capture_supervisor.py` | 16 |
 | `tests/test_fit_audit.py` | 16 |
 | `tests/test_gps_guard.py` | 13 |
+| `tests/test_splits.py` | 10 |
 | `tests/test_paths_and_guards.py` | 9 |
-| `tests/test_history_safety.py` | 2 |
-| `tests/test_publish_scope.py` | 17 |
-| `tests/test_publish_flow.py` | 50 |
-| `tests/test_brief_consistency.py` | 37 |
 | `tests/test_sync_import.py` | 5 |
-| `tests/test_backup_data.py` | 17 |
-| `tests/test_aurora_template.py` | 25 |
-| **Total** | **648** (647 pass, 1 skip) |
+| `tests/test_history_safety.py` | 2 |
+| **Total** | **693** (692 pass, 1 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -93,17 +93,17 @@ $ python fit_audit.py
 FIT data audit
 parser: fitparse=1.2.0 reader=1.1.0
 
-files inspected           : 72
+files inspected           : 74
 parse failures            : 0
-files readable            : 72
-files with GPS            : 72
+files readable            : 74
+files with GPS            : 74
 files without GPS         : 0
-files with usable timestamp: 72
+files with usable timestamp: 74
 files without timestamp   : 0
-session messages          : 72
-lap messages              : 650
-record messages           : 67446
-position points (counted) : 67425
+session messages          : 74
+lap messages              : 668
+record messages           : 69293
+position points (counted) : 69272
 files missing fields      : 0
 
 warnings:
@@ -134,13 +134,13 @@ Re-running is a no-op. Editing an applied migration raises
 
 ## Import against the real corpus
 
-On a fresh database with the current corpus of 72 files, the first import
-inserts all 72. Re-running against a database that already holds them reports
+On a fresh database with the current corpus of 74 files, the first import
+inserts all 74. Re-running against a database that already holds them reports
 every file `unchanged`:
 
 ```
 $ python activities.py import
-{"inserted": 0, "updated": 0, "unchanged": 72, "unreadable": 0}
+{"inserted": 0, "updated": 0, "unchanged": 74, "unreadable": 0}
 ```
 
 **Idempotency verified on the real data**: no rows updated, and no new audit
@@ -148,20 +148,22 @@ rows written on the second pass.
 
 ```
 $ python activities.py summary
-{"activities": 72, "open_reviews": 1}
+{"activities": 74, "open_reviews": 3}
 ```
 
-- 72 activities
-- 0 open `timezone_uncertain` reviews: all 72 local dates were confirmed by
-  the athlete (US Central, UTC-5/-6 with DST applied per run; the 2026-11-08
-  run was confirmed at UTC-6 on 2026-11-10, and the 2026-11-10 and 2026-11-11
-  runs on 2026-11-11)
+- 74 activities
+- 2 open `timezone_uncertain` reviews: the two newest runs, 2026-11-14
+  (`garmin:25080247947`) and 2026-11-17 (`garmin:25113046573`), whose local date
+  is derived from the filename and still needs athlete confirmation. Every
+  earlier local date was confirmed (US Central, UTC-5/-6 with DST applied per
+  run; the 2026-11-08 run at UTC-6 on 2026-11-10, and the 2026-11-10 and
+  2026-11-11 runs on 2026-11-11)
 - 1 open `activity_gap`: `no activity 2026-06-26..2026-07-05 (8 days)`
 - 0 duplicates detected
-- 72 SHA-256 raw references stored
+- 74 SHA-256 raw references stored
 
 The FIT-file inventory, the canonical table and the published CSV all agree at
-**72**. An earlier brief described a 55/56/59 discrepancy; that premise was
+**74**. An earlier brief described a 55/56/59 discrepancy; that premise was
 checked against the live corpus and is unsupported, so there is no
 reconciliation to perform.
 
@@ -177,11 +179,13 @@ every load figure and the dashboard silently excluded them. Re-running
 (`{"inserted": 8, "unchanged": 61}`), bringing the table to 69. On 2026-11-09
 the 2026-11-08 run was imported (`{"inserted": 1, "unchanged": 69}`), bringing
 the table to 70. On 2026-11-11 two more runs (2026-11-10 and 2026-11-11) were
-imported (`{"inserted": 2, "unchanged": 70}`), bringing the table to 72. The
-2026-11-10 run was the fourth recurrence: it was on disk but absent from the
-dashboard. `POST /sync` now runs `trainloop.py bootstrap` after `garmin_sync.py`,
-and the import is attempted even when the download fails, so the dashboard path
-can no longer stop after the download.
+imported (`{"inserted": 2, "unchanged": 70}`), bringing the table to 72. On
+2026-11-17 the two newest runs (2026-11-14 and 2026-11-17) were imported
+(`{"inserted": 2, "unchanged": 72}`), bringing the table to 74. The 2026-11-10
+run was the fourth recurrence: it was on disk but absent from the dashboard.
+`POST /sync` now runs `trainloop.py bootstrap` after `garmin_sync.py`, and the
+import is attempted even when the download fails, so the dashboard path can no
+longer stop after the download.
 
 ## Training load and recommendation
 
@@ -288,8 +292,8 @@ gained a deliberate, opt-in exposure path rather than an always-on one:
   the LAN URL with the token. The default binding is still `127.0.0.1`.
 - `_host_ok()` requires the `Host` header to name a bound address **and** carry
   the served port, so a DNS-rebinding host or a wrong port is refused (`403`).
-- Every data route stays behind the per-launch token (`X-Dash-Token` or
-  `?tk=`).
+- Every data route stays behind the per-launch token (`X-Dash-Token`, `?tk=`
+  or the local `dash_local` cookie) or a valid login session.
 - **No CORS headers are sent.** The page and the API share one origin, so CORS
   is unnecessary; `test_no_cors_headers_are_ever_sent` asserts
   `Access-Control-Allow-Origin` never appears.
@@ -331,12 +335,35 @@ needs more than the token, so the server gained an additive password gate:
 - `--idle-timeout 0` disables the idle shutdown, which is needed for a
   long-lived tunnel.
 
-`tests/test_dashboard_api_http.py` (68 tests) covers the manifest and worker
+### Local session cookie and the classic placeholder
+
+The launch URL carries the token as `?tk=`, but a PWA launch (`start_url: "/"`),
+a bookmark, a restored tab or a second visit does not. Those loads used to get
+`403` from every data call and from `Sync Garmin now`, which read like a Garmin
+failure. Serving `/` or `/classic` now sets an `HttpOnly`, `SameSite=Strict`
+`dash_local` cookie carrying the local token, so the page authenticates its own
+fetches without a query string.
+
+- `SameSite=Strict` is deliberate: a cross-site `POST` cannot carry the cookie,
+  so the CSRF protection of the token gate is unchanged. `HttpOnly` keeps page
+  script from reading the token back out.
+- In password mode the signed `dash_session` cookie already covers the page, so
+  `dash_local` is only set when no password is configured.
+- The classic page refuses `/sync` without `?tk=`, so when an already-authed
+  request reaches `/classic` with no token in the query, the server injects
+  `inject_classic_session()`. It sets `tk=session` with
+  `history.replaceState`; the literal string `session` is not a credential, the
+  cookie is. A real `?tk=` URL is left unchanged, and the real token never
+  enters the URL, history or a tunnel log.
+
+`tests/test_dashboard_api_http.py` (102 tests) covers the manifest and worker
 routes, the injected tags, injection idempotence, host/port allowlisting, the
 offline fallback (the worker keeps the shell and API data, and falls back to the
-cache on a `5xx` origin outage), and the login gate (redirect, form, wrong
+cache on a `5xx` origin outage), the login gate (redirect, form, wrong
 password, cookie unlock, forged cookie, token back-compat, logout, `Secure`
-flag, session expiry). **Caveat:** service workers require a secure context, so
+flag, session expiry), the local cookie (set on `/`, authenticates a data route,
+a wrong cookie refused), the classic placeholder, and the manual-run route.
+**Caveat:** service workers require a secure context, so
 over plain `http://<lan-ip>` the "Add to Home Screen" action produces a live
 shortcut with no offline worker; the worker - and therefore the offline copy -
 activates only under https (the tunnel) or on localhost.
@@ -390,10 +417,12 @@ clean checkout), `/` falls back to the local page rather than returning `404`.
   template literal (`` `card")} `` instead of `` `card`)} ``), which raised
   `SyntaxError: missing ) after argument list` at line 148 and stopped the whole
   app from initialising. It was corrected in place in the committed artifact.
-- Verified in-browser against the live database: 72 runs, nineteen Analysis
+- Verified in-browser against the live database at 72 runs: nineteen Analysis
   charts with data (72 points on each run-based chart, 62 weeks, 16 months, 115
   heatmap days), six mile splits on the latest run, and no console errors.
-  `/classic` still renders its ten canvases with no console errors.
+  The corpus has since grown to 74; the same page served by the live server
+  reports 74 activities and 3 open reviews, and `/classic` still renders its ten
+  canvases with no console errors.
 - Wire tests cover the routes and the mobile paths: `/` serves Aurora with the
   live bootstrap and PWA tags, `/aurora` remains an alias, `/classic` serves the
   local page, `/` falls back when Aurora is absent, the token gate still applies,
@@ -403,6 +432,36 @@ clean checkout), `/` falls back to the local page rather than returning `404`.
   Bearer tokens, incremental records, deletions, Daily records, JSON backups).
 - `--open` lands on `/`, the canonical dashboard; `launch_url()` no longer
   chooses between two pages.
+
+### Quick log (`POST /api/runs`, `manual_runs.py`)
+
+The Aurora "Log a run" form used to write only to `localStorage`, so a typed run
+vanished on the next reload and a Garmin sync never saw it. It now POSTs to
+`/api/runs`.
+
+- `manual_runs.py` validates the payload and stores it at
+  `paths.data_dir()/manual_runs.json` with an atomic replace. One entry per local
+  date, so re-saving a day replaces it. Bodies are capped at 64 KB. An
+  impossible date, zero distance or unreadable time is a `400` with a detail
+  string.
+- The entry is **not** a canonical `activities` row. `/api/activities` merges it
+  in with `source_system: "manual"`, `value_state: athlete_reported`,
+  `splits: null` and `manual: true`, so `loadcalc`, the review queue and coaching
+  never count a typed entry as device-recorded. A Garmin activity on the same
+  local date hides the typed copy, which is the promise the form makes.
+- The page waits for the response and shows `Run not saved: <detail>` on
+  failure. The run feed and report label manual rows "manual entry"; a manual run
+  has no lap profile, cadence or elevation, and the report says so.
+- `manual_runs.json` is in `paths.DATA_FILES` and bundled by `backup_data.py`.
+- `tests/test_manual_runs.py` (30 tests) covers duration parsing, validation,
+  atomic writes, date replacement, merge, same-day dedupe, idempotence and the
+  refusal to claim device provenance.
+
+Verified on the live server: `POST /api/runs` stored one entry, and
+`/api/activities` then reported `count 75, manual 1` with `manual: true` on the
+new row. The probe row was removed afterwards. With a session cookie and the
+classic placeholder header, `POST /sync` returned `{"ok": true}` and
+`activities: 74, open reviews: 3`.
 
 ### Nutrition ingestion (`nutrition.py`, `/api/nutrition`)
 
@@ -474,8 +533,10 @@ a missing date column, unparseable dates, and negative or non-numeric values.
 ## Local data backup and restore
 
 `backup_data.py` bundles the data that git does not carry: the FIT corpus,
-`trainloop.db`, `dashboard/index.html`, the sleep/HR exports, the sync marker and
-the nutrition log with its Health Connect sidecar. It writes one timestamped zip,
+`trainloop.db`, `dashboard/index.html`, the sleep/HR exports, the sync marker,
+the nutrition log with its Health Connect sidecar, and the manual-run sidecar
+`manual_runs.json` (typed quick-log runs are not rebuilt from Garmin, so a
+backup that omitted them would lose them). It writes one timestamped zip,
 prunes older copies (default 14) and writes a `MANIFEST.txt` naming the code
 commit and every file it bundled.
 
@@ -508,7 +569,7 @@ A scheduled task, **Coach Data Backup**, runs it daily at 12:00 with
 `StartWhenAvailable`; a manual `Start-ScheduledTask` returned `LastTaskResult 0`
 and wrote a second copy.
 
-`tests/test_backup_data.py` (17 tests) pins the archive contents, the credential
+`tests/test_backup_data.py` (18 tests) pins the archive contents, the credential
 exclusion and its manifest line, `--include-secrets`, retention pruning, the
 empty-directory failure path, the dry run writing nothing, the OneDrive-then-
 Documents destination order, and the git marker reader.
@@ -554,7 +615,7 @@ Stated rather than implied:
 | Strength data | Schema and service verified by tests; no real strength sessions recorded yet. |
 | `profile.json` | Partially populated. `hr_max=198`; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` null. The UTC offset is now confirmed (US Central), so local dates are settled; the remaining fields block cohort percentiles and the weather location policy. |
 | Brief bridge idempotency | **Now verified.** `3054d6a` gave the file a content-derived `brief_id`; `captured_utc` is metadata only. Tests advance a frozen clock 90s to prove an unchanged brief is a no-op. |
-| Athlete UTC offset | **Confirmed**: US Central (UTC-5/-6, DST applied per activity). All 72 `timezone_uncertain` reviews resolved (69 on 2026-11-07, the 2026-11-08 run on 2026-11-10, and the 2026-11-10 and 2026-11-11 runs on 2026-11-11); only the calendar-gap review remains. |
+| Athlete UTC offset | **Confirmed**: US Central (UTC-5/-6, DST applied per activity). Every `timezone_uncertain` review was resolved except the two newest runs (2026-11-14 and 2026-11-17), which remain open pending athlete confirmation; only the calendar-gap review is otherwise outstanding. |
 | Elevation accuracy | **Derived, not measured.** These FIT files carry no `barometer_pressure`, so altitude is GPS-derived and noisy. The device figure and a smoothed recomputation differ by up to ~25% on real runs. See [ELEVATION.md](ELEVATION.md). |
 
 ## Withdrawn claims
@@ -588,7 +649,7 @@ Recorded so they are not reintroduced by a later brief:
   prevents the error from reaching the UI. The API queries every count; none is
   written down. See [SUPERVISOR_BRIEF_ERRORS.md](SUPERVISOR_BRIEF_ERRORS.md).
 - **"55 audit records and a historical 59-record source."** Both counts are
-  unsupported. The live corpus is 72 across every source.
+  unsupported. The live corpus is 74 across every source.
 
 ## Reproducing this report
 

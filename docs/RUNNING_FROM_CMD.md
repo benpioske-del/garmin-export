@@ -37,9 +37,9 @@ trainloop.cmd status
 Expected on a healthy machine:
 
 ```
-FIT files on disk    : 69
-  activities in database: 69
-  open review items     : 1
+FIT files on disk    : 74
+  activities in database: 74
+  open review items     : 3
 ```
 
 If `activities in database` is lower than `FIT files on disk`, run
@@ -83,10 +83,11 @@ Or add it once to `profile.json`:
 It is never estimated from your age.
 
 **UTC offset.** Your recorded start times are in UTC. The athlete confirmed US
-Central on 2026-11-07, so every activity now has a confirmed local date
-(`timezone_source=confirmed_offset`) and the `timezone_uncertain` reviews are
-closed. The remaining open review is the calendar gap (2026-06-26 to
-2026-07-05), which does not block recent-state advice.
+Central on 2026-11-07, so the older activities have a confirmed local date
+(`timezone_source=confirmed_offset`) and their `timezone_uncertain` reviews are
+closed. The open reviews are the calendar gap (2026-06-26 to 2026-07-05), which
+does not block recent-state advice, and the two newest runs (2026-11-14 and
+2026-11-17), whose local date is derived from the filename until confirmed.
 
 The current refusal is a different one, and an honest one:
 

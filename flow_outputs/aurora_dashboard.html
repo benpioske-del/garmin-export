@@ -302,6 +302,9 @@ function normalizeRun(r){
     calories:r.calories==null?null:Number(r.calories),
     laps:r.laps==null?splits.length:Number(r.laps),
     source:r.source||null,
+    // The live layer marks a typed quick-log row. normalizeRun() rebuilds the
+    // object, so it has to carry the flag or the feed and report lose it.
+    manual:r.manual===true,
     band:r.band||band(distance)
   };
 }
@@ -433,6 +436,7 @@ async function syncGarmin(btn){
     var h={"Content-Type":"application/json"};if(tk)h["X-Dash-Token"]=tk;
     var r=await fetch("/sync",{method:"POST",headers:h,credentials:"same-origin"});
     var res=await r.json().catch(function(){return{}});
+    if(r.status===401||r.status===403){throw new Error("dashboard token missing - reload the page from the link the server printed")}
     if(!r.ok||!res.ok){var tail=(res&&res.output)?String(res.output).trim().split("\n").slice(-1)[0]:("HTTP "+r.status);throw new Error(tail)}
     show("Garmin sync complete");
     if(window.auroraReloadAll){await window.auroraReloadAll()}else{location.reload()}
@@ -496,7 +500,7 @@ function home(){
   var miles=SUMMARY.this_week_miles!=null?SUMMARY.this_week_miles:RUNS.slice(-7).reduce(function(a,x){return a+(x.distance||0)},0);
   var acwr=COACH.acwr!=null?Number(COACH.acwr).toFixed(2):"unavailable";
   var today=new Date().toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
-  return '<div class="sync"><span><b>'+SUMMARY.total_runs+'</b> runs synced</span><span><b>'+esc(SUMMARY.latest_run_date)+'</b> latest</span><span><b>'+SUMMARY.latest_run_distance+' mi</b> latest distance</span><button class="btn secondary" style="margin-left:auto;min-height:36px;padding:8px 12px" onclick="syncGarmin(this)">Sync Garmin now</button></div>'
+  return '<div class="sync"><span><b>'+SUMMARY.total_runs+'</b> runs tracked</span><span><b>'+esc(SUMMARY.latest_run_date)+'</b> latest</span><span><b>'+SUMMARY.latest_run_distance+' mi</b> latest distance</span><button class="btn secondary" style="margin-left:auto;min-height:36px;padding:8px 12px" onclick="syncGarmin(this)">Sync Garmin now</button></div>'
     +'<div class="eyebrow">'+esc(today)+'</div><h1 class="title">Your training, illuminated.</h1>'
     +card('<div class="row"><div><div class="eyebrow">Latest sync</div><div class="stat">'+SUMMARY.total_runs+' runs</div><div class="muted">'+esc(SUMMARY.latest_run_date)+' &middot; '+SUMMARY.latest_run_distance+' mi picked up</div></div><span class="chip good">AUDITED</span></div>')
     +card('<div class="eyebrow">Training signal</div><div class="h2">Signal unavailable</div><p class="muted">Open this page from the dashboard server to read live coaching.</p><span class="pill">live /api/coaching</span>',"signal")
@@ -512,7 +516,7 @@ function home(){
 function runs(){
   return '<div class="row"><div><div class="eyebrow">Activity feed</div><h1 class="title">Every run, ready.</h1></div><a class="btn" href="#log/run">Log run</a></div>'
     +(RUNS.length?RUNS.slice().reverse().map(function(r){
-      return card('<a class="run" href="#runs/'+esc(r.date)+'"><div class="row"><div><b>'+esc(r.date)+'</b><div class="muted">'+r.distance+' mi &middot; '+band(r.distance)+' &middot; '+esc(r.pace)+'/mi</div></div><div><b>'+(r.avgHR==null?"--":r.avgHR)+'</b><div class="muted">bpm</div></div></div><div class="row" style="margin-top:12px"><span class="chip">'+r.splits.length+' laps</span><span class="chip '+(r.distance>9?"warn":"good")+'">'+(r.distance>9?"long":"steady")+'</span><span class="muted">estimated breakdown</span></div></a>');
+      return card('<a class="run" href="#runs/'+esc(r.date)+'"><div class="row"><div><b>'+esc(r.date)+'</b><div class="muted">'+r.distance+' mi &middot; '+band(r.distance)+' &middot; '+esc(r.pace)+'/mi</div></div><div><b>'+(r.avgHR==null?"--":r.avgHR)+'</b><div class="muted">bpm</div></div></div><div class="row" style="margin-top:12px"><span class="chip">'+r.splits.length+' laps</span>'+(r.manual?'<span class="chip warn">manual entry</span>':'')+'<span class="chip '+(r.distance>9?"warn":"good")+'">'+(r.distance>9?"long":"steady")+'</span><span class="muted">estimated breakdown</span></div></a>');
     }).join(""):card('<div class="empty"><strong>No runs yet</strong>Run a Garmin sync to load activities.</div>'));
 }
 
@@ -527,27 +531,46 @@ function report(date){
     var idx=vals.findIndex(function(v,i){return i>1&&v>base+20});
     if(idx>=0){br=(idx+1).toFixed(2)}
   }
-  return '<div class="row"><a class="chip" href="#runs">&larr; Runs</a><span class="chip">ESTIMATED</span></div>'
+  return '<div class="row"><a class="chip" href="#runs">&larr; Runs</a><span class="chip">'+(r.manual?'MANUAL ENTRY':'ESTIMATED')+'</span></div>'
     +card('<div class="eyebrow">'+band(r.distance)+' RUN</div><h1 class="title">'+esc(r.date)+'</h1><div class="grid g3"><div><div class="stat">'+r.distance+'</div><div class="label">miles</div></div><div><div class="stat">'+esc(r.pace)+'</div><div class="label">pace / mi</div></div><div><div class="stat">'+(r.avgHR==null?"--":r.avgHR)+'</div><div class="label">avg HR</div></div></div><p class="muted">Score computed from pace, heart rate and consistency. Cadence, weather and fueling are not recorded.</p>')
-    +card('<div class="row"><div><div class="eyebrow">Lap profile</div><div class="h2">'+(br==="NONE"?"Held pace all the way":"Breaks at mile "+br)+'</div></div><span class="chip '+(br==="NONE"?"good":"risk")+'">'+(br==="NONE"?"NO BREAKDOWN":"ESTIMATED")+'</span></div>'+(r.splits.length?'<div class="chartbox"><canvas id="split"></canvas></div>':'<div class="empty"><strong>Splits not recorded</strong>This activity source did not provide lap splits.</div>')+'<p class="muted">Baseline band is computed from the first third of supplied lap splits. Slow laps remain visible and are not corrected.</p>')
+    +card('<div class="row"><div><div class="eyebrow">Lap profile</div><div class="h2">'+(r.manual?"No lap data":(br==="NONE"?"Held pace all the way":"Breaks at mile "+br))+'</div></div><span class="chip '+(r.manual?"warn":(br==="NONE"?"good":"risk"))+'">'+(r.manual?"MANUAL ENTRY":(br==="NONE"?"NO BREAKDOWN":"ESTIMATED"))+'</span></div>'+(r.splits.length?'<div class="chartbox"><canvas id="split"></canvas></div>':'<div class="empty"><strong>Splits not recorded</strong>This activity source did not provide lap splits.</div>')+'<p class="muted">Baseline band is computed from the first third of supplied lap splits. Slow laps remain visible and are not corrected.</p>')
     +card('<div class="eyebrow">Context</div><div class="grid g2"><span class="chip">Climb / mi: '+(r.ascent!=null&&r.distance?fmt(r.ascent/r.distance):"not recorded")+' ft</span><span class="chip">HR: '+(r.avgHR==null?"not recorded":r.avgHR+"/198")+'</span><span class="chip">Max HR: '+(r.maxHR==null?"not recorded":r.maxHR)+'</span><span class="chip">Cadence: '+(r.cadence==null?"not recorded":r.cadence)+'</span><span class="chip">Calories: '+(r.calories==null?"not recorded":r.calories)+'</span><span class="chip">Laps: '+(r.laps==null?"not recorded":r.laps)+'</span></div>')
-    +card('<div class="eyebrow">Written coaching report</div><div class="report"><h3>Run summary</h3><p>This '+r.distance+'-mile '+band(r.distance).toLowerCase()+' run averaged '+esc(r.pace)+'/mi at '+(r.avgHR==null?"an unrecorded heart rate":r.avgHR+" bpm")+'. The lap profile is preserved exactly from the audited Garmin activity.</p></div>');
+    +card('<div class="eyebrow">Written coaching report</div><div class="report"><h3>Run summary</h3><p>This '+r.distance+'-mile '+band(r.distance).toLowerCase()+' run averaged '+esc(r.pace)+'/mi at '+(r.avgHR==null?"an unrecorded heart rate":r.avgHR+" bpm")+'. '+(r.manual?"This is a manual entry; lap splits and device metrics are not recorded.":"The lap profile is preserved exactly from the audited Garmin activity.")+'</p></div>');
 }
 
 function log(){
-  return card('<div class="eyebrow">Quick log</div><h1 class="title">Capture the effort.</h1><form id="runform" class="form" onsubmit="saveRun(event)"><label>Date<input name="date" type="date" value="'+new Date().toISOString().slice(0,10)+'" required></label><label>Distance, miles<input name="distance" type="number" step=".01" required></label><label>Time<input name="time" placeholder="45:00" required></label><label>Average HR<input name="hr" type="number" required></label><label>RPE <input name="rpe" type="range" min="1" max="10" value="5"></label><button class="btn">Save and view report</button></form><p class="muted">Quick logs stay in this browser until the next Garmin sync replaces them.</p>');
+  return card('<div class="eyebrow">Quick log</div><h1 class="title">Capture the effort.</h1><form id="runform" class="form" onsubmit="saveRun(event)"><label>Date<input name="date" type="date" value="'+new Date().toISOString().slice(0,10)+'" required></label><label>Distance, miles<input name="distance" type="number" step=".01" required></label><label>Time<input name="time" placeholder="45:00" required></label><label>Average HR<input name="hr" type="number" required></label><label>RPE <input name="rpe" type="range" min="1" max="10" value="5"></label><button class="btn">Save and view report</button></form><p class="muted">Saved to this dashboard as a manual entry. A Garmin sync for the same day replaces it.</p>');
 }
 function saveRun(e){
   e.preventDefault();
-  var f=new FormData(e.target);
+  var form=e.target;
+  var f=new FormData(form);
   var date=f.get("date"),t=f.get("time")||"0:00",dist=+f.get("distance")||0;
-  var r=normalizeRun({date:date,distance:dist,time:t,avgHR:+f.get("hr"),pace:pstr(sec(t)/(dist||1)),splits:[],source:"Quick log - pending Garmin sync"});
-  var i=RUNS.findIndex(function(x){return x.date===date});
-  if(i>=0){RUNS[i]=r}else{RUNS.push(r)}
-  RUNS.sort(function(a,b){return a.date.localeCompare(b.date)});
-  localStorage.setItem("aurora_last_seen_run",date);
-  toast("Run saved - pending Garmin sync");
-  go("#runs/"+date);
+  var btn=form.querySelector("button");
+  if(btn){btn.disabled=true;btn.textContent="Saving..."}
+  var tk=new URLSearchParams(location.search).get("tk")||"";
+  var h={"Content-Type":"application/json"};if(tk)h["X-Dash-Token"]=tk;
+  function done(msg){
+    if(btn){btn.disabled=false;btn.textContent="Save and view report"}
+    if(msg){toast(msg)}
+  }
+  // Persist on the server. The old version wrote only to localStorage, so the
+  // run vanished on the next reload and a Garmin sync never saw it.
+  fetch("/api/runs",{method:"POST",headers:h,credentials:"same-origin",body:JSON.stringify({date:date,distance:dist,time:t,hr:f.get("hr"),rpe:f.get("rpe")})})
+    .then(function(r){
+      return r.json().catch(function(){return{}}).then(function(res){
+        if(!r.ok||!res.ok){throw new Error((res&&(res.detail||res.error))||("HTTP "+r.status))}
+        return res;
+      });
+    })
+    .then(function(){
+      done("Run saved");
+      if(window.auroraReloadAll){
+        return window.auroraReloadAll().then(function(){go("#runs/"+date)});
+      }
+      go("#runs/"+date);
+    })
+    .catch(function(err){done("Run not saved: "+(err&&err.message?err.message:err))});
 }
 
 function fuel(date){

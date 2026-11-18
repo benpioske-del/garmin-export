@@ -107,6 +107,26 @@ def test_quick_log_forms_bind_inline(template):
     assert 'onsubmit="saveLift(event)"' in template
 
 
+def test_quick_log_persists_on_the_server(template):
+    """The old form wrote only to localStorage and vanished on reload."""
+    assert 'fetch("/api/runs"' in template
+    assert "aurora_last_seen_run" not in template
+    assert "Quick logs stay in this browser" not in template
+
+
+def test_manual_entries_are_labelled_not_presented_as_device_runs(template):
+    assert "manual entry" in template
+    assert 'manual: a.source_system === "manual"' in G.AURORA_LIVE_SCRIPT
+    # normalizeRun() rebuilds each run object, so it must carry the flag or the
+    # label is lost on the next render.
+    assert "manual:r.manual===true" in template
+
+
+def test_sync_reports_a_missing_token_instead_of_a_bare_status(template):
+    """A stale ?tk= used to surface as 'Sync failed: HTTP 403'."""
+    assert "dashboard token missing" in template
+
+
 def test_importer_sends_the_shape_the_server_parses():
     """JSON backups must post ``json``; CSV exports must post ``csv``."""
     assert "{ json: text }" in G.AURORA_LIVE_SCRIPT

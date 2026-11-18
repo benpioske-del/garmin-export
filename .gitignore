@@ -18,7 +18,15 @@ garmin_hr.csv
 garmin_last_sync.json
 .pytest_cache/
 .coach_dash_token
+.coach_dash_auth
+.coach_dash_sessionkey
 dashboard/
+
+# health and athlete-entered data: local only, bundled by backup_data.py
+nutrition_log.csv
+nutrition_log.records.json
+nutrition_log.hook-token
+manual_runs.json
 
 # local canonical database: personal training history, never published.
 # migrations/ is tracked; the database built from it is not.

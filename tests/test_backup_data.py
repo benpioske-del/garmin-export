@@ -25,9 +25,12 @@ def make_data(tmp_path, secrets=True):
                                                 encoding="utf-8")
     (data / "nutrition_log.csv").write_text("date,calories\n", encoding="utf-8")
     (data / "nutrition_log.records.json").write_text("[]", encoding="utf-8")
+    (data / "manual_runs.json").write_text('{"version": 1, "runs": []}',
+                                           encoding="utf-8")
     if secrets:
         (data / ".coach_dash_token").write_text("secret", encoding="utf-8")
         (data / ".coach_dash_auth").write_text("secret", encoding="utf-8")
+        (data / ".coach_dash_sessionkey").write_text("secret", encoding="utf-8")
         (data / "nutrition_log.hook-token").write_text("secret", encoding="utf-8")
         (data / "garmin_tokens.json").write_text("{}", encoding="utf-8")
         (data / "garmin_sync.log").write_text("log", encoding="utf-8")
@@ -84,6 +87,15 @@ def test_backup_includes_nutrition_sidecar(tmp_path):
     assert "nutrition_log.records.json" in names_in(result["path"])
 
 
+def test_backup_includes_typed_manual_runs(tmp_path):
+    """A typed quick-log run is not rebuilt from Garmin, so it must be bundled."""
+    data = make_data(tmp_path)
+    repo = make_repo(tmp_path)
+    result = B.create_backup(dest=str(tmp_path / "out"), data_dir=str(data),
+                             repo_dir=str(repo))
+    assert "manual_runs.json" in names_in(result["path"])
+
+
 def test_backup_includes_sync_marker_and_exports(tmp_path):
     data = make_data(tmp_path)
     repo = make_repo(tmp_path)
@@ -120,10 +132,13 @@ def test_backup_excludes_credentials_by_default(tmp_path):
                              repo_dir=str(repo))
     names = names_in(result["path"])
     for secret in (".coach_dash_token", ".coach_dash_auth",
+                   ".coach_dash_sessionkey",
                    "nutrition_log.hook-token", "garmin_tokens.json",
                    "garmin_sync.log"):
         assert secret not in names, secret
     assert not any(n.startswith(".garmin_tokens/") for n in names)
+    # Typed runs are athlete data, not a credential: they must be present.
+    assert "manual_runs.json" in names
 
 
 def test_excluded_credentials_are_reported(tmp_path):
@@ -132,6 +147,7 @@ def test_excluded_credentials_are_reported(tmp_path):
     result = B.create_backup(dest=str(tmp_path / "out"), data_dir=str(data),
                              repo_dir=str(repo))
     assert ".coach_dash_token" in result["excluded"]
+    assert ".coach_dash_sessionkey" in result["excluded"]
     assert ".garmin_tokens/" in result["excluded"]
 
 

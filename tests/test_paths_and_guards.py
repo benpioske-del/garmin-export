@@ -70,6 +70,12 @@ def test_publisher_blocks_credentials_and_raw_fit():
     # was moved into the repository.
     assert "garmin_sleep.csv" in body
     assert "garmin_hr.csv" in body
+    # Athlete data the dashboard and server write into the local data dir. If
+    # GARMIN_DATA_DIR is ever pointed at the repo, none of it may be committed.
+    assert "nutrition_log.csv" in body
+    assert "manual_runs.json" in body
+    assert ".coach_dash_auth" in body
+    assert ".coach_dash_sessionkey" in body
 
 
 def test_published_csv_carries_no_gps_or_health_columns():

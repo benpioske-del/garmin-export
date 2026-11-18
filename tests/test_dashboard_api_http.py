@@ -124,6 +124,64 @@ def test_api_rejects_a_foreign_host_header(server):
         assert e.code == 403
 
 
+# -------------------------------------------------- local session cookie
+#
+# The page can be opened as a PWA (start_url "/") or from a bookmark, which
+# drops the ?tk= query. Serving the page therefore hands the browser an
+# HttpOnly, SameSite=Strict cookie so its own fetches -- including the Sync
+# Garmin button -- still authenticate. SameSite=Strict keeps a cross-site POST
+# from carrying it, so the CSRF protection of the token gate is unchanged.
+
+def test_the_dashboard_sets_a_same_site_session_cookie(server):
+    req = urllib.request.Request(server + "/")
+    with urllib.request.urlopen(req, timeout=10) as r:
+        cookies = r.headers.get_all("Set-Cookie") or []
+    assert any(c.startswith(G.LOCAL_COOKIE + "=") for c in cookies)
+    joined = "; ".join(cookies)
+    assert "HttpOnly" in joined
+    assert "SameSite=Strict" in joined
+
+
+def test_the_local_cookie_alone_authenticates_data_routes(server):
+    req = urllib.request.Request(server + "/")
+    with urllib.request.urlopen(req, timeout=10) as r:
+        cookie = (r.headers.get_all("Set-Cookie") or [""])[0].split(";")[0]
+    assert cookie.startswith(G.LOCAL_COOKIE + "=")
+    req = urllib.request.Request(server + "/api/activities")
+    req.add_header("Cookie", cookie)
+    with urllib.request.urlopen(req, timeout=10) as r:
+        assert r.status == 200
+
+
+def test_a_wrong_local_cookie_is_still_refused(server):
+    req = urllib.request.Request(server + "/api/activities")
+    req.add_header("Cookie", "%s=not-the-token" % G.LOCAL_COOKIE)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as r:
+            pytest.fail("a wrong local cookie was served: %s" % r.status)
+    except urllib.error.HTTPError as e:
+        assert e.code == 403
+
+
+def test_classic_gets_a_non_secret_tk_placeholder(server):
+    """The classic page refuses /sync without ?tk=, even on a cookie session.
+
+    The injected placeholder is the literal string ``session``, not the real
+    token, so the cookie remains the only credential.
+    """
+    status, _, body = _get(server, "/classic", token=None)
+    text = body.decode("utf-8")
+    assert status == 200
+    assert G.CLASSIC_SESSION_MARK in text
+    assert "searchParams.set('tk','session')" in text
+    assert TOKEN not in text
+
+
+def test_classic_keeps_a_real_token_url_unchanged(server):
+    _, _, body = _get(server, "/classic?tk=" + TOKEN, token=None)
+    assert G.CLASSIC_SESSION_MARK not in body.decode("utf-8")
+
+
 # ------------------------------------------------------------- error handling
 
 def test_unknown_api_endpoint_is_a_json_404(server):
@@ -729,6 +787,92 @@ def test_aurora_bootstrap_wires_the_nutrition_route(server, aurora_html):
     assert "loadNutrition" in text
     # The committed FUEL view reads `kcal`; the API schema is `calories`.
     assert "kcal:" in text
+
+
+# ------------------------------------------------------------- manual runs
+#
+# The quick-log form used to write only to localStorage, so a typed run was
+# gone on the next reload. It now POSTs to /api/runs, which stores a local
+# sidecar row and merges it into /api/activities for display.
+
+@pytest.fixture
+def manual_file(monkeypatch, tmp_path):
+    import manual_runs
+    path = tmp_path / "manual_runs.json"
+    monkeypatch.setattr(manual_runs, "STORE_FILE", str(path))
+    return path
+
+
+def test_manual_run_requires_the_dash_token(server, manual_file):
+    status, _, _ = _post_json(server, "/api/runs", {
+        "date": "2026-11-16", "distance": 5, "time": "45:00"}, token=None)
+    assert status == 403
+    assert not manual_file.exists()
+
+
+def test_manual_run_persists_and_appears_in_activities(server, manual_file):
+    status, _, result = _post_json(server, "/api/runs", {
+        "date": "2026-11-16", "distance": 5, "time": "45:00", "hr": 150})
+    assert status == 200
+    assert result["ok"] is True
+    assert result["activity"]["activity_id"] == "manual:2026-11-16"
+
+    status, _, payload = _json(server, "/api/activities")
+    assert status == 200
+    assert payload["count"] == 1
+    assert payload["manual_count"] == 1
+    row = payload["activities"][0]
+    assert row["source_system"] == "manual"
+    assert row["distance_mi"] == 5.0
+    assert row["moving_time_s"] == 2700
+    assert row["avg_hr"] == 150
+    # No FIT file means no laps. An empty list would read as zero laps.
+    assert row["splits"] is None
+
+
+def test_manual_run_same_date_replaces_the_entry(server, manual_file):
+    _post_json(server, "/api/runs", {
+        "date": "2026-11-16", "distance": 5, "time": "45:00"})
+    _post_json(server, "/api/runs", {
+        "date": "2026-11-16", "distance": 7, "time": "1:05:00"})
+    _, _, payload = _json(server, "/api/activities")
+    assert payload["count"] == 1
+    assert payload["activities"][0]["distance_mi"] == 7.0
+
+
+def test_manual_run_rejects_a_malformed_payload(server, manual_file):
+    status, _, payload = _post_json(server, "/api/runs", {
+        "date": "nope", "distance": 5, "time": "45:00"})
+    assert status == 400
+    assert payload["error"] == "invalid run payload"
+
+
+def test_manual_run_rejects_non_json(server, manual_file):
+    status, _, payload = _post_json(server, "/api/runs", None,
+                                    raw=b"not json")
+    assert status == 400
+    assert payload["error"] == "body must be JSON"
+
+
+def test_a_synced_run_hides_the_manual_copy(server, manual_file, migrated_db):
+    migrated_db.execute(
+        "INSERT INTO activities (activity_id, source_system,"
+        " source_activity_id, sport, start_utc, start_local, timezone_source,"
+        " distance_mi, moving_time_s, avg_hr, value_state, confidence,"
+        " confirmation, review_state, first_seen_utc, last_updated_utc)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        ("garmin:1", "garmin", "1", "Running", "2026-11-16T12:00:00Z",
+         "2026-11-16", "filename_date", 5.0, 2700, 150, "device_derived",
+         "unverified", "confirmation_required", "open",
+         "2026-11-16T12:00:00Z", "2026-11-16T12:00:00Z"))
+    migrated_db.commit()
+
+    _post_json(server, "/api/runs", {
+        "date": "2026-11-16", "distance": 5, "time": "45:00"})
+    _, _, payload = _json(server, "/api/activities")
+    assert payload["count"] == 1
+    assert payload["manual_count"] == 0
+    assert payload["activities"][0]["source_system"] == "garmin"
 
 # ------------------------------------------------ Android share target (PWA)
 

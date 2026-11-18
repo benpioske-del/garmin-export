@@ -115,11 +115,13 @@ detectable, and a report can state which exact files it was derived from.
 
 From the reproducible audit (`python fit_audit.py`, see `docs/FIT_AUDIT.md`):
 
-- 56 files, all parse, all carry GPS, all carry a usable timestamp
-- 1 session per file, 499 laps, 51,653 records, 51,637 position points
+- 74 files, all parse, all carry GPS, all carry a usable timestamp
+- 1 session per file, 668 laps, 69,293 records, 69,272 position points
 - 0 files with missing session fields, 0 parse failures
 - **1 open date-gap review**: no activity 2026-06-26 through 2026-07-05
-- **56 open `timezone_uncertain` reviews**, one per activity, all expected
+- **2 open `timezone_uncertain` reviews**: the two newest runs, 2026-11-14 and
+  2026-11-17, whose local date is derived from the filename and still needs
+  confirmation. Every earlier local date was confirmed by the athlete
 - 1 activity where the local date and the UTC date differ
 
 The June–July gap is reported, not filled. Nothing in this pipeline creates a

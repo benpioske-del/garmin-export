@@ -76,6 +76,12 @@ garmin_sleep.csv
 garmin_hr.csv
 garmin_last_sync.json
 .coach_dash_token
+.coach_dash_auth
+.coach_dash_sessionkey
+nutrition_log.csv
+nutrition_log.records.json
+nutrition_log.hook-token
+manual_runs.json
 
 # local-only artefacts
 garmin_sync.log
@@ -125,6 +131,7 @@ PUBLISHED_MODULES = frozenset([
     "garmin_sync.py",
     "health.py",
     "loadcalc.py",
+    "manual_runs.py",
     "nutrition.py",
     "paths.py",
     "recommend.py",

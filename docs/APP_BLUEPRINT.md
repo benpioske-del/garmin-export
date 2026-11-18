@@ -15,7 +15,7 @@ Current reference:
 - File: `flow_outputs/aurora_dashboard.html`
 - File size: 33,047 bytes
 
-The current analysis covers 72 runs and found the clearest measured weakness in long-run durability:
+The current analysis covers 74 runs and found the clearest measured weakness in long-run durability:
 
 - 7 of 24 long runs broke down.
 - Median estimated breakdown: 7.79 miles, or 52.0% of the run.

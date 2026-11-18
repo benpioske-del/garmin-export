@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 647 passed, 1 skipped (Windows symlink case) |
+| Tests | 692 passed, 1 skipped (Windows symlink case) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -72,11 +72,12 @@ Docs: [`DATA_QUALITY.md`](DATA_QUALITY.md),
 | Component | Path | Notes |
 | --- | --- | --- |
 | FIT reader | `garmin_fit_reader.py` | `__version__ = 1.1.0`; asserts no GPS field escapes; attaches internal elevation diagnostics (`_ascent_smoothed_ft`, `_elev_range_ft`) that are excluded from the published CSV |
-| CSV export | `garmin_export.csv` | 72 activities, 31 columns |
+| CSV export | `garmin_export.csv` | 74 activities, 31 columns |
 | Publisher | `export_publish.py` | guard, remote sync, history-safety enforcement |
 | Sync | `garmin_sync.py` | OAuth, local only |
-| Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching`; `/` serves the committed Aurora app, `/classic` the local page, `/aurora` remains an alias; `GET`/`POST /api/nutrition` read and ingest the local nutrition log; `POST /api/nutrition/hook` is the token-only Health Connect bridge endpoint and `GET /api/nutrition/hook-info` its authenticated setup envelope; `POST /share-target` is the Android share-sheet fallback; `POST /sync` runs the Garmin download and import |
+| Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching`; `/` serves the committed Aurora app, `/classic` the local page, `/aurora` remains an alias; `GET`/`POST /api/nutrition` read and ingest the local nutrition log; `POST /api/nutrition/hook` is the token-only Health Connect bridge endpoint and `GET /api/nutrition/hook-info` its authenticated setup envelope; `POST /api/runs` stores a typed quick-log run in the local sidecar and merges it into `/api/activities` as `source_system: "manual"`; `POST /share-target` is the Android share-sheet fallback; `POST /sync` runs the Garmin download and import; serving `/` or `/classic` sets an `HttpOnly`, `SameSite=Strict` `dash_local` cookie so a PWA launch or bookmark authenticates without `?tk=` |
 | Nutrition | `nutrition.py` | CalTrak CSV/JSON parse/aggregate, Health Connect ingestion, header aliases, local daily log at `paths.data_dir()/nutrition_log.csv` |
+| Manual runs | `manual_runs.py` | quick-log sidecar at `paths.data_dir()/manual_runs.json`; validation, one entry per date, atomic write, merge into `/api/activities`, same-day dedupe against device activities |
 | Audit | `fit_audit.py` | rewritten: hashes, parser versions, counts only |
 | Brief bridge | `brief_bridge.py` | `post` / `ingest` / `paste` / `serve` / `capture` |
 | Profile | `profile.json` | `hr_max` set to 198; `age`, `sex`, `resting_hr`, `weight_lb`, `height_in` still `null` |
@@ -92,7 +93,7 @@ profile as empty is reading an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 647 passed, 1 skipped. |
+| `python -m pytest` | Works. 692 passed, 1 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -111,13 +112,17 @@ regression in it.
 
 ## Data state
 
-- 72 FIT files on disk, all parse, all with GPS and a usable timestamp
-- 72 rows in `garmin_export.csv`
-- 72 activities imported into `trainloop.db`, newest `2026-11-11`
-- 650 laps, 67,446 records, 67,425 position points
-- Re-import of identical files: 72 `unchanged`, 0 audit rows written
+- 74 FIT files on disk, all parse, all with GPS and a usable timestamp
+- 74 rows in `garmin_export.csv`
+- 74 activities imported into `trainloop.db`, newest `2026-11-17`
+- 668 laps, 69,293 records, 69,272 position points
+- Re-import of identical files: 74 `unchanged`, 0 audit rows written
 - **1 open date gap**: 2026-06-26 to 2026-07-05
-- **0 open `timezone_uncertain` reviews**: all 72 local dates were confirmed by the athlete (US Central, UTC-5/-6 with DST applied per run; the 2026-11-08 run was confirmed at UTC-6 on 2026-11-10, and the 2026-11-10 and 2026-11-11 runs on 2026-11-11)
+- **2 open `timezone_uncertain` reviews**: the two newest runs, 2026-11-14 and
+  2026-11-17, whose local date is derived from the filename and still needs
+  confirmation. Every earlier local date was confirmed by the athlete (US
+  Central, UTC-5/-6 with DST applied per run; the 2026-11-08 run was confirmed
+  at UTC-6 on 2026-11-10, and the 2026-11-10 and 2026-11-11 runs on 2026-11-11)
 - **1 open `activity_gap` review** for the 2026-06-26 to 2026-07-05 gap
 - 1 activity where the local date and UTC date differ
     (`garmin:23745136848`, local 2026-07-26T20:10:15, UTC 2026-07-27T01:10:15Z)

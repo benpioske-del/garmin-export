@@ -40,6 +40,9 @@ DATA_FILES = (
     "garmin_last_sync.json",
     "nutrition_log.csv",
     "nutrition_log.records.json",
+    # Quick-log runs typed into the dashboard. Not rebuilt from Garmin, so a
+    # backup that omitted it would lose them.
+    "manual_runs.json",
 )
 
 # Repository files that are not in git. ``trainloop.db`` is rebuilt by
@@ -52,6 +55,7 @@ REPO_FILES = ("trainloop.db", "dashboard/index.html")
 SECRET_FILES = (
     ".coach_dash_token",
     ".coach_dash_auth",
+    ".coach_dash_sessionkey",
     "nutrition_log.hook-token",
     "garmin_tokens.json",
 )

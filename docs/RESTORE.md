@@ -19,16 +19,18 @@ lives only in the local data directory and the backup zip:
 | `trainloop.db` | no | yes, `trainloop.cmd bootstrap` |
 | `nutrition_log.csv` | no | **no** |
 | `nutrition_log.records.json` | no | **no** |
+| `manual_runs.json` (typed quick-log runs) | no | **no** |
 | `dashboard/index.html` (`/classic`) | no | **no** |
 | `garmin_sleep.csv`, `garmin_hr.csv` | no | partly, 14-day window |
 | `.coach_dash_token`, `.coach_dash_auth` | no | yes, regenerated |
 | `nutrition_log.hook-token` | no | yes, regenerated |
 | `.garmin_tokens/` | no | yes, re-login |
 
-The nutrition files and `dashboard/index.html` are the data that cannot be
-recreated. That is the whole reason the backup exists. Aurora at `/` comes from
-the committed template, so the dashboard is usable even if the classic page is
-gone.
+The nutrition files, the manual-run sidecar and `dashboard/index.html` are the
+data that cannot be recreated. That is the whole reason the backup exists.
+Aurora at `/` comes from the committed template, so the dashboard is usable even
+if the classic page is gone. A typed quick-log run is not rebuilt from Garmin,
+so losing `manual_runs.json` loses those entries.
 
 ## Before you start
 
@@ -96,8 +98,9 @@ Get-ChildItem $env:GARMIN_DATA_DIR
 
 Expected: `garmin_fit\`, `garmin_sleep.csv`, `garmin_hr.csv`,
 `garmin_last_sync.json`, `trainloop.db`, `dashboard\`, `MANIFEST.txt`.
-`nutrition_log.csv` and `nutrition_log.records.json` appear in the zip once
-nutrition has been ingested; before that they are legitimately absent.
+`nutrition_log.csv`, `nutrition_log.records.json` and `manual_runs.json` appear
+in the zip once nutrition has been ingested or a run has been typed; before that
+they are legitimately absent.
 
 Two files belong in the **repository**, not the data directory:
 
@@ -189,7 +192,7 @@ Run these in order. Each one should be boring.
 ```powershell
 .\trainloop.cmd doctor          # Python, sqlite3, fitparse, FIT dir, gitignore
 .\trainloop.cmd status          # FIT files on disk == activities in database
-py -m pytest                    # expect 647 passed, 1 skipped on a full corpus
+py -m pytest                    # expect 692 passed, 1 skipped on a full corpus
 py backup_data.py --dry-run     # lists what a new backup would contain
 ```
 
@@ -201,9 +204,10 @@ your nutrition days, and **Sync Garmin now** completes in 15-90 seconds.
 - **Nutrition history older than the newest backup.** Health Connect keeps a
   limited window and the logging app keeps its own. If the backup is a month old
   and the app has since discarded the raw records, that month is gone.
-- **Anything logged only in a browser.** The "Log a run" and lift-session forms
-  currently write to `localStorage`, which is not part of this backup and does
-  not leave the browser that created it.
+- **Anything logged only in a browser.** Lift sessions typed into the dashboard
+  are still written to `localStorage`, which is not part of this backup and does
+  not leave the browser that created it. Typed runs no longer share that fate:
+  they are stored in `manual_runs.json`, which the backup includes.
 - **Weather enrichment**, which is fetched per run and can be refetched.
 
 ## Keeping the backup running
