@@ -163,8 +163,25 @@ py garmin_server.py --idle-timeout 0
 
 Open `http://127.0.0.1:24567`. The first page sets the dashboard password.
 
-For the phone link, recreate the launcher (`start-dashboard.cmd` in
-`%USERPROFILE%\coach-dashboard`) or run ngrok directly:
+For the phone link, recreate the launcher in `%USERPROFILE%\coach-dashboard`.
+It is four small files, none of them secret:
+
+- `start-dashboard.cmd` starts the watchdog and prints the permanent address.
+- `watch-dashboard.ps1` checks every 30 seconds and starts the server or the
+  tunnel if either is down. A named mutex keeps exactly one copy running.
+- `watch-dashboard.vbs` launches the watchdog with no console window. A
+  shortcut to it sits in the user's Startup folder, so it starts at sign-in.
+- `host-header-policy.yml` rewrites the tunnel's Host header to
+  `127.0.0.1:24567`, which the server's DNS-rebinding defence requires.
+- `stop-dashboard.cmd` stops the watchdog, the tunnel and the server.
+
+The permanent link is `https://foam-tackiness-header.ngrok-free.dev`. It works
+on any network, including cellular, so the phone does not need the laptop's
+WiFi. The password gate still protects every route. On a new phone or browser,
+tap **Visit Site** once if ngrok shows its "You are about to visit" page, then
+install the home-screen app from the tunnel URL, not from a LAN address.
+
+To run the tunnel by hand instead:
 
 ```powershell
 ngrok http 127.0.0.1:24567 --url=https://foam-tackiness-header.ngrok-free.dev `
