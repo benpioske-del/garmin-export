@@ -244,7 +244,7 @@ source. Re-derive it if you can.
 | FIT files with lap records | 74 of 74 | `python brief_consistency.py` |
 | Splits published | yes (`Best 5K Time`, `Lap Splits`) | header of `garmin_export.csv` |
 | Fastest measured 5 km crossing | 24:42 on 2026-06-16, measured | `brief_facts.json` → `best_5k` |
-| Tests | 708 passed, 2 skipped (710 collected) | `python -m pytest` |
+| Tests | 727 passed, 3 skipped (730 collected) | `python -m pytest` |
 | Dashboard API routes | 3, implemented and tested | `python dashboard_contract.py` |
 | Dashboard consumes the API | yes, all three | `python dashboard_contract.py` |
 
@@ -273,6 +273,12 @@ a secure context, so over plain `http://<lan-ip>` the home-screen shortcut is
 live but offline caching is not (it activates under the https tunnel or on
 localhost). Do not ask for CORS or `0.0.0.0` by default; both were decided
 against.
+
+Since 2026-11-18 the permanent host can also be a free Ubuntu VM
+(`deploy/cloud/`), running the same loopback server and the same tunnel. The
+laptop is then only a browser, and the dashboard survives it being off, asleep
+or broken. The free ngrok plan allows one agent per static domain, so the laptop
+watchdog must be stopped before the VM tunnel starts.
 
 **Phone nutrition has a seamless path.** Cronometer's Android app writes food
 entries to Android Health Connect. The free, open-source **HC Webhook** app can

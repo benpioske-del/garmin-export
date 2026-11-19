@@ -9,6 +9,7 @@
 garmin_sync.log
 __pycache__/
 *.pyc
+*.egg-info/
 
 # raw activity files embed GPS position
 garmin_fit/

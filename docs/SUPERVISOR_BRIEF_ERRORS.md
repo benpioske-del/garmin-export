@@ -1637,3 +1637,53 @@ which reads the same export and confirms `Energy (kcal)`, `Net Carbs (g)` and
 - **History before the newest backup is still unrecoverable.** The nutrition log
   lives in the local data directory and is gitignored, so the repository holds a
   header-only schema file, not the athlete's rows.
+
+# Twenty-sixth correction: 2026-11-18, the laptop that was the single point of failure
+
+The twenty-fifth correction left the dashboard hosted by the laptop. The tunnel
+made it reachable from any network, but the server, the SQLite database and the
+Garmin sync all stopped when the laptop slept, shut down or broke. A brief that
+says "use the phone on the same home Wi-Fi" is wrong twice over: the tunnel needs
+no shared network, and the host no longer has to be the laptop.
+
+What is now true:
+
+- `deploy/cloud/` installs the same `garmin_server.py`, `garmin_sync.py` and
+  `trainloop.py` on a free Ubuntu 24.04 VM (Oracle Always Free or Google
+  e2-micro). The server still binds `127.0.0.1:24567`; ngrok is the only way in
+  and the VM opens no inbound port.
+- Athlete data lives in `/srv/coach-dashboard/data` and code in
+  `/opt/coach-dashboard/app`, so a `git reset --hard` upgrade cannot delete the
+  database, FIT files, nutrition log or tokens.
+- `coach-dashboard-sync.timer` runs at 04:30 with `Persistent=true`. It
+  downloads, imports and rebuilds `garmin_export.csv` locally; publishing the
+  public CSV stays optional and separately credentialed.
+- The sync unit has `StandardInput=null`. An expired Garmin token fails fast
+  instead of hanging the timer on a password prompt; re-authentication is a
+  one-time interactive command in `deploy/cloud/README.md`.
+- `migrate-to-cloud.ps1` copies the laptop's data and tokens over SSH, and
+  `migrate-apply.sh` sets ownership and 0600 modes. Copying
+  `.coach_dash_auth` keeps the existing dashboard password.
+- The free ngrok plan allows one agent per static domain, so the laptop watchdog
+  must be stopped before the VM tunnel starts. Running both makes the address
+  flap.
+
+What is not fixed:
+
+- **No VM has been provisioned.** The units, installer and migration script are
+  verified as files and by tests; they have not been started on Ubuntu.
+- **The VM is still a single host.** If it dies, the link is down until it is
+  rebuilt. Garmin history can be re-downloaded, but manual runs, nutrition and
+  notes need a backup. `backup_data.py --include-secrets --dest ...` is the
+  documented off-VM copy.
+- **The dashboard password remains required.** The tunnel URL is public; anyone
+  who finds it gets the login page.
+- **Cronometer is still export-based.** The cloud host changes where the
+  dashboard runs, not how nutrition arrives.
+
+Verification: `tests/test_cloud_deploy.py` adds 20 tests. Full suite:
+**727 passed, 3 skipped (730 collected)**. Clean checkout with no FIT files, no
+`trainloop.db` and no `dashboard/index.html`: **699 passed, 31 skipped**.
+`ruff check .` is clean. These replace the twenty-fifth correction's 708/2 and
+679/31.
+

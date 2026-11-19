@@ -17,17 +17,18 @@ merged and re-wired. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-708 passed, 2 skipped (710 collected)
+727 passed, 3 skipped (730 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `679 passed, 31 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `699 passed, 31 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`; the dashboard-contract and brief checks that read the
 gitignored page skip when it is absent; one symlink case skips on Windows; the
 JavaScript syntax check skips where `node` is not installed (GitHub's runners
-have it, so CI still parses the injected script). CI fails only on a real
-defect. `ruff check .` is clean.
+have it, so CI still parses the injected script); the `bash -n` check on the
+deployment scripts skips where `bash` is not installed (CI runs it). CI fails
+only on a real defect. `ruff check .` is clean.
 
 CI runs the suite on Python 3.12 and 3.13. `garminconnect>=0.3.13` declares
 `Requires-Python >=3.12`, so `requires-python` is now `>=3.12` and the old 3.10
@@ -59,7 +60,8 @@ lint or tests ran.
 | `tests/test_paths_and_guards.py` | 9 |
 | `tests/test_sync_import.py` | 8 |
 | `tests/test_history_safety.py` | 2 |
-| **Total** | **710** (708 pass, 2 skip) |
+| `tests/test_cloud_deploy.py` | 20 |
+| **Total** | **730** (727 pass, 3 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -67,7 +69,8 @@ leak guard, which caught the diagnostics being published as columns before this
 report was written.
 
 The skip is the Windows symlink case in the brief-bridge suite; the code path is
-covered on platforms that permit symlinks.
+covered on platforms that permit symlinks. The other two skips on this laptop are
+the `node` and `bash` syntax checks; both tools are present on CI, where they run.
 
 Up from 90 passed / 1 skipped at the start of the data-layer round. The brief
 bridge grew from 26 to 62 tests since then: clipboard and `.txt` transports,
@@ -608,6 +611,50 @@ empty-directory failure path, the dry run writing nothing, the OneDrive-then-
 Documents destination order, and the git marker reader.
 
 Restore steps are in [RESTORE.md](RESTORE.md).
+
+## Cloud deployment kit
+
+`deploy/cloud/` moves the host off the laptop: the same server, sync and tunnel
+on a free Ubuntu VM. `tests/test_cloud_deploy.py` (20 tests) pins the properties
+that make it safe rather than the prose:
+
+- the server unit still runs `garmin_server.py --idle-timeout 0` with no
+  `--host`/`--lan`, and no file in the kit contains `0.0.0.0` or a CORS header;
+- `GARMIN_DATA_DIR`, `TRAINLOOP_DB` and `GARMINTOKENS` point at
+  `/srv/coach-dashboard/data`, outside the checkout an upgrade resets;
+- the tunnel unit `Requires=coach-dashboard.service`, reads its token from
+  `/etc/coach-dashboard/ngrok.env`, and never embeds it;
+- the timer is nightly, `Persistent=true`, and targets the one-shot sync unit;
+- the sync unit has `StandardInput=null`, so an expired Garmin token fails
+  instead of hanging on a password prompt;
+- `sync.sh` runs download, import and export in order and records a failure
+  without skipping the remaining steps;
+- `refresh_export.py` calls `export_publish.build_csv()` and contains no git or
+  subprocess call;
+- the migration copies only named files, deletes its local archive in `finally`,
+  and never prints a copied file;
+- `export_publish.code_paths()` now stages `deploy/` so the unattended publisher
+  cannot silently leave the kit behind, and the secret scanner covers the new
+  file types.
+
+Run directly, with `GARMIN_REPO` pointed at a temporary directory:
+
+```
+$ python deploy/cloud/refresh_export.py
+export refreshed: 74 runs, latest 2026-11-17
+```
+
+The generated `garmin_export.csv` was 20,846 bytes, the same size as the
+published copy, so the cloud path uses the same builder as the laptop.
+
+The PowerShell migration script parses cleanly with
+`[System.Management.Automation.Language.Parser]::ParseFile`. `bash -n` on the
+three shell scripts skips on this laptop because `bash` is not installed; CI runs
+it.
+
+**Not verified:** no VM was provisioned, so the systemd units have not been
+started on Ubuntu and the end-to-end tunnel handover has not been exercised. The
+kit is verified as files, plus the one script that can run on Windows.
 
 ## Privacy checks
 

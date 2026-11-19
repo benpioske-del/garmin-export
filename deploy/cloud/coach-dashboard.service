@@ -1,0 +1,40 @@
+[Unit]
+Description=Coach Dashboard (Aurora) local server
+Documentation=file:/opt/coach-dashboard/app/deploy/cloud/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=coach
+Group=coach
+WorkingDirectory=/opt/coach-dashboard/app
+
+# All athlete data, tokens and the SQLite database live outside the checkout, so
+# a code upgrade (git reset --hard) can never delete them.
+Environment=GARMIN_DATA_DIR=/srv/coach-dashboard/data
+Environment=TRAINLOOP_DB=/srv/coach-dashboard/data/trainloop.db
+Environment=GARMINTOKENS=/srv/coach-dashboard/data/.garmin_tokens
+Environment=GARMIN_REPO=/opt/coach-dashboard/app
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+# Loopback only. The ngrok unit is the single way in from outside; no inbound
+# port is opened on the VM. --idle-timeout 0 keeps the server up when nobody is
+# looking, which a tunnel needs.
+ExecStart=/opt/coach-dashboard/venv/bin/python garmin_server.py --idle-timeout 0
+
+Restart=always
+RestartSec=5
+
+# The server only needs to read its own code and write the data directory.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/coach-dashboard/data /opt/coach-dashboard/app
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+# Rewrite the Host header to what the dashboard server expects.
+#
+# The server answers only for a host it bound plus its own port (DNS-rebinding
+# defence), so a tunnel must present Host: 127.0.0.1:24567. ngrok 3.39 removed
+# --host-header in favour of traffic policy; add-headers overrides an existing
+# Host header rather than appending a second one.
+on_http_request:
+  - actions:
+      - type: add-headers
+        config:
+          headers:
+            host: "127.0.0.1:24567"

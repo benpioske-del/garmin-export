@@ -198,6 +198,18 @@ def code_paths():
                     continue
                 full = os.path.join(base, name)
                 out.append(os.path.relpath(full, REPO).replace("\\", "/"))
+    # The cloud deployment kit. These files live below deploy/, not at the root,
+    # so the module allowlist above would leave them out of an unattended
+    # commit even after a manual `git add`.
+    deploy_root = os.path.join(REPO, "deploy")
+    if os.path.isdir(deploy_root):
+        for base, _dirs, names in os.walk(deploy_root):
+            for name in sorted(names):
+                if not name.endswith((".sh", ".py", ".md", ".yml",
+                                      ".service", ".timer", ".ps1")):
+                    continue
+                full = os.path.join(base, name)
+                out.append(os.path.relpath(full, REPO).replace("\\", "/"))
     return out
 
 
@@ -486,7 +498,8 @@ def publishable_text_paths():
     """Tracked, text-shaped files the publisher would put in a commit."""
     out = []
     for rel in code_paths() + [CANON, META, ".gitignore", "publish_state.json", FACTS]:
-        if rel.endswith((".py", ".md", ".json", ".csv", ".toml", ".html")):
+        if rel.endswith((".py", ".md", ".json", ".csv", ".toml", ".html",
+                         ".sh", ".yml", ".service", ".timer", ".ps1")):
             out.append(rel)
     for base, _dirs, names in os.walk(os.path.join(REPO, "tasks")):
         for name in sorted(names):

@@ -188,6 +188,36 @@ ngrok http 127.0.0.1:24567 --url=https://foam-tackiness-header.ngrok-free.dev `
       --traffic-policy-file="$env:USERPROFILE\coach-dashboard\host-header-policy.yml"
 ```
 
+### 9. Optional: run it on a free cloud VM
+
+The laptop does not have to be the host. `deploy/cloud/` installs the same
+server, the same nightly Garmin sync and the same tunnel on a free Ubuntu VM
+(Oracle Always Free or Google e2-micro). The laptop then becomes a browser, and
+the dashboard keeps working when it is off, asleep or broken.
+
+The short version:
+
+```bash
+# on the VM, after creating it and adding your SSH key
+git clone https://github.com/benpioske-del/garmin-export.git
+sudo bash garmin-export/deploy/cloud/install.sh
+```
+
+```powershell
+# on the laptop
+powershell -ExecutionPolicy Bypass -File deploy\cloud\migrate-to-cloud.ps1 `
+    -Target coach@<vm-ip> -Key $env:USERPROFILE\.ssh\<key>
+```
+
+Then paste the ngrok authtoken into `/etc/coach-dashboard/ngrok.env` on the VM
+and enable `coach-dashboard-tunnel.service`. Full instructions, including the
+one-agent-per-domain rule, the Garmin MFA re-auth, upgrades and backups, are in
+`deploy/cloud/README.md`.
+
+Do not run the laptop watchdog and the VM tunnel at the same time: the free
+ngrok plan allows one agent per static domain, so the address flaps. Once the
+VM is verified, stop the laptop watchdog and remove the Startup shortcut.
+
 ## Re-create credentials
 
 Nothing secret is in the backup. Each one regenerates on demand:
@@ -209,7 +239,7 @@ Run these in order. Each one should be boring.
 ```powershell
 .\trainloop.cmd doctor          # Python, sqlite3, fitparse, FIT dir, gitignore
 .\trainloop.cmd status          # FIT files on disk == activities in database
-py -m pytest                    # expect 708 passed, 2 skipped on a full corpus
+py -m pytest                    # expect 727 passed, 3 skipped on a full corpus
 py backup_data.py --dry-run     # lists what a new backup would contain
 ```
 

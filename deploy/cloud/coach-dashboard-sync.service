@@ -1,0 +1,34 @@
+[Unit]
+Description=Coach Dashboard Garmin sync and export refresh
+Documentation=file:/opt/coach-dashboard/app/deploy/cloud/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=coach
+Group=coach
+WorkingDirectory=/opt/coach-dashboard/app
+
+Environment=GARMIN_DATA_DIR=/srv/coach-dashboard/data
+Environment=TRAINLOOP_DB=/srv/coach-dashboard/data/trainloop.db
+Environment=GARMINTOKENS=/srv/coach-dashboard/data/.garmin_tokens
+Environment=GARMIN_REPO=/opt/coach-dashboard/app
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+
+# A fresh Garmin login needs a terminal for the password and MFA code. With no
+# stdin it fails fast instead of hanging the timer forever; re-authenticate by
+# hand, once, as described in README.md.
+StandardInput=null
+ExecStart=/bin/bash /opt/coach-dashboard/app/deploy/cloud/sync.sh
+
+TimeoutStartSec=45min
+Nice=10
+IOSchedulingClass=idle
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/coach-dashboard/data /opt/coach-dashboard/app

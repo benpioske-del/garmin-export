@@ -37,7 +37,7 @@ data-layer-and-provenance | 4051291 | migrations 001-006
 fit-audit-and-guard | evidence from SUPERVISOR_BRIEF.md | 0 parse failures, 74/74 GPS, guard verified
 formalize-continuity-review-without-synthetic-activities | evidence from docs/VERIFICATION_REPORT.md | 1 open activity_gap; no synthetic activities may be created; accepted corpus is 74 activities
 make-coaching-rationales-deterministic-and-auditable | evidence from docs/IMPLEMENTATION_INVENTORY.md | tests/recommend_snapshots.py pins every reachable coaching branch to golden JSON with fixed as_of and supplied hr_max
-harden-bridge-and-release-quality-gates | evidence from docs/VERIFICATION_REPORT.md | 708 passed, 2 skipped; facts gate, rejected-brief staging, content-derived idempotency, and publish protections are tested
+harden-bridge-and-release-quality-gates | evidence from docs/VERIFICATION_REPORT.md | 727 passed, 3 skipped; facts gate, rejected-brief staging, content-derived idempotency, and publish protections are tested
 connect-dashboard-to-data-layer | evidence from docs/IMPLEMENTATION_INVENTORY.md and docs/VERIFICATION_REPORT.md | GET /api/activities, GET /api/load, and GET /api/coaching are served on the same origin and the dashboard fetches them
 caltrak-nutrition-ingestion | evidence from docs/VERIFICATION_REPORT.md and docs/IMPLEMENTATION_INVENTORY.md | nutrition.py parses and aggregates Cronometer and CalTrak CSV; GET/POST /api/nutrition serve and upsert daily totals; the FUEL tab consumes live nutrition data
 
@@ -59,7 +59,7 @@ establish-authenticated-athlete-ownership | BLOCKED / PARKED AND DEMOTED | Authe
 - FIT file count: 74. Source: docs/VERIFICATION_REPORT.md, "files inspected           : 74".
 - Activity count: 74. Source: docs/VERIFICATION_REPORT.md, `{"activities": 74, "open_reviews": 3}`.
 - Open review count: 3. Source: docs/VERIFICATION_REPORT.md, `{"activities": 74, "open_reviews": 3}`.
-- Test result: 708 passed, 2 skipped. Source: docs/VERIFICATION_REPORT.md, "708 passed, 2 skipped (710 collected)".
+- Test result: 727 passed, 3 skipped. Source: docs/VERIFICATION_REPORT.md, "727 passed, 3 skipped (730 collected)".
 - Parse failures: 0. Source: docs/VERIFICATION_REPORT.md, "parse failures            : 0".
 - Files with GPS: 74. Source: docs/VERIFICATION_REPORT.md, "files with GPS            : 74".
 - Open timezone_uncertain reviews: 2. Source: docs/VERIFICATION_REPORT.md, "2 open `timezone_uncertain` reviews".
@@ -217,6 +217,14 @@ Verification steps:
 11. Confirm the app shows a visible endpoint error while the server is unavailable.
 12. Add the app to the phone home screen and verify that the offline shell opens.
 
+> **Update 2026-11-18.** Steps 1 and 6 are superseded for daily use. The
+> permanent host is reached through the ngrok tunnel
+> `https://foam-tackiness-header.ngrok-free.dev`, which works on cellular and
+> needs no shared Wi-Fi. `deploy/cloud/` can run the same server, sync and tunnel
+> on a free Ubuntu VM, so the laptop no longer has to be on. The loopback default
+> and the `--lan` opt-in are unchanged and still tested; they are simply no
+> longer the phone path.
+
 The generated app embeds its manifest and service worker as blob URLs. It queues uploads until the laptop answers. The queue must retry failed uploads and must not silently discard them.
 
 ---
@@ -247,9 +255,9 @@ Rank 11: establish-authenticated-athlete-ownership | Keep parked and last. This 
 
 - `lifting_log.csv` exists with headers only. Record a lifting session in the Aurora LIFT tab or populate the file using its documented schema.
 - `nutrition_log.csv` exists with headers only. Export Daily Nutrition from cronometer.com (or import a CalTrak export) into the Aurora FUEL workflow to create daily nutrition rows.
-- Open the Aurora app through `/aurora` after `adopt-flow-generated-dashboard` is implemented.
-- On the phone, use the laptop's home-Wi-Fi IP and add the app to the home screen.
-- Use the app on home Wi-Fi to test queued lift and nutrition uploads.
+- Open the Aurora app at `/` (or the tunnel URL) and confirm the live data loads.
+- On the phone, open `https://foam-tackiness-header.ngrok-free.dev`, tap **Visit Site** once if ngrok shows its notice, sign in, and add the app to the home screen from that URL.
+- Use the app on any network, including cellular, to test queued lift and nutrition uploads.
 - Current analyses cannot calculate real e1RM progression, RPE trends, bodyweight trends, or nutrition trends while both logs have no rows.
 
 ---

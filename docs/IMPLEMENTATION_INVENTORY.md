@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 708 passed, 2 skipped (Windows symlink case; JS syntax check without node) |
+| Tests | 727 passed, 3 skipped (Windows symlink; JS syntax without `node`; shell syntax without `bash`) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -93,7 +93,7 @@ profile as empty is reading an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 708 passed, 2 skipped. |
+| `python -m pytest` | Works. 727 passed, 3 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -424,6 +424,41 @@ auto-detects JSON versus CSV.
 hand-entered athlete data, so the panel markup is not in version control. It is
 appended as a self-contained IIFE that reads its own token from the URL and
 exposes `window.refreshApiPanel()`.
+
+## Cloud deployment kit
+
+`deploy/cloud/` moves the host off the laptop. The same `garmin_server.py`,
+`garmin_sync.py` and `trainloop.py` run on a free Ubuntu VM; the laptop becomes
+a browser. Nothing is rewritten for Linux and no inbound port is opened: the
+server still binds `127.0.0.1:24567` and the existing ngrok static domain is the
+only way in.
+
+| File | Purpose |
+| --- | --- |
+| `install.sh` | Idempotent installer: user, checkout, venv, swap, ngrok, units |
+| `coach-dashboard.service` | Loopback server with `--idle-timeout 0`, data outside the checkout |
+| `coach-dashboard-tunnel.service` | ngrok agent, token from `/etc/coach-dashboard/ngrok.env` |
+| `coach-dashboard-sync.service` | One-shot download, import and CSV refresh |
+| `coach-dashboard-sync.timer` | Nightly at 04:30 with a 15-minute delay, `Persistent=true` |
+| `sync.sh` | Runs `garmin_sync.py`, `trainloop.py bootstrap`, `refresh_export.py` |
+| `refresh_export.py` | Calls `export_publish.build_csv()` only; no git, no credentials |
+| `host-header-policy.yml` | Rewrites the tunnel Host header to `127.0.0.1:24567` |
+| `migrate-to-cloud.ps1` | Laptop-side archive and `scp` of data, tokens and the classic page |
+| `migrate-apply.sh` | VM-side extract, ownership, secret modes and restart |
+| `README.md` | VM creation, migration, verification, MFA re-auth, upgrades, backups |
+
+Operational invariants:
+
+- Athlete data lives in `/srv/coach-dashboard/data`; code lives in
+  `/opt/coach-dashboard/app`. A `git reset --hard` upgrade cannot delete data.
+- `GARMIN_DATA_DIR`, `TRAINLOOP_DB` and `GARMINTOKENS` are set explicitly in
+  every unit, so no process falls back to the service user's home.
+- The sync unit has `StandardInput=null`: an expired Garmin token fails fast
+  instead of hanging the timer on a password prompt.
+- The CSV is rebuilt locally for splits; publishing the public copy stays an
+  optional, separately credentialed step.
+- The free ngrok plan allows one agent per static domain. The laptop watchdog
+  must be stopped before the VM tunnel starts, or the address flaps.
 
 ## Backup and restore
 

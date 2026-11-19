@@ -1,0 +1,14 @@
+[Unit]
+Description=Nightly Coach Dashboard Garmin sync
+
+[Timer]
+# Overnight, after the athlete has finished the day. Persistent=true means a
+# missed run (VM off for maintenance) happens once at the next boot instead of
+# being skipped until tomorrow.
+OnCalendar=*-*-* 04:30:00
+RandomizedDelaySec=15min
+Persistent=true
+Unit=coach-dashboard-sync.service
+
+[Install]
+WantedBy=timers.target

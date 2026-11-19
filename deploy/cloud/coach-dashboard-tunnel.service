@@ -1,0 +1,32 @@
+[Unit]
+Description=Coach Dashboard public tunnel (ngrok)
+Documentation=file:/opt/coach-dashboard/app/deploy/cloud/README.md
+After=network-online.target coach-dashboard.service
+Wants=network-online.target
+Requires=coach-dashboard.service
+
+[Service]
+Type=simple
+User=coach
+Group=coach
+
+# A single variable holding the ngrok authtoken. Never commit it and never put
+# it on the command line, where every local user could read it from /proc.
+EnvironmentFile=/etc/coach-dashboard/ngrok.env
+
+# The server answers only for a host it bound (DNS-rebinding defence), so the
+# traffic policy rewrites Host to 127.0.0.1:24567 before the request arrives.
+ExecStart=/usr/bin/ngrok http 127.0.0.1:24567 --url=https://foam-tackiness-header.ngrok-free.dev --traffic-policy-file=/etc/coach-dashboard/host-header-policy.yml --log=stdout --log-format=logfmt
+
+Restart=always
+RestartSec=10
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+# ngrok keeps its own state under $HOME (/srv/coach-dashboard).
+ReadWritePaths=/srv/coach-dashboard
+
+[Install]
+WantedBy=multi-user.target
