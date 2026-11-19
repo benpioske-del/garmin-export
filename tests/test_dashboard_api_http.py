@@ -747,6 +747,23 @@ def test_nutrition_post_accepts_a_raw_caltrak_csv(server, nutrition_file):
     assert payload["days"][0]["protein"] == 30
 
 
+def test_nutrition_post_accepts_a_cronometer_daily_export(server,
+                                                          nutrition_file):
+    """Cronometer's Daily Nutrition export, with a totals row per day."""
+    text = ("Day,Group,Energy (kcal),Protein (g),Carbs (g),Fat (g)\n"
+            "2026-11-17,Breakfast,500,30,50,15\n"
+            "2026-11-17,Lunch,700,50,60,25\n"
+            "2026-11-17,,1200,80,110,40\n")
+    status, _, result = _post_json(server, "/api/nutrition", {"csv": text})
+    assert status == 200
+    assert result["upserted"] == 1
+    _, _, payload = _json(server, "/api/nutrition")
+    day = payload["days"][0]
+    assert day["calories"] == 1200
+    assert day["carbs"] == 110
+    assert day["fat"] == 40
+
+
 def test_nutrition_post_requires_the_dash_token(server, nutrition_file):
     status, _, _ = _post_json(server, "/api/nutrition",
                               {"days": []}, token=None)

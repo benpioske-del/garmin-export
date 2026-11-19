@@ -5,7 +5,7 @@ UNVERIFIED LLM OUTPUT
 ## Run by: CrewAI Flow Supervisor
 
 > FACT-GATE NOTE (2026-11-11): this flow brief is the first to include the
-> committed Aurora dashboard and the CalTrak/nutrition/lifting templates. Its
+> committed Aurora dashboard and the nutrition/lifting templates. Its
 > measured numbers agree with `brief_facts.json` and
 > `docs/VERIFICATION_REPORT.md`. The `0.0.0.0`, `Access-Control-Allow-Origin: *`
 > and `OPTIONS` preflight requirements reissued from earlier runs were corrected
@@ -18,7 +18,7 @@ UNVERIFIED LLM OUTPUT
 > Chart.js, the `/api/activities` summary/splits fields, and the mobile tunnel
 > finding are recorded in the seventeenth correction.
 >
-> PHONE CAPTURE NOTE (2026-11-12): the Android share target for CalTrak, the
+> PHONE CAPTURE NOTE (2026-11-12): the Android share target for nutrition CSVs, the
 > token-only Health Connect webhook, and the one-tap Garmin sync button are
 > recorded in the eighteenth and nineteenth corrections, along with the expanded
 > Analysis charts. The pinned canary below is unchanged.
@@ -37,9 +37,9 @@ data-layer-and-provenance | 4051291 | migrations 001-006
 fit-audit-and-guard | evidence from SUPERVISOR_BRIEF.md | 0 parse failures, 74/74 GPS, guard verified
 formalize-continuity-review-without-synthetic-activities | evidence from docs/VERIFICATION_REPORT.md | 1 open activity_gap; no synthetic activities may be created; accepted corpus is 74 activities
 make-coaching-rationales-deterministic-and-auditable | evidence from docs/IMPLEMENTATION_INVENTORY.md | tests/recommend_snapshots.py pins every reachable coaching branch to golden JSON with fixed as_of and supplied hr_max
-harden-bridge-and-release-quality-gates | evidence from docs/VERIFICATION_REPORT.md | 699 passed, 2 skipped; facts gate, rejected-brief staging, content-derived idempotency, and publish protections are tested
+harden-bridge-and-release-quality-gates | evidence from docs/VERIFICATION_REPORT.md | 708 passed, 2 skipped; facts gate, rejected-brief staging, content-derived idempotency, and publish protections are tested
 connect-dashboard-to-data-layer | evidence from docs/IMPLEMENTATION_INVENTORY.md and docs/VERIFICATION_REPORT.md | GET /api/activities, GET /api/load, and GET /api/coaching are served on the same origin and the dashboard fetches them
-caltrak-nutrition-ingestion | evidence from docs/VERIFICATION_REPORT.md and docs/IMPLEMENTATION_INVENTORY.md | nutrition.py parses and aggregates CalTrak CSV; GET/POST /api/nutrition serve and upsert daily totals; the FUEL tab consumes live nutrition data
+caltrak-nutrition-ingestion | evidence from docs/VERIFICATION_REPORT.md and docs/IMPLEMENTATION_INVENTORY.md | nutrition.py parses and aggregates Cronometer and CalTrak CSV; GET/POST /api/nutrition serve and upsert daily totals; the FUEL tab consumes live nutrition data
 
 ---
 ## VERIFICATION (open tasks from previous brief)
@@ -59,7 +59,7 @@ establish-authenticated-athlete-ownership | BLOCKED / PARKED AND DEMOTED | Authe
 - FIT file count: 74. Source: docs/VERIFICATION_REPORT.md, "files inspected           : 74".
 - Activity count: 74. Source: docs/VERIFICATION_REPORT.md, `{"activities": 74, "open_reviews": 3}`.
 - Open review count: 3. Source: docs/VERIFICATION_REPORT.md, `{"activities": 74, "open_reviews": 3}`.
-- Test result: 699 passed, 2 skipped. Source: docs/VERIFICATION_REPORT.md, "699 passed, 2 skipped (701 collected)".
+- Test result: 708 passed, 2 skipped. Source: docs/VERIFICATION_REPORT.md, "708 passed, 2 skipped (710 collected)".
 - Parse failures: 0. Source: docs/VERIFICATION_REPORT.md, "parse failures            : 0".
 - Files with GPS: 74. Source: docs/VERIFICATION_REPORT.md, "files with GPS            : 74".
 - Open timezone_uncertain reviews: 2. Source: docs/VERIFICATION_REPORT.md, "2 open `timezone_uncertain` reviews".
@@ -68,8 +68,8 @@ establish-authenticated-athlete-ownership | BLOCKED / PARKED AND DEMOTED | Authe
 - hr_max: 198. Source: docs/VERIFICATION_REPORT.md, "with `hr_max=198` supplied by the caller".
 - Nutrition rows: 0 in the committed repository; `nutrition_log.csv` is headers only. Ingested rows are written to the local data directory and are not published. Source: docs/IMPLEMENTATION_INVENTORY.md, "Nutrition ingestion".
 - Lifting rows: 0 in the committed repository; `lifting_log.csv` is headers only. Source: the committed file at `d775add`.
-- CalTrak integration status: implemented. `nutrition.py` parses and aggregates CalTrak CSV and JSON backups; `GET`/`POST /api/nutrition` serve and upsert daily totals; the FUEL tab consumes live data; the PWA share target posts CalTrak's Share Log straight to the server; and `POST /api/nutrition/hook` accepts Health Connect payloads from the phone bridge with a dedicated token. Source: docs/VERIFICATION_REPORT.md, "Nutrition ingestion".
-- Seamless phone nutrition status: implemented server-side. CalTrak writes food to Health Connect; the free HC Webhook app POSTs Nutrition to `/api/nutrition/hook` on an interval or on demand, with Daily resolution producing one authoritative total per local day. One-time setup, then no export or file picker. Source: docs/VERIFICATION_REPORT.md, "Seamless Android path".
+- Nutrition integration status: implemented. `nutrition.py` parses and aggregates Cronometer CSV exports (exact macro columns) and CalTrak CSV and JSON backups; `GET`/`POST /api/nutrition` serve and upsert daily totals; the FUEL tab consumes live data; the PWA share target posts an exported nutrition CSV straight to the server; and `POST /api/nutrition/hook` accepts Health Connect payloads from the phone bridge with a dedicated token. Source: docs/VERIFICATION_REPORT.md, "Nutrition ingestion".
+- Seamless phone nutrition status: implemented server-side, unverified on the athlete's device. Cronometer's Android app writes Food to Health Connect; the HC Webhook app POSTs Nutrition to `/api/nutrition/hook` on an interval or on demand, with Daily resolution producing one authoritative total per local day. One-time setup, then no export or file picker. Cronometer itself has no personal webhook or public API, so the manual CSV export from cronometer.com is the free fallback. Source: docs/VERIFICATION_REPORT.md, "Seamless Android path".
 - One-tap Garmin sync status: implemented. The home view's `Sync Garmin now` button POSTs `/sync`, which runs `garmin_sync.py` then `trainloop.py bootstrap`, from the phone or the laptop. Source: docs/VERIFICATION_REPORT.md, "One-tap Garmin sync".
 - Bodyweight trend status: not stated in the newest repo docs.
 
@@ -82,7 +82,7 @@ Run `git pull` before implementation, then open the committed files below.
   - This is the committed Aurora app and the source of truth for the generated app.
   - It contains six tabs.
   - It contains run report pages.
-  - Its FUEL tab includes CalTrak CSV import.
+  - Its FUEL tab includes nutrition CSV import (Cronometer and CalTrak).
   - Its LIFT logger exports `lifting_log.csv`.
   - It presents a bodyweight trend.
   - It presents a This week card.
@@ -110,7 +110,7 @@ The existing data-layer dashboard integration is closed. The verified read-only 
 
 The local product now needs a server route for the committed Aurora app, the existing LAN/token access path, and upload endpoints for the app's offline sync queue. The app must use live server responses and visible errors rather than treating embedded arrays as authoritative.
 
-The app and log templates do not establish that nutrition, lifting, bodyweight, or CalTrak data already exist. Both CSV files contain headers only. Do not claim that real nutrition or strength analysis is available until rows are recorded and ingested.
+The app and log templates do not establish that nutrition, lifting, bodyweight, or Cronometer data already exist. Both CSV files contain headers only. Do not claim that real nutrition or strength analysis is available until rows are recorded and ingested.
 
 The local deployment remains single-athlete and single-user. Authentication stays parked and demoted.
 
@@ -162,7 +162,7 @@ Server implementation:
 11. Preserve the app's existing behavior:
    - Six-tab navigation.
    - Run report pages.
-   - FUEL tab and CalTrak CSV parsing.
+   - FUEL tab and Cronometer (and CalTrak) CSV parsing.
    - LIFT tab and lifting log export.
    - Bodyweight trend presentation.
    - This week card.
@@ -246,7 +246,7 @@ Rank 11: establish-authenticated-athlete-ownership | Keep parked and last. This 
 ## ATHLETE ACTIONS
 
 - `lifting_log.csv` exists with headers only. Record a lifting session in the Aurora LIFT tab or populate the file using its documented schema.
-- `nutrition_log.csv` exists with headers only. Import or place a CalTrak export into the Aurora FUEL workflow to create daily nutrition rows.
+- `nutrition_log.csv` exists with headers only. Export Daily Nutrition from cronometer.com (or import a CalTrak export) into the Aurora FUEL workflow to create daily nutrition rows.
 - Open the Aurora app through `/aurora` after `adopt-flow-generated-dashboard` is implemented.
 - On the phone, use the laptop's home-Wi-Fi IP and add the app to the home screen.
 - Use the app on home Wi-Fi to test queued lift and nutrition uploads.
@@ -256,7 +256,7 @@ Rank 11: establish-authenticated-athlete-ownership | Keep parked and last. This 
 ## NEXT SUPERVISOR CHECK
 
 - adopt-flow-generated-dashboard | Verify `GET /aurora`, live API wiring, same-origin behavior, loopback default and `--lan` opt-in, activity latency, lift upload idempotency, nutrition upsert behavior, visible errors, and offline queue retry behavior.
-- caltrak-nutrition-ingestion | Verify CalTrak parsing, `GET /api/nutrition`, daily aggregation, and FUEL rendering after the primary task.
+- caltrak-nutrition-ingestion | Verify Cronometer and CalTrak parsing, `GET /api/nutrition`, daily aggregation, and FUEL rendering after the primary task.
 - lift-logger-and-lifting-log-ingestion | Verify `GET /api/lifts`, lifting schema ingestion, Epley e1RM, pull-up and dip handling, and per-session bodyweight.
 - bodyweight-and-weekly-summary-endpoints | Verify `GET /api/bodyweight`, `GET /api/week`, the bodyweight trend, and This week card against stored data.
 - complete-athlete-profile-and-timezone-provenance | Verify that the remaining profile fields are populated and that local dates retain UTC provenance.

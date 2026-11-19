@@ -107,7 +107,7 @@ th{color:var(--cyan);position:sticky;top:0;background:#0b1120}
 <button onclick="go('#log/run')">Log a run</button>
 <button onclick="go('#lift')">Start a lift session</button>
 <button onclick="go('#fuel')">Fuel and nutrition</button>
-<button onclick="document.getElementById('csv').click()">Import CalTrak backup</button>
+<button onclick="document.getElementById('csv').click()">Import nutrition CSV</button>
 <input id="csv" type="file" accept=".csv,.json,text/csv,application/json" hidden onchange="importCSV(event)">
 </div>
 <script>
@@ -600,12 +600,12 @@ function saveRun(e){
 
 function fuel(date){
   var rows=NUTRITION.filter(function(x){return !date||x.date===date});
-  return card('<div class="row"><div><div class="eyebrow">Fuel</div><h1 class="title">'+esc(date||"Today")+'</h1></div><label class="btn secondary">Import backup<input id="fuelcsv" type="file" accept=".csv,.json,text/csv,application/json" hidden onchange="importCSV(event)"></label></div>')
+  return card('<div class="row"><div><div class="eyebrow">Fuel</div><h1 class="title">'+esc(date||"Today")+'</h1></div><label class="btn secondary">Import CSV<input id="fuelcsv" type="file" accept=".csv,.json,text/csv,application/json" hidden onchange="importCSV(event)"></label></div>')
     +(rows.length?rows.map(function(x){
       return card('<a class="run-card" href="#fuel/'+esc(x.date)+'"><div><b>'+esc(x.date)+'</b><div class="muted">Calories '+(x.kcal==null?"not recorded":x.kcal)+' &middot; Protein '+(x.protein==null?"not recorded":x.protein)+'g</div></div><div class="stat">'+(x.carbs==null?"--":x.carbs)+'<small class="label"> g carbs</small></div></a>');
-    }).join(""):card('<div class="empty"><strong>Nutrition unavailable</strong>No nutrition days yet. Set up automatic phone upload below, or import a CalTrak backup.</div>'))
-    +card('<div class="eyebrow">Automatic upload</div><h2 class="h2">Health Connect &rarr; dashboard</h2><p class="muted">CalTrak writes your food to Health Connect. A bridge app can forward it here automatically - no export and no file picker.</p><button class="btn" onclick="showNutritionHook(this)">Set up automatic upload</button><div id="nutrition-hook" hidden style="margin-top:14px"></div>')
-    +card('<div class="eyebrow">Manual fallback</div><p class="muted">You can still export a CalTrak backup (JSON) or CSV and choose it above. Missing columns remain not recorded.</p>');
+    }).join(""):card('<div class="empty"><strong>Nutrition unavailable</strong>No nutrition days yet. Export Daily Nutrition from cronometer.com and import the CSV below, or set up automatic upload.</div>'))
+    +card('<div class="eyebrow">Automatic upload</div><h2 class="h2">Cronometer &rarr; Health Connect &rarr; dashboard</h2><p class="muted">The Cronometer Android app can write food to Health Connect. A bridge app forwards it here automatically - no export and no file picker.</p><button class="btn" onclick="showNutritionHook(this)">Set up automatic upload</button><div id="nutrition-hook" hidden style="margin-top:14px"></div>')
+    +card('<div class="eyebrow">Manual fallback</div><p class="muted">On cronometer.com: <b>More</b> &rarr; <b>Account</b> &rarr; <b>Export Data</b> &rarr; <b>Export Daily Nutrition</b>, then choose that CSV above. Missing columns remain not recorded.</p>');
 }
 
 function analysis(){
@@ -770,7 +770,7 @@ render();
 (function(){
   var s=new URLSearchParams(location.search).get("shared");
   if(!s)return;
-  var msg=s==="ok"?"CalTrak log imported from the share sheet":s==="empty"?"The shared file had no readable rows":"The shared file could not be read as CalTrak CSV";
+  var msg=s==="ok"?"Nutrition imported from the share sheet":s==="empty"?"The shared file had no readable rows":"The shared file could not be read as a nutrition CSV";
   setTimeout(function(){toast(msg)},300);
   if(s==="ok"){setTimeout(function(){go("#fuel")},500)}
 })();

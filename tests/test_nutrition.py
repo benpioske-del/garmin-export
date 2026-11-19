@@ -1,9 +1,10 @@
-"""Tests for the server-side CalTrak nutrition parser and local log.
+"""Tests for the server-side nutrition parsers and local log.
 
-CalTrak exports one row per food entry, so the parser's job is aggregation:
-several rows can share a date and the dashboard wants one daily total. These
-tests pin the aggregation, the header aliases, the rejection rules, and the
-fact that the log is read and written idempotently.
+Cronometer and CalTrak export one row per food entry (or per diary group), so
+the parser's job is aggregation: several rows can share a date and the
+dashboard wants one daily total. These tests pin the aggregation, the header
+aliases, the rejection rules, and the fact that the log is read and written
+idempotently.
 
 The committed ``nutrition_log.csv`` is headers only; ingested rows live in the
 local data directory. Every test here points ``NUTRITION_FILE`` at a temp file,
@@ -456,6 +457,93 @@ def test_parse_export_detects_json_and_csv():
         "date,calories\n2026-11-10,1\n")[0]
     assert json_day["date"] == "2026-11-10"
     assert csv_day["date"] == "2026-11-10"
+
+
+# ------------------------------------------------------------ Cronometer CSV
+
+CRONO_DAILY = (
+    "Day,Energy (kcal),Protein (g),Carbs (g),Fat (g),Fiber (g)\n"
+    "2026-11-16,2100,150,200,70,30\n"
+    "2026-11-17,1900,140,180,60,25\n"
+)
+
+
+def test_cronometer_daily_export_is_read_by_exact_columns():
+    assert nutrition.parse_cronometer_csv(CRONO_DAILY) == [
+        {"date": "2026-11-16", "calories": 2100, "protein": 150,
+         "carbs": 200, "fat": 70},
+        {"date": "2026-11-17", "calories": 1900, "protein": 140,
+         "carbs": 180, "fat": 60},
+    ]
+
+
+def test_cronometer_group_rows_do_not_double_count_a_day():
+    csv_text = (
+        "Day,Group,Energy (kcal),Protein (g),Carbs (g),Fat (g)\n"
+        "2026-11-17,Breakfast,500,30,50,15\n"
+        "2026-11-17,Lunch,700,50,60,25\n"
+        "2026-11-17,,1200,80,110,40\n"
+    )
+    assert nutrition.parse_cronometer_csv(csv_text) == [
+        {"date": "2026-11-17", "calories": 1200, "protein": 80,
+         "carbs": 110, "fat": 40}]
+
+
+def test_cronometer_totals_row_may_be_labelled_total():
+    csv_text = (
+        "Day,Group,Energy (kcal),Protein (g),Carbs (g),Fat (g)\n"
+        "2026-11-17,Dinner,400,20,40,10\n"
+        "2026-11-17,Total,400,20,40,10\n"
+    )
+    assert nutrition.parse_cronometer_csv(csv_text)[0]["calories"] == 400
+
+
+def test_cronometer_servings_export_sums_food_rows_without_net_carbs():
+    """Substring matching would add net carbs and trans fat on top."""
+    csv_text = (
+        "Day,Group,Food Name,Energy (kcal),Protein (g),Net Carbs (g),"
+        "Carbs (g),Trans-Fats (g),Fat (g)\n"
+        "2026-11-17,Breakfast,Oats,300,10,5,50,0,5\n"
+        "2026-11-17,Lunch,Rice,400,8,70,80,0,2\n"
+    )
+    assert nutrition.parse_cronometer_csv(csv_text) == [
+        {"date": "2026-11-17", "calories": 700, "protein": 18,
+         "carbs": 130, "fat": 7}]
+
+
+def test_cronometer_trace_values_and_thousands_are_read():
+    csv_text = (
+        'Day,Energy (kcal),Protein (g),Carbs (g),Fat (g)\n'
+        '2026-11-17,"1,234","<1",0,0\n'
+    )
+    day = nutrition.parse_cronometer_csv(csv_text)[0]
+    assert day["calories"] == 1234
+    assert day["protein"] == 1
+
+
+def test_cronometer_export_requires_every_macro_column():
+    csv_text = "Day,Energy (kcal),Protein (g),Carbs (g)\n2026-11-17,1,1,1\n"
+    with pytest.raises(nutrition.NutritionError, match="missing fat"):
+        nutrition.parse_cronometer_csv(csv_text)
+
+
+def test_cronometer_negative_value_is_rejected():
+    csv_text = (
+        "Day,Energy (kcal),Protein (g),Carbs (g),Fat (g)\n"
+        "2026-11-17,-5,1,1,1\n"
+    )
+    with pytest.raises(nutrition.NutritionError):
+        nutrition.parse_cronometer_csv(csv_text)
+
+
+def test_parse_export_routes_each_csv_to_its_own_parser():
+    caltrak = "date,calories,protein,carbs,fat\n2026-11-10,1,2,3,4\n"
+    assert nutrition.looks_like_cronometer(CRONO_DAILY.splitlines()[0].split(","))
+    assert not nutrition.looks_like_cronometer(caltrak.splitlines()[0].split(","))
+    assert nutrition.parse_export(CRONO_DAILY) == \
+        nutrition.parse_cronometer_csv(CRONO_DAILY)
+    assert nutrition.parse_export(caltrak) == \
+        nutrition.parse_caltrak_csv(caltrak)
 
 
 # ------------------------------------------------------- phone webhook token

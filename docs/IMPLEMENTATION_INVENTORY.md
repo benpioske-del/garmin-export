@@ -8,7 +8,7 @@ Supervisor brief Task 1. Verified against the working tree on 2026-10-01.
 | Branch | `main` |
 | Python | 3.13.15 |
 | Git | 2.53.0.windows.4 |
-| Tests | 699 passed, 2 skipped (Windows symlink case; JS syntax check without node) |
+| Tests | 708 passed, 2 skipped (Windows symlink case; JS syntax check without node) |
 | `OPENCODE_INSTRUCTIONS.md` | **Absent.** Searched repository, parent, and local project directories. |
 
 ## Current status
@@ -76,7 +76,7 @@ Docs: [`DATA_QUALITY.md`](DATA_QUALITY.md),
 | Publisher | `export_publish.py` | guard, remote sync, history-safety enforcement |
 | Sync | `garmin_sync.py` | OAuth, local only |
 | Trigger server | `garmin_server.py` | localhost static + trigger routes, plus a read-only JSON API: `/api/activities`, `/api/load`, `/api/coaching`; `/` serves the committed Aurora app, `/classic` the local page, `/aurora` remains an alias; `GET`/`POST /api/nutrition` read and ingest the local nutrition log; `POST /api/nutrition/hook` is the token-only Health Connect bridge endpoint and `GET /api/nutrition/hook-info` its authenticated setup envelope; `POST /api/runs` stores a typed quick-log run in the local sidecar and merges it into `/api/activities` as `source_system: "manual"`; `POST /share-target` is the Android share-sheet fallback; `POST /sync` runs the Garmin download and import; serving `/` or `/classic` sets an `HttpOnly`, `SameSite=Strict` `dash_local` cookie so a PWA launch or bookmark authenticates without `?tk=` |
-| Nutrition | `nutrition.py` | CalTrak CSV/JSON parse/aggregate, Health Connect ingestion, header aliases, local daily log at `paths.data_dir()/nutrition_log.csv` |
+| Nutrition | `nutrition.py` | Cronometer and CalTrak CSV/JSON parse/aggregate, exact Cronometer columns, Health Connect ingestion, header aliases, local daily log at `paths.data_dir()/nutrition_log.csv` |
 | Manual runs | `manual_runs.py` | quick-log sidecar at `paths.data_dir()/manual_runs.json`; validation, one entry per date, atomic write, merge into `/api/activities`, same-day dedupe against device activities |
 | Audit | `fit_audit.py` | rewritten: hashes, parser versions, counts only |
 | Brief bridge | `brief_bridge.py` | `post` / `ingest` / `paste` / `serve` / `capture` |
@@ -93,7 +93,7 @@ profile as empty is reading an out-of-date copy of this document.
 
 | Tool | Status |
 | --- | --- |
-| `python -m pytest` | Works. 699 passed, 2 skipped. |
+| `python -m pytest` | Works. 708 passed, 2 skipped. |
 | `python export_publish.py` | Works. Guard + push. |
 | `python fit_audit.py` | Works. Deterministic, hash-per-file. |
 | `python trainingdb.py migrate` | Works. Idempotent. |
@@ -300,7 +300,7 @@ download cannot leave the dashboard behind; the order and the failure reporting
 are pinned by `tests/test_sync_import.py`.
 
 Tests: `tests/test_dashboard_api.py` (42), `tests/test_dashboard_api_http.py`
-(91), `tests/test_nutrition.py` (50) and `tests/test_aurora_template.py` (25).
+(104), `tests/test_nutrition.py` (58) and `tests/test_aurora_template.py` (32).
 `smoke_dashboard_api.py` runs the same paths against the live database and is
 deliberately not part of pytest.
 
@@ -348,15 +348,22 @@ table; a missing or malformed CSV yields `null` rather than an invented split.
 
 ### Nutrition ingestion
 
-`nutrition.py` parses a CalTrak export server-side. CalTrak emits one row per
-food entry, so `parse_caltrak_csv()` sums rows that share a date and returns one
-daily total per date. It accepts the same header aliases the app's importer uses
+`nutrition.py` parses a nutrition export server-side. Cronometer's Daily
+Nutrition export uses its own wide header (`Day`, `Energy (kcal)`, `Protein (g)`,
+`Carbs (g)`, `Fat (g)`), so `parse_cronometer_csv()` matches those five columns
+exactly: substring matching would add `Net Carbs (g)` on top of carbs and
+`Trans-Fats (g)` on top of fat. When a day carries both diary-group rows and a
+totals row, only the totals row is summed. CalTrak emits one row per food entry,
+so `parse_caltrak_csv()` sums rows that share a date and returns one daily total
+per date. It accepts the same header aliases the app's importer uses
 (`date`/`day`, `calories`/`kcal`/`energy`, `protein`, `carbs`/`carbohydrates`/
 `carb`, `fat`), normalises `YYYY-MM-DD`, `YYYY/MM/DD`, `M/D/YYYY` and `M/D/YY`,
 treats empty numeric cells as zero, and rejects a missing date column,
 unparseable dates, and negative or non-numeric values. `parse_caltrak_json()`
 accepts a CalTrak JSON backup with no published schema by walking it for dated
-nutrition objects, and `parse_export()` auto-detects CSV versus JSON.
+nutrition objects, and `parse_export()` routes a CSV to the Cronometer parser
+when its exact columns are present and to the CalTrak parser otherwise, and
+auto-detects JSON versus CSV.
 
 - `GET /api/nutrition` returns `{days, count, fields, source, storage}` behind
   the token/login gate. Unknown query parameters are a `400`.
@@ -382,12 +389,13 @@ nutrition objects, and `parse_export()` auto-detects CSV versus JSON.
   threshold cannot be 24 hours; a shorter no-id record is a time bucket and is
   summed. Deletions are applied by id; dates managed by the webhook are
   replaced wholesale while manually imported dates survive.
-- **Seamless Android path.** CalTrak writes food entries to Android Health
-  Connect. The free, open-source HC Webhook app reads Nutrition on an interval
-  or on demand and POSTs it to `/api/nutrition/hook`, so no export or file
-  picker is involved after one-time setup. The setup card recommends Daily
-  resolution (one authoritative total per local day) and Local time so meals
-  land on the right date.
+- **Seamless Android path.** Cronometer's Android app writes Food entries to
+  Android Health Connect. The free, open-source HC Webhook app reads Nutrition on
+  an interval or on demand and POSTs it to `/api/nutrition/hook`, so no export or
+  file picker is involved after one-time setup. It is the only no-export path,
+  because Cronometer has no personal webhook or public API. The setup card
+  recommends Daily resolution (one authoritative total per local day) and Local
+  time so meals land on the right date.
 - Rows are written to `paths.data_dir()/nutrition_log.csv`, not the committed
   template, so athlete nutrition is never published. `GARMIN_NUTRITION_FILE`
   overrides the path (tests use it). The committed `nutrition_log.csv` remains
@@ -399,15 +407,15 @@ nutrition objects, and `parse_export()` auto-detects CSV versus JSON.
   at that seam. It exposes `window.auroraReloadAll` and
   `window.auroraReloadNutrition` so the sync button and importer redraw from
   the server.
-- **Android share target.** CalTrak has no account or cloud API; its log is
-  shared as a file. `MANIFEST_JSON` declares a `share_target` for
-  `/share-target` (`POST`, `multipart/form-data`, file field `log`), so CalTrak's
-  Share Log can go straight to the dashboard from Android's share sheet. The
-  service worker intercepts the POST and forwards `{csv: text}` to
-  `/api/nutrition`; `POST /share-target` is the server fallback for the first
-  share before the worker is active. `multipart_file_text()` parses the body
-  (Python 3.13 removed `cgi`), and both paths call `parse_export()` and
-  redirect to `/?shared=ok|empty|error`.
+- **Android share target.** Cronometer exports only from its website, so the
+  file arrives as a download. `MANIFEST_JSON` declares a `share_target` for
+  `/share-target` (`POST`, `multipart/form-data`, file field `log`), so the
+  downloaded `dailysummary.csv` can go straight to the dashboard from the
+  browser's download notification. The service worker intercepts the POST and
+  forwards `{csv: text}` to `/api/nutrition`; `POST /share-target` is the server
+  fallback for the first share before the worker is active.
+  `multipart_file_text()` parses the body (Python 3.13 removed `cgi`), and both
+  paths call `parse_export()` and redirect to `/?shared=ok|empty|error`.
 - **One-tap Garmin sync.** The home view's `Sync Garmin now` button POSTs
   `/sync`, which runs `garmin_sync.py` and then `trainloop.py bootstrap`, and
   reloads from the API. The same button works from the phone and the laptop.

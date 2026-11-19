@@ -1541,3 +1541,99 @@ still says `from coaching analysis` even though the number now comes from
 `/api/load`; the label is misleading but was left unchanged. The training
 signal still refuses with `DATA INSUFFICIENT` while two activities await
 confirmation, which is correct refusal behaviour, not a missing number.
+
+# Twenty-fifth correction: 2026-11-18, the nutrition source that changed under us
+
+## The gap
+
+The twenty-fourth correction ended with a question: how should phone nutrition
+arrive? Every earlier brief and the dashboard's Fuel view described CalTrak. The
+athlete answered that he is moving to Cronometer because it has a browser
+version. Nothing in the repository knew what a Cronometer export looks like. A
+Cronometer CSV dropped on the Fuel view or shared to the Android share target
+would have been handed to `parse_caltrak_csv()`.
+
+## The cause
+
+Cronometer's servings export carries every nutrient in one wide header. It
+contains both `Carbs (g)` and `Net Carbs (g)`, and both `Fat (g)` and
+`Trans-Fats (g)`. The CalTrak alias table matches a header by substring
+(`alias in header`), so the obvious "add Cronometer to the aliases" change would
+have been wrong in two silent ways:
+
+- `Net Carbs (g)` contains `carbs`, so it was counted as well, inflating carbs.
+- `Trans-Fats (g)` contains `fat`, so it was counted as well, inflating fat.
+
+Both macros would have been inflated on every day, with no error and a plausible
+looking total. The Daily Nutrition export has a second trap: a day can carry one
+row per diary group plus a totals row. Summing every row doubles the day.
+
+## What changed
+
+- **An exact column map.** `CRONOMETER_COLUMNS` pins `day`, `energy (kcal)`,
+  `protein (g)`, `carbs (g)` and `fat (g)`. `_exact_header_index()` compares
+  stripped, lowercased headers for equality, never containment, so net carbs and
+  trans fat cannot be mistaken for carbs and fat.
+- **A separate parser.** `parse_cronometer_csv()` reads the Daily Nutrition
+  export (one row per day, or group rows plus a totals row) and the servings
+  export (one row per food). `looks_like_cronometer()` requires all five exact
+  columns, and `parse_export()` routes such a CSV to the Cronometer parser and
+  every other CSV to the CalTrak parser, so existing CalTrak backups still work.
+- **A totals-row rule.** `CRONOMETER_TOTAL_GROUPS` (`""`, `total`, `totals`,
+  `day total`, `day totals`) marks the authoritative row. When a day has any
+  totals row, only totals rows are summed; otherwise the food and group rows are
+  summed. A day is never counted twice.
+- **Number handling that matches the export.** `_cronometer_number()` strips
+  thousands separators (`1,234`) and treats a trace value (`<1`) as its bound,
+  then reuses `_number()`'s rejection of non-finite and negative values.
+- **The copy follows the source.** The Fuel view, quick actions, share-sheet
+  messages, automatic-upload card and server docstrings now name Cronometer and
+  give the exact export path. CalTrak remains a named, supported import.
+- **Tests.** Eight cases in `tests/test_nutrition.py` pin the exact columns, the
+  totals rule, the servings shape with net carbs and trans fat present, trace and
+  thousands values, the missing-column refusal, the negative-value refusal, and
+  the parser dispatch. One HTTP case posts a Cronometer export through
+  `POST /api/nutrition`.
+
+## Verification
+
+Checked against a temporary copy of the live database on port 24568
+(non-password mode), so the athlete's real log was never touched.
+
+| Signal | Result |
+| --- | --- |
+| Group rows plus totals row, 500 + 700 + 1200 | stored 1200, not 2400 |
+| `POST /api/nutrition {"csv": ...}` | `{"accepted": 2, "upserted": 2, "total_days": 2}` |
+| Fuel view, two days | 1200 kcal and 1900 kcal, carbs 110 g and 180 g |
+| Fuel view copy | "Cronometer -> Health Connect -> dashboard", manual export path named |
+| `CalTrak` in the served page | absent |
+| Console errors | none |
+
+The real header names were checked against the published `gocronometer` parser,
+which reads the same export and confirms `Energy (kcal)`, `Net Carbs (g)` and
+`Trans-Fats (g)` as literal column names.
+
+- `tests/test_nutrition.py` grew from 50 to 58 tests.
+- `tests/test_dashboard_api_http.py` grew from 103 to 104 tests.
+- Full suite: **708 passed, 2 skipped (710 collected)**. Clean checkout with no
+  FIT files, no `trainloop.db` and no `dashboard/index.html`: **679 passed, 31
+  skipped**. `ruff check .` is clean. These replace the twenty-fourth
+  correction's 699/2 and 670/31.
+
+## What this does not fix
+
+- **Cronometer has no personal webhook and no public API.** Its only automatic
+  path is Cronometer Android -> Health Connect (Food) -> a bridge -> 
+  `POST /api/nutrition/hook`. The bridge that can do that, HC Webhook, is not
+  installed, and no live phone payload has ever reached the hook. The automatic
+  path stays documented and unverified until one does.
+- **The free path is still an export.** Cronometer exports only on its website,
+  so the athlete must open cronometer.com, choose More -> Account -> Export Data
+  -> Export Daily Nutrition, and import the CSV. The Android share sheet shortens
+  the last step to one tap after the download, but it is not hands-free.
+- **The unofficial API was not adopted.** Cronometer's private GWT endpoints are
+  capped at 10 exports per day and their magic values change without notice. That
+  is not a dependable integration for a daily habit.
+- **History before the newest backup is still unrecoverable.** The nutrition log
+  lives in the local data directory and is gitignored, so the repository holds a
+  header-only schema file, not the athlete's rows.

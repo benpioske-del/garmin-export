@@ -17,11 +17,11 @@ merged and re-wired. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-699 passed, 2 skipped (701 collected)
+708 passed, 2 skipped (710 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `670 passed, 31 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `679 passed, 31 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`; the dashboard-contract and brief checks that read the
 gitignored page skip when it is absent; one symlink case skips on Windows; the
@@ -38,10 +38,10 @@ lint or tests ran.
 | --- | --- |
 | `tests/test_training_data.py` | 64 |
 | `tests/test_brief_bridge.py` | 62 |
-| `tests/test_nutrition.py` | 50 |
+| `tests/test_nutrition.py` | 58 |
 | `tests/test_publish_flow.py` | 50 |
 | `tests/test_dashboard_api.py` | 42 |
-| `tests/test_dashboard_api_http.py` | 103 |
+| `tests/test_dashboard_api_http.py` | 104 |
 | `tests/test_brief_consistency.py` | 37 |
 | `tests/test_dashboard_contract.py` | 36 |
 | `tests/test_manual_runs.py` | 30 |
@@ -59,7 +59,7 @@ lint or tests ran.
 | `tests/test_paths_and_guards.py` | 9 |
 | `tests/test_sync_import.py` | 8 |
 | `tests/test_history_safety.py` | 2 |
-| **Total** | **701** (699 pass, 2 skip) |
+| **Total** | **710** (708 pass, 2 skip) |
 
 `tests/test_fit_reader_elevation.py` covers the elevation diagnostics added with
 reader 1.1.0; see [ELEVATION.md](ELEVATION.md). Four of its tests are the CSV
@@ -359,7 +359,7 @@ fetches without a query string.
   cookie is. A real `?tk=` URL is left unchanged, and the real token never
   enters the URL, history or a tunnel log.
 
-`tests/test_dashboard_api_http.py` (102 tests) covers the manifest and worker
+`tests/test_dashboard_api_http.py` (104 tests) covers the manifest and worker
 routes, the injected tags, injection idempotence, host/port allowlisting, the
 offline fallback (the worker keeps the shell and API data, and falls back to the
 cache on a `5xx` origin outage), the login gate (redirect, form, wrong
@@ -468,18 +468,25 @@ classic placeholder header, `POST /sync` returned `{"ok": true}` and
 
 ### Nutrition ingestion (`nutrition.py`, `/api/nutrition`)
 
-CalTrak exports one row per food entry, so `parse_caltrak_csv()` aggregates
-rows that share a date into one daily total. It accepts the app's header
-aliases, four date formats, and treats empty numeric cells as zero; it rejects
-a missing date column, unparseable dates, and negative or non-numeric values.
+Cronometer's Daily Nutrition export uses its own wide header (`Day`,
+`Energy (kcal)`, `Protein (g)`, `Carbs (g)`, `Fat (g)`), so
+`parse_cronometer_csv()` matches those columns exactly: substring matching would
+add `Net Carbs (g)` on top of carbs and `Trans-Fats (g)` on top of fat. When a
+day carries both diary-group rows and a totals row, only the totals row is
+summed, so a day cannot be counted twice. CalTrak exports one row per food
+entry, so `parse_caltrak_csv()` aggregates rows that share a date into one daily
+total. Both accept the app's header aliases, four date formats and empty numeric
+cells as zero, and reject a missing date column, unparseable dates, and negative
+or non-numeric values. `parse_export()` sends a CSV to the Cronometer parser
+when the five exact columns are present and to the CalTrak parser otherwise.
 
 - `GET /api/nutrition` is token/login-gated, rejects unknown query parameters
   with a `400`, and returns `{days, count, fields, source, storage}`.
 - `POST /api/nutrition` accepts `{"days": [...]}`, `{"csv": "..."}`,
   `{"json": ...}`, `{"backup": ...}`, or a raw CalTrak backup object and
   upserts one row per date, returning `{accepted, upserted, total_days}`. The
-  `csv` form auto-detects CSV or JSON. Repeating a date updates it instead of
-  appending a duplicate.
+  `csv` form auto-detects a Cronometer export, a CalTrak CSV or a JSON backup.
+  Repeating a date updates it instead of appending a duplicate.
 - **Phone webhook.** `POST /api/nutrition/hook` is the only route above the
   browser gate. It authenticates with a dedicated `X-Nutrition-Token` header
   (or `Authorization: Bearer`) that is separate from the dashboard login token
@@ -497,13 +504,15 @@ a missing date column, unparseable dates, and negative or non-numeric values.
   shorter no-id record is a time bucket and is summed. Deletions are applied by
   id. Dates the webhook manages are replaced wholesale, so a deleted record can
   remove a day, while manually imported dates are preserved.
-- **Seamless Android path.** CalTrak writes food entries to Android Health
-  Connect. The free, open-source HC Webhook app reads Nutrition from Health
-  Connect on an interval or on demand and POSTs it to
-  `/api/nutrition/hook`. Setup is one-time: enable Nutrition at Daily
+- **Seamless Android path.** Cronometer's Android app writes Food entries to
+  Android Health Connect (Cronometer documents Food and Water as export types).
+  HC Webhook reads Nutrition from Health Connect on an interval or on demand and
+  POSTs it to `/api/nutrition/hook`. Setup is one-time: enable Nutrition at Daily
   resolution, add the webhook URL and custom header, then use its interval,
   widget, Quick Settings tile or broadcast trigger. No export and no file picker
-  are needed after that. The manual JSON/CSV import remains a fallback.
+  are needed after that. It is the only no-export path, because Cronometer has no
+  personal webhook or public API. The manual CSV import remains the free
+  fallback.
 - The log is stored at `paths.data_dir()/nutrition_log.csv`, never in the
   committed template, so athlete nutrition is not published.
   `GARMIN_NUTRITION_FILE` overrides the path for tests. The committed
@@ -514,17 +523,18 @@ a missing date column, unparseable dates, and negative or non-numeric values.
   `window.auroraReloadAll` and `window.auroraReloadNutrition`, so the Garmin
   sync button and the importer redraw from the server instead of a browser-only
   copy.
-- **Android share target.** CalTrak has no account or cloud API; its log lives
-  on the device and is shared as a file. The web manifest now declares a
-  `share_target` for `/share-target` (`POST`, `multipart/form-data`, one file
-  field named `log` accepting `text/csv`, `text/plain`, JSON and `.csv`/`.json`).
-  After the PWA is installed, CalTrak's Share Log appears in Android's share
-  sheet; choosing Coach Dashboard posts the file to the server, which parses and
-  upserts it. Chrome normally routes the POST through the service worker, which
-  forwards `{csv: text}` to `/api/nutrition`; the server route is the fallback
-  for the first share before the worker is active. Both paths call
-  `parse_export()`, which auto-detects a CSV export or a JSON backup, and
-  redirect to `/?shared=ok|empty|error`.
+- **Android share target.** Cronometer exports only from its website, so the
+  file arrives as a download rather than from a native app. The web manifest
+  declares a `share_target` for `/share-target` (`POST`,
+  `multipart/form-data`, one file field named `log` accepting `text/csv`,
+  `text/plain`, JSON and `.csv`/`.json`). After the PWA is installed, the
+  downloaded `dailysummary.csv` can be shared straight to Coach Dashboard from
+  the browser's download notification; choosing it posts the file to the server,
+  which parses and upserts it. Chrome normally routes the POST through the
+  service worker, which forwards `{csv: text}` to `/api/nutrition`; the server
+  route is the fallback for the first share before the worker is active. Both
+  paths call `parse_export()`, which auto-detects a Cronometer export, a CalTrak
+  CSV or a JSON backup, and redirect to `/?shared=ok|empty|error`.
 - **One-tap Garmin sync.** The home view has a `Sync Garmin now` button that
   POSTs `/sync` with the session cookie (or `?tk=`), runs `garmin_sync.py` then
   `trainloop.py bootstrap`, and reloads from the API when it finishes. The same

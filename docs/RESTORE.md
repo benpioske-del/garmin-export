@@ -192,7 +192,7 @@ Run these in order. Each one should be boring.
 ```powershell
 .\trainloop.cmd doctor          # Python, sqlite3, fitparse, FIT dir, gitignore
 .\trainloop.cmd status          # FIT files on disk == activities in database
-py -m pytest                    # expect 699 passed, 2 skipped on a full corpus
+py -m pytest                    # expect 708 passed, 2 skipped on a full corpus
 py backup_data.py --dry-run     # lists what a new backup would contain
 ```
 

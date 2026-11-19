@@ -1,7 +1,8 @@
-"""Server-side CalTrak nutrition parsing and daily aggregation.
+"""Server-side nutrition parsing and daily aggregation.
 
-CalTrak exports one row per food entry, so several rows can share a date. The
-dashboard wants one daily total per date, which is what this module produces.
+Cronometer and CalTrak both export CSV rows that share a date (one row per food
+entry, or one row per diary group). The dashboard wants one daily total per
+date, which is what this module produces.
 
 Where the rows live: the committed ``nutrition_log.csv`` is a schema template
 with headers only. Ingested rows are written to the *local data directory*
@@ -43,12 +44,28 @@ ALIASES = {
 
 DATE_FORMATS = ("%Y-%m-%d", "%Y/%m/%d", "%m/%d/%Y", "%m/%d/%y")
 
+# Cronometer's export headers are wide and repetitive: a servings export carries
+# every nutrient, including "Net Carbs (g)" and "Trans-Fats (g)". Matching these
+# by substring, the way the CalTrak aliases do, would silently add net carbs on
+# top of carbs and trans fat on top of fat. Match the exact column names instead.
+CRONOMETER_COLUMNS = {
+    "date": "day",
+    "calories": "energy (kcal)",
+    "protein": "protein (g)",
+    "carbs": "carbs (g)",
+    "fat": "fat (g)",
+}
+CRONOMETER_GROUP = "group"
+# Daily Nutrition exports can include one row per diary group plus a totals row.
+# Only the totals row is summed, so a day is never counted twice.
+CRONOMETER_TOTAL_GROUPS = ("", "total", "totals", "day total", "day totals")
+
 NUTRITION_FILE = (os.environ.get("GARMIN_NUTRITION_FILE")
                   or os.path.join(paths.data_dir(), "nutrition_log.csv"))
 
 
 class NutritionError(ValueError):
-    """A CalTrak export or API payload that cannot be trusted."""
+    """A nutrition export or API payload that cannot be trusted."""
 
 
 def _normalize_date(value):
@@ -130,6 +147,88 @@ def parse_caltrak_csv(text):
             record[field] += _number(value, field, "row %d" % line_no)
     return [dict(date=d, **{f: _fmt(totals[d][f]) for f in NUMERIC})
             for d in sorted(totals)]
+
+
+def _exact_header_index(header, names):
+    """Map canonical fields to exact column indexes (None when absent)."""
+    lowered = [str(h).strip().lower() for h in header]
+    return {field: (lowered.index(name) if name in lowered else None)
+            for field, name in names.items()}
+
+
+def looks_like_cronometer(header):
+    """True when every Cronometer macro column is present, matched exactly."""
+    index = _exact_header_index(header, CRONOMETER_COLUMNS)
+    return all(col is not None for col in index.values())
+
+
+def _cronometer_number(value, field, where):
+    """Read one Cronometer cell. Trace values ("<1") count at their bound."""
+    text = str(value or "").strip()
+    if not text:
+        return 0.0
+    if text.startswith("<"):
+        text = text[1:].strip()
+    # Some locales/exports group thousands with a comma ("1,234.5").
+    return _number(text.replace(",", ""), field, where)
+
+
+def parse_cronometer_csv(text):
+    """Parse a Cronometer CSV export into one row per local day.
+
+    Accepts the Daily Nutrition export (one row per day, or one row per diary
+    group plus a totals row) and the servings export (one row per food). When a
+    day carries both group rows and a totals row, only the totals row is summed.
+    Raises NutritionError on missing macro columns, a bad date, or a value that
+    is not a finite non-negative number.
+    """
+    if not isinstance(text, str) or not text.strip():
+        raise NutritionError("CSV is empty")
+    rows = list(csv.reader(text.splitlines()))
+    if not rows:
+        raise NutritionError("CSV is empty")
+    header = rows[0]
+    index = _exact_header_index(header, CRONOMETER_COLUMNS)
+    missing = [f for f, col in index.items() if col is None]
+    if missing:
+        raise NutritionError(
+            "Cronometer CSV is missing %s" % ", ".join(missing))
+    group_col = _exact_header_index(
+        header, {"group": CRONOMETER_GROUP})["group"]
+
+    parsed = []
+    for line_no, row in enumerate(rows[1:], start=2):
+        if not any(str(cell).strip() for cell in row):
+            continue
+        date_col = index["date"]
+        if date_col >= len(row):
+            raise NutritionError("row %d has no date value" % line_no)
+        date = _normalize_date(row[date_col])
+        group = ""
+        if group_col is not None and group_col < len(row):
+            group = str(row[group_col]).strip()
+        values = {}
+        for field in NUMERIC:
+            col = index[field]
+            cell = row[col] if col < len(row) else ""
+            values[field] = _cronometer_number(cell, field, "row %d" % line_no)
+        parsed.append((date, group, values))
+    if not parsed:
+        return []
+
+    by_date = {}
+    for date, group, values in parsed:
+        by_date.setdefault(date, []).append((group, values))
+
+    out = []
+    for date in sorted(by_date):
+        entries = by_date[date]
+        totals = [v for g, v in entries
+                  if g.lower() in CRONOMETER_TOTAL_GROUPS]
+        chosen = totals or [v for _, v in entries]
+        record = {f: _fmt(sum(v[f] for v in chosen)) for f in NUMERIC}
+        out.append(dict(date=date, **record))
+    return out
 
 
 def normalize_days(days):
@@ -337,12 +436,15 @@ def parse_caltrak_json(text):
 
 
 def parse_export(text):
-    """Parse either a CalTrak CSV export or a JSON backup."""
+    """Parse a nutrition CSV (Cronometer or CalTrak) or a JSON backup."""
     if not isinstance(text, str) or not text.strip():
         raise NutritionError("export is empty")
     stripped = text.lstrip("\ufeff \t\r\n")
     if stripped[:1] in ("{", "["):
         return parse_caltrak_json(stripped)
+    header = next(csv.reader(stripped.splitlines()), [])
+    if looks_like_cronometer(header):
+        return parse_cronometer_csv(stripped)
     return parse_caltrak_csv(stripped)
 
 

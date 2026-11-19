@@ -656,10 +656,11 @@ MANIFEST_JSON = {
     "display": "standalone",
     "background_color": "#111418",
     "theme_color": "#111418",
-    # Android share sheet: CalTrak's Share Log can post the CSV straight here,
-    # so the athlete never emails a file to himself. Chrome dispatches the POST
-    # to the service worker; the server route is the fallback when it is not
-    # active yet. iOS has no Web Share Target, so it uses a Shortcut instead.
+    # Android share sheet: a nutrition CSV exported from cronometer.com can be
+    # shared straight here, so the athlete never emails a file to himself.
+    # Chrome dispatches the POST to the service worker; the server route is the
+    # fallback when it is not active yet. iOS has no Web Share Target, so it
+    # uses a Shortcut instead.
     "share_target": {
         "action": "/share-target",
         "method": "POST",
@@ -970,7 +971,7 @@ AURORA_LIVE_SCRIPT = """
       var t = token();
       if (t) { headers["X-Dash-Token"] = t; }
       var text = String(reader.result || "");
-      // CalTrak exports arrive as either CSV or a JSON backup. Send the shape
+      // Nutrition exports arrive as either CSV or a JSON backup. Send the shape
       // the server expects so it parses and aggregates instead of storing a
       // JSON document as if it were CSV.
       var payload;
@@ -991,22 +992,22 @@ AURORA_LIVE_SCRIPT = """
       }).then(function (res) {
         return loadNutrition().then(function () {
           if (typeof show === "function") {
-            show("CalTrak imported: " + (res.upserted || 0) + " days");
+            show("Nutrition imported: " + (res.upserted || 0) + " days");
           }
           if (typeof navigate === "function") { navigate("#fuel"); }
           else { refresh(); }
         });
       }).catch(function (e) {
         if (typeof show === "function") {
-          show("CalTrak import failed: " + e);
+          show("Nutrition import failed: " + e);
         }
         badge("nutrition upload failed", String(e));
       });
     };
     reader.readAsText(file);
   }
-  // The committed app imports CalTrak CSV into localStorage only. Replace that
-  // handler so the server parses and stores the rows, then re-read the live log.
+  // The committed app imports a nutrition CSV into localStorage only. Replace
+  // that handler so the server parses and stores the rows, then re-read the log.
   window.showNutritionHook = function () {
     var box = document.getElementById("nutrition-hook");
     if (!box) { return; }
@@ -1046,7 +1047,7 @@ AURORA_LIVE_SCRIPT = """
           "<li>In HC Webhook: <b>Webhooks</b> &rarr; add a JSON webhook with the URL above and a custom header <b>" +
             esc(info.header) + "</b> set to the token above.</li>" +
           "<li>Set a sync interval (15 minutes is the minimum) or add its Quick Settings tile for a one-tap sync.</li>" +
-          "<li>In CalTrak: allow Health Connect to <b>write food</b> entries (Settings &rarr; Health Connect).</li>" +
+          "<li>In Cronometer (Android app): <b>More</b> &rarr; <b>Connect Apps &amp; Devices</b> &rarr; <b>Health Connect</b> &rarr; <b>Sync with Health Connect</b>, and allow Cronometer to <b>write food</b>.</li>" +
         "</ol>" +
         '<p class="sub">Keep the bridge on <b>Local time</b> so meals land on the right day. ' +
           "The manual import below still works as a fallback.</p>";
@@ -1107,7 +1108,7 @@ AURORA_LIVE_SCRIPT = """
       badge("live activity, load, coaching and nutrition data", "");
     }
   }
-  // The Sync Garmin button and the CalTrak importer both call these, so the
+  // The Sync Garmin button and the nutrition importer both call these, so the
   // page redraws from the server instead of trusting the browser's own copy.
   window.auroraReloadNutrition = function () {
     return loadNutrition().then(function () { refresh(); });
@@ -1318,7 +1319,7 @@ def login_page(error=""):
 def multipart_file_text(body, content_type):
     """Return the text of the first file part in a multipart/form-data body.
 
-    The Android share target posts the CalTrak CSV as a file part. ``cgi`` was
+    The Android share target posts the nutrition CSV as a file part. ``cgi`` was
     removed in Python 3.13, so this parses just enough of the format: find the
     boundary, split the parts, and take the first one that carries a filename.
     Returns None for anything it does not recognise rather than guessing.
@@ -1470,9 +1471,10 @@ class Handler(BaseHTTPRequestHandler):
         """POST /api/nutrition - validate and upsert daily nutrition totals.
 
         Accepts either the app's queued shape ``{"days": [...]}`` or a raw
-        CalTrak export ``{"csv": "..."}``. The CSV path exists so aggregation
-        happens on the server, not only in the browser. Repeating a date
-        updates that day's row instead of appending a duplicate.
+        nutrition CSV export ``{"csv": "..."}`` (Cronometer or CalTrak). The CSV
+        path exists so aggregation happens on the server, not only in the
+        browser. Repeating a date updates that day's row instead of appending a
+        duplicate.
         """
         try:
             length = int(self.headers.get("Content-Length") or "0")
@@ -1501,7 +1503,7 @@ class Handler(BaseHTTPRequestHandler):
             elif isinstance(body.get("days"), list):
                 result = nutrition.upsert_days(body["days"])
             else:
-                # A CalTrak backup POSTed directly, with no wrapper key.
+                # A CalTrak JSON backup POSTed directly, with no wrapper key.
                 days = nutrition.parse_caltrak_json(body)
                 result = nutrition.upsert_days(days)
         except nutrition.NutritionError as exc:
