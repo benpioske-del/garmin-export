@@ -1750,6 +1750,10 @@ What is not fixed:
   2026-11-19 archives in `%OneDrive%\CoachDashboardBackups` are not readable
   zips. That is a separate defect and is not fixed by this correction.
 - **No VM has been provisioned.** The cloud kit is still verified as files.
+- **The unpinned raw URL is not a freshness guarantee.** After this publish,
+  `raw.githubusercontent.com/.../main/garmin_export.csv` still served the old
+  74-run blob from the CDN while the commit-pinned raw URL served 75. Pin to the
+  `commit` in `brief_facts.json` or use the contents API.
 
 Verification: `tests/test_run_fuel.py` covers parsing, validation, storage,
 fade, attach, suggestions, journal import, payload and the CLI; nine HTTP tests

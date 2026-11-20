@@ -255,6 +255,15 @@ position data is present, then commits and pushes. The guard blocks labelled
 coordinate fields, degree pairs, FIT semicircle field names, and CSV coordinate
 columns.
 
+**Raw URL freshness, observed 2026-11-20:** after the 75-run publish, the
+`main` raw URL below still served the older 74-run blob from the CDN, while the
+same URL pinned to the published commit SHA and the GitHub contents API both
+served the current 75-run blob. A crew that needs current numbers should fetch
+the commit-pinned raw URL built from `brief_facts.json`'s `commit` field, or the
+contents API, rather than trusting the unpinned `main` URL. This is a CDN cache
+behaviour, not a git problem: `origin/main` and the local blob both point at the
+75-run file.
+
 **Known limitation, unchanged:** the guard cannot reject a bare single
 coordinate, because a decimal such as `44.95` is indistinguishable from
 legitimate training data. Manual review remains necessary. This is recorded in
