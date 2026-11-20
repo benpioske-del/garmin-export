@@ -1770,3 +1770,68 @@ the normalize-copy contract and the manual-run edit form. Full suite:
 no `trainloop.db` and no `dashboard/index.html`: **780 passed, 32 skipped**.
 `ruff check .` is clean. These replace the twenty-sixth correction's 727/3 and
 699/31.
+
+# Twenty-eighth correction: 2026-11-20, the historical water/fuel sweep
+
+The twenty-seventh correction stopped at nine recovered entries. Asked for a
+second pass over everything ever written about water and fuel, the audit parsed
+all 49 historical HTML artifacts that embed `const baseRuns` and deduplicated
+19 intake-ish records (most were copies of the same note in older reports). Two
+real gaps were found, both in the classic journal that `dashboard/index.html`
+still carries:
+
+- `2026-05-08` — "Dehydration bonk in low-70s breezy weather; stopped early by
+  choice." It was missed because `_INTAKE_WORDS` had no `dehydrat*` or `bonk`.
+- `2026-09-13` — `fnotes` held one blank water event, but `note2` held
+  "Recovery / shake-out Sunday. · hydration 0 oz · electrolytes none". The old
+  importer read only `note`, so both deliberate zeroes were lost.
+
+The first live reconciliation also explained a reported `fuel_count` of 9: it
+predated the `2026-11-19` manual entry. The server reads `run_fuel.json` on each
+request and now reports 10 before this sweep, 11 after it.
+
+What is now true:
+
+- `_INTAKE_WORDS` includes `dehydrat*` and `bonk`; `snacks?` and `bars?` are
+  recognised as fuel words. `python run_fuel.py import-journal` now scans 52
+  journal entries and seeds 10: three with events, seven note-only. Re-running
+  it against the live store adds `2026-05-08` and leaves saved measured events
+  alone (`skipped: 1` for 2026-09-11).
+- `import_journal()` carries `note2` into the stored note and calls the new
+  `explicit_zero_events()` on the combined text. Only a literal `0 oz`, `none`
+  or `zero` written after the noun becomes an event, so `2026-09-13` gains a
+  water `oz: 0` and an electrolyte `sodium_mg: 0`, and its blank `fnotes`
+  placeholder is replaced. A narrative "no water, vest only" is still prose:
+  `2026-06-04` remains `journal-note` with `needs_review: true`. An entry whose
+  prior events are all blanks is upgraded; one with measured events is skipped
+  without `--overwrite`.
+- `suggest_events()` now applies the athlete's calibration to *suggestions
+  only*: a gel or GU carries 100 kcal / 21 g carbs, generic "electrolytes" is
+  labelled LMNT, and a full vest carries 1.5 L (50.7 oz) — but never when the
+  note also says "no water", "water ran out" or "under-hydrated". A trailing
+  "electrolytes none" is recognised as a zero just like a leading "no
+  electrolytes". Nothing is written to the store until the athlete saves.
+- The live store holds 11 entries: seven note-only awaiting review, three
+  journal entries with events and one manual entry. `GET /api/activities`
+  reports `count: 75`, `fuel_count: 11` and `fuel_with_fade: 11`.
+
+What is not fixed:
+
+- **Seven entries are still prose, not events.** They are visible and offer
+  suggestions; only the athlete can turn a suggestion into a record.
+- **The 2026-09-09 fuel mapping was not guessed.** The note lists a vest, gel,
+  two fruit snacks, a GU and an LMNT but only locates snacks at miles 5/7 and
+  the refill between 8 and 9. `fnotes` keeps generic fuel events at miles 5, 7
+  and 10; inventing a product for each would be a lie.
+- **A full vest is a prompt, not a measurement.** 1.5 L is the vest's known
+  capacity; whether it was finished on a given run remains unrecorded.
+- **No bodyweight, age, sex, resting HR or height** has been supplied, and the
+  weather-location policy is still unsettled, so those cards stay empty.
+
+Verification: `tests/test_run_fuel.py` gains 11 tests for the calibrated
+suggestions, trailing zeroes, `explicit_zero_events()`, the dehydration note,
+`note2` recovery, blank-placeholder upgrade and preservation of measured
+events. Full suite: **820 passed, 3 skipped (823 collected)**. Clean checkout
+with no FIT files, no `trainloop.db`, no `dashboard/index.html` and an empty
+`GARMIN_DATA_DIR`: **791 passed, 32 skipped (823 collected)**. `ruff check .`
+is clean. These replace the twenty-seventh correction's 809/3 and 780/32.

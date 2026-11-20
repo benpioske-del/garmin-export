@@ -17,11 +17,11 @@ merged and re-wired. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-809 passed, 3 skipped (812 collected)
+820 passed, 3 skipped (823 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `780 passed, 32 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `791 passed, 32 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`; the dashboard-contract and brief checks that read the
 gitignored page skip when it is absent; one symlink case skips on Windows; the
@@ -611,8 +611,9 @@ when the five exact columns are present and to the CalTrak parser otherwise.
 
 In-run fluid, fuel and electrolyte intake was recorded once, in the classic
 journal, and became unreachable when Aurora replaced `/`: three runs carried
-structured `fnotes` (`{mi, kind, what}`) and eight narrative notes mentioned
-intake. Nothing had been deleted. The data was still in
+structured `fnotes` (`{mi, kind, what}`) and nine narrative notes mentioned
+intake (one of them as dehydration rather than a drink). Nothing had been
+deleted. The data was still in
 `dashboard/index.html`, but no view read it and no API served it. It is now a
 first-class sidecar, and it is the input needed to test whether late-run fade
 tracks under-fuelling.
@@ -646,13 +647,21 @@ tracks under-fuelling.
   `note`, `source` and `needs_review`. `items` exists so the editor renders the
   stored events, not just a count. The merge runs after the manual-run merge
   and is never fed to `loadcalc` or `recommend`.
-- **Journal recovery.** `python run_fuel.py import-journal` scanned 52 journal
-  entries and seeded 9: three with structured events (`journal`, no review
-  needed) and six note-only (`journal-note`, `needs_review: true`). A
-  note-only entry is not silently converted: `suggest_events()` proposes events
-  in the editor and the athlete saves them. Suggestions turn "no water" and
-  "no gel" into explicit zeroes, keep a mile marker, and leave unmeasured
-  amounts blank.
+- **Journal recovery.** `python run_fuel.py import-journal` scans all 52 journal
+  entries and seeds 10: three with structured events (`journal`, no review
+  needed) and seven note-only (`journal-note`, `needs_review: true`). The
+  importer also reads `note2`, which held the 2026-09-13 recovery run's
+  "hydration 0 oz · electrolytes none"; that becomes two explicit zeroes and
+  replaces the blank `fnotes` water placeholder. `dehydration`/`bonk` count as
+  intake words, so 2026-05-08 is recovered as a note-only entry. A note-only
+  entry is not silently converted: "no water" stays prose until saved, and a
+  blank placeholder is upgraded only when a literal `0 oz`/`none` observation
+  exists. `suggest_events()` proposes events in the editor and the athlete
+  saves them. Suggestions turn "no water", "no gel" and trailing "none"/"0 oz"
+  into explicit zeroes, keep a mile marker, apply the athlete's calibration
+  (gel/GU 100 kcal and 21 g carbs, generic "electrolytes" → LMNT, full vest
+  1.5 L) and leave unmeasured snacks blank. A vest is never counted as water
+  when the note also says "no water".
 - **Editing.** The run report has a "Fuel & fade" card with totals, rates,
   events and the fade, plus an inline editor: add or remove rows, Save, Clear,
   and "Use journal suggestions" for note-only entries. `#analysis` adds a
@@ -665,10 +674,14 @@ tracks under-fuelling.
   the `POST /api/runs` body beside distance, time, HR and RPE, so a typed run and
   its fuel are one editable record. See "Quick log" above for the validation and
   identity rules.
-- **What the recovered notes already say.** 2026-06-07 was a bonk at mile 14
-  after water ran out; 2026-06-04 was deliberately under-hydrated; 2026-05-28
-  was LMNT only with no gel. The point of the scatter and the table is to test
-  that pattern against the runs that did not fade, rather than to assume it.
+- **What the recovered notes already say.** 2026-05-08 was a dehydration bonk
+  in low-70s breezy weather (prose, left for review); 2026-06-07 was a bonk at
+  mile 14 after water ran out; 2026-06-04 was deliberately under-hydrated;
+  2026-05-28 was LMNT only with no gel; 2026-09-11 and 2026-09-13 both recorded
+  zero water and zero electrolytes. 2026-09-09 lists a vest, a gel, two fruit
+  snacks, a GU and an LMNT with only the snack and refuel miles recorded. The
+  point of the scatter and the table is to test the pattern against the runs
+  that did not fade, rather than to guess unlocated fuel or assume it.
 - **Plumbing.** `run_fuel.json` is in `paths.DATA_FILES`,
   `backup_data.DATA_FILES`, `.gitignore`, `export_publish.IGNORE`,
   `export_publish.PUBLISHED_MODULES` (`run_fuel.py`) and the cloud migration

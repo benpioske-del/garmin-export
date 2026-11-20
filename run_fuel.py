@@ -76,21 +76,53 @@ _OZ = re.compile(r"(\d+(?:\.\d+)?)\s*(?:oz|ounces?)\b", re.I)
 
 # The words the journal uses. They are deliberately broad: this only proposes
 # events in the editor, and a proposal the athlete does not save is not data.
+# ``dehydrat*`` and ``bonk`` are included because a run that fell apart from
+# dehydration still belongs in the fuel journal even when it records no intake.
 _INTAKE_WORDS = re.compile(
-    r"\b(water|fluid|fluids|camelback|vest|hydration|drink|drank|electrolytes?|"
-    r"salt|saltstick|nuun|lmnt|lyte|gatorade|coke|gels?|gu\b|chews?|snack|"
-    r"banana|bar\b|pb&j|fuel|fueled|fueling|ate|eat)\b", re.I)
+    r"\b(water|fluid|fluids|camelback|vest|hydration|dehydrat\w*|bonk|"
+    r"drink|drank|electrolytes?|salt|saltstick|nuun|lmnt|lyte|gatorade|coke|"
+    r"gels?|gu\b|chews?|snacks?|banana|bars?\b|pb&j|fuel|fueled|fueling|ate|eat)\b",
+    re.I)
 
 _SUGGEST_GROUPS = (
     (re.compile(r"\b(water|fluid|fluids|camelback|vest|hydration|drink|drank)\b",
                 re.I), "water"),
     (re.compile(r"\b(electrolytes?|salt|saltstick|nuun|lmnt|lyte|gatorade|coke)\b",
                 re.I), "electrolyte"),
-    (re.compile(r"\b(gels?|gu\b|chews?|snack|banana|bar\b|pb&j|fueled?|fueling|"
-                r"ate|eat)\b", re.I), "fuel"),
+    (re.compile(r"\b(gels?|gu\b|chews?|snacks?|banana|bars?\b|pb&j|fueled?|"
+                r"fueling|ate|eat)\b", re.I), "fuel"),
 )
 
 _NEGATION = re.compile(r"\b(no|none|without|zero|0)\s*$", re.I)
+
+# A deliberate zero is different from prose: "hydration 0 oz" and
+# "electrolytes none" are observations, while "no water, vest only" is a
+# narrative the athlete left for review. Only a value written after the noun
+# is promoted into a measured event by the importer. The more general phrase
+# "no water" is still offered as a suggestion in the editor, but never stored
+# without the athlete saving it.
+_EXPLICIT_ZEROS = (
+    (re.compile(r"\b(?:hydration|water|fluids?|drink)\s*"
+                r"(?::|=|is)?\s*(?:0\s*(?:oz|ounces?)\b|none\b|zero\b)",
+                re.I), "water", "oz", "0 oz"),
+    (re.compile(r"\belectrolytes?\s*(?::|=|is)?\s*(?:none\b|zero\b|0(?!\.\d)\b)",
+                re.I), "electrolyte", "sodium_mg", "none"),
+)
+
+# The athlete's own calibration (also encoded in the classic page): a gel or a
+# GU is 100 kcal / 21 g carbs, and a full vest is 1.5 L. These only annotate
+# editor suggestions; nothing is written to the store until the athlete saves.
+_GEL_KCAL = 100.0
+_GEL_CARBS_G = 21.0
+_VEST_OZ = round(1.5 * 33.814, 1)  # 50.7 US fl oz
+_GEL_WORD = re.compile(r"\b(gels?|gu)\b", re.I)
+_GENERIC_ELECTROLYTE = re.compile(r"\belectrolytes?\b", re.I)
+_VEST_WORD = re.compile(r"\b(vest|camelback)\b", re.I)
+_VESSEL_NEGATION = re.compile(
+    r"\b(no\s+water|water\s+(?:ran\s+out|is\s+gone)|0\s*oz|none|without|"
+    r"under[-\s]?hydrated)\b", re.I)
+_TRAILING_ZERO = re.compile(
+    r"\s*(?::|=|is)?\s*(?:none\b|zero\b|0(?!\.\d)\b)", re.I)
 
 
 class FuelError(ValueError):
@@ -175,6 +207,33 @@ def _oz_from_text(text):
         return _number(match.group(1), "oz")
     except FuelError:
         return None
+
+
+def explicit_zero_events(text):
+    """Events for intake the athlete explicitly recorded as zero.
+
+    Only a value written after the noun ("0 oz", "none", "zero") becomes
+    measured data; a narrative "no water" stays prose for the athlete to
+    review. The classic journal kept some of these only in ``note2`` (the
+    recovery run whose "hydration 0 oz · electrolytes none" never reached
+    ``fnotes``), so the importer uses this to stop that deliberate zero being
+    lost. One event per kind: a second explicit zero adds no information.
+    """
+    text = str(text or "")
+    out = []
+    seen = set()
+    for pattern, kind, field, what in _EXPLICIT_ZEROS:
+        if kind in seen:
+            continue
+        if not pattern.search(text):
+            continue
+        seen.add(kind)
+        event = {"mile": None, "at": None, "kind": kind, "what": what,
+                 "oz": None, "kcal": None, "carbs_g": None,
+                 "sodium_mg": None}
+        event[field] = 0.0
+        out.append(event)
+    return out
 
 
 def normalize_event(raw):
@@ -501,7 +560,11 @@ def suggest_events(note):
             seen.add(key)
 
             before = text[max(0, index - 20):index]
-            negated = bool(_NEGATION.search(before))
+            after = text[match.end():min(len(text), match.end() + 60)]
+            # "no water" negates before the noun; "electrolytes none" and
+            # "hydration 0 oz" negate after it. Both are explicit zeros.
+            negated = (bool(_NEGATION.search(before))
+                       or bool(_TRAILING_ZERO.match(after)))
             event = {"mile": mile, "at": at, "kind": kind,
                      "what": "none" if negated else match.group(0),
                      "oz": None, "kcal": None, "carbs_g": None,
@@ -514,7 +577,24 @@ def suggest_events(note):
                 elif kind == "fuel":
                     event["kcal"] = 0.0
             elif kind == "water":
-                event["oz"] = _oz_from_text(window)
+                if _VEST_WORD.search(window):
+                    if not _VESSEL_NEGATION.search(window):
+                        # The athlete's calibration: a full vest is 1.5 L.
+                        event["oz"] = _VEST_OZ
+                        event["what"] = "Hydration vest (1.5 L)"
+                else:
+                    event["oz"] = _oz_from_text(window)
+            elif kind == "electrolyte":
+                # The athlete's calibration: whenever they wrote
+                # "electrolytes" they meant LMNT.
+                if _GENERIC_ELECTROLYTE.search(match.group(0)):
+                    event["what"] = "LMNT"
+            elif kind == "fuel":
+                # The athlete's calibration: a gel or GU is 100 kcal / 21 g
+                # carbohydrates. Unmeasured snacks and bars stay unmeasured.
+                if _GEL_WORD.search(match.group(0)):
+                    event["kcal"] = _GEL_KCAL
+                    event["carbs_g"] = _GEL_CARBS_G
             out.append(event)
             if len(out) >= MAX_EVENTS:
                 return out
@@ -578,7 +658,9 @@ def import_journal(html_text, path=None, overwrite=False):
 
     Structured ``fnotes`` become events. A narrative note that mentions intake
     but has no structured events is stored as a note-only entry flagged
-    ``needs_review``; it is not turned into invented events. Existing entries
+    ``needs_review``; it is not turned into invented events. ``note2`` is
+    carried into the stored note as well: the classic page used it for facts
+    that never reached ``fnotes``, including deliberate zeros. Existing entries
     that already have events are left alone unless ``overwrite`` is set, so the
     import can be re-run safely after the athlete has edited something.
     """
@@ -594,25 +676,48 @@ def import_journal(html_text, path=None, overwrite=False):
         if not _DATE.match(date):
             continue
         note = str(run.get("note") or "").strip()
+        note2 = str(run.get("note2") or "").strip()
+        # The classic page kept some intake facts only in note2. Joining it to
+        # the primary note keeps the whole observation visible in the editor.
+        combined = note
+        if note2 and note2 not in combined:
+            combined = (combined + " · " + note2).strip(" ·")
         events = []
         for raw in run.get("fnotes") or []:
             try:
                 events.append(normalize_event(raw))
             except FuelError:
                 continue
-        if not events and not _INTAKE_WORDS.search(note):
+        zeros = explicit_zero_events(combined)
+        if zeros:
+            # A blank fnotes placeholder carries no information. Replace a
+            # same-kind blank with the deliberate zero instead of keeping both.
+            zero_kinds = {event["kind"] for event in zeros}
+            events = [event for event in events
+                      if event["kind"] not in zero_kinds
+                      or any(event[field] is not None for field in NUMERIC)]
+            events.extend(zeros)
+
+        if not events and not _INTAKE_WORDS.search(combined):
             continue
 
         prior = existing.get(date)
         if prior and prior.get("events") and not overwrite:
-            result["skipped"] += 1
-            continue
+            # A prior entry made only of blank fnotes placeholders holds no
+            # measured data. Filling it with an explicit zero is an upgrade,
+            # not an overwrite of something the athlete saved by hand.
+            placeholder = all(
+                all(event.get(field) is None for field in NUMERIC)
+                for event in prior["events"])
+            if not (events and placeholder):
+                result["skipped"] += 1
+                continue
 
         upsert({
             "date": date,
             "activity_id": (prior or {}).get("activity_id"),
             "events": events,
-            "note": note,
+            "note": combined,
             "source": "journal" if events else "journal-note",
             "needs_review": not events,
         }, path)

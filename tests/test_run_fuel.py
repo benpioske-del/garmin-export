@@ -365,6 +365,61 @@ def test_suggest_returns_nothing_for_a_note_about_other_things():
     assert run_fuel.suggest_events("Legs felt heavy, hamstrings tight.") == []
 
 
+def test_suggest_uses_the_athlete_calibration_for_a_gel_or_gu():
+    for text in ("a gel at mile 5", "a GU at mile 9"):
+        fueled = [event for event in run_fuel.suggest_events(text)
+                  if event["kind"] == "fuel"]
+        assert len(fueled) == 1
+        assert fueled[0]["kcal"] == 100.0
+        assert fueled[0]["carbs_g"] == 21.0
+
+
+def test_suggest_leaves_an_unmeasured_snack_unmeasured():
+    events = run_fuel.suggest_events("2 fruit snacks at miles 5/7")
+    assert events
+    assert all(event["kcal"] is None and event["carbs_g"] is None
+               for event in events)
+
+
+def test_suggest_relabels_generic_electrolytes_as_lmnt():
+    events = run_fuel.suggest_events("GU + electrolytes")
+    electrolytes = [e for e in events if e["kind"] == "electrolyte"]
+    assert electrolytes and electrolytes[0]["what"] == "LMNT"
+
+
+def test_suggest_keeps_a_named_electrolyte_product():
+    events = run_fuel.suggest_events("nuun at mile 3")
+    assert events[0]["what"] == "nuun"
+
+
+def test_suggest_counts_a_full_vest_but_not_a_vest_without_water():
+    full = run_fuel.suggest_events("hydration vest at the start")
+    assert full[0]["oz"] == 50.7
+    assert "1.5 L" in full[0]["what"]
+    dry = run_fuel.suggest_events("deliberately under-hydrated (no water, vest only)")
+    water = [event for event in dry if event["kind"] == "water"]
+    assert water and all(event["oz"] == 0.0 for event in water)
+
+
+def test_suggest_turns_a_trailing_electrolytes_none_into_an_explicit_zero():
+    events = run_fuel.suggest_events("hydration 0 oz · electrolytes none")
+    electrolytes = [e for e in events if e["kind"] == "electrolyte"]
+    water = [e for e in events if e["kind"] == "water"]
+    assert electrolytes and electrolytes[0]["sodium_mg"] == 0.0
+    assert water and water[0]["oz"] == 0.0
+
+
+def test_explicit_zero_events_only_promises_unambiguous_zeros():
+    events = run_fuel.explicit_zero_events(
+        "Recovery run · hydration 0 oz · electrolytes none")
+    assert {event["kind"] for event in events} == {"water", "electrolyte"}
+    assert all(event["mile"] is None for event in events)
+    assert run_fuel.explicit_zero_events("water ran out at mile 14") == []
+    assert run_fuel.explicit_zero_events("Dehydration bonk") == []
+    # Narrative "no water" stays a note-only entry for the athlete to review.
+    assert run_fuel.explicit_zero_events("no water, vest only") == []
+
+
 # ------------------------------------------------------------- journal import
 
 def _journal_html(runs):
@@ -438,6 +493,76 @@ def test_import_journal_overwrite_replaces_saved_events(tmp_path):
     }])
     run_fuel.import_journal(html, path, overwrite=True)
     assert run_fuel.load(path)[0]["events"][0]["kind"] == "fuel"
+
+
+def test_import_journal_recovers_a_dehydration_bonk_note(tmp_path):
+    path = str(tmp_path / "run_fuel.json")
+    html = _journal_html([{
+        "seq": 1, "date": "2026-05-08", "dist": 13.1,
+        "note": "Dehydration bonk in low-70s breezy weather; stopped early by choice.",
+    }])
+    result = run_fuel.import_journal(html, path)
+    assert result["notes_only"] == 1
+    row = run_fuel.load(path)[0]
+    assert row["needs_review"] is True
+    assert row["source"] == "journal-note"
+    assert "Dehydration" in row["note"]
+
+
+def test_import_journal_recovers_zeros_from_note2(tmp_path):
+    path = str(tmp_path / "run_fuel.json")
+    html = _journal_html([{
+        "seq": 1, "date": "2026-09-13", "dist": 6,
+        "note": "Imported from Garmin CSV · +295ft gain, -335ft loss",
+        "note2": "Recovery / shake-out Sunday. · hydration 0 oz · electrolytes none",
+        "fnotes": [{"mi": "None", "kind": "water", "what": ""}],
+    }])
+    result = run_fuel.import_journal(html, path)
+    assert result["with_events"] == 1
+    row = run_fuel.load(path)[0]
+    assert row["needs_review"] is False
+    by_kind = {event["kind"]: event for event in row["events"]}
+    assert by_kind["water"]["oz"] == 0.0
+    assert by_kind["electrolyte"]["sodium_mg"] == 0.0
+    assert "hydration 0 oz" in row["note"]
+
+
+def test_import_journal_upgrades_a_blank_placeholder_without_overwrite(tmp_path):
+    path = str(tmp_path / "run_fuel.json")
+    run_fuel.upsert({
+        "date": "2026-09-13",
+        "events": [{"kind": "water", "what": ""}],
+        "source": "journal",
+    }, path)
+    html = _journal_html([{
+        "seq": 1, "date": "2026-09-13", "dist": 6,
+        "note": "Imported from Garmin CSV",
+        "note2": "hydration 0 oz · electrolytes none",
+        "fnotes": [{"mi": "None", "kind": "water", "what": ""}],
+    }])
+    result = run_fuel.import_journal(html, path)
+    assert result["skipped"] == 0
+    events = run_fuel.load(path)[0]["events"]
+    assert len(events) == 2
+    assert {event["kind"] for event in events} == {"water", "electrolyte"}
+
+
+def test_import_journal_does_not_overwrite_measured_events(tmp_path):
+    path = str(tmp_path / "run_fuel.json")
+    run_fuel.upsert({
+        "date": "2026-09-11",
+        "events": [{"kind": "water", "oz": 0},
+                   {"kind": "electrolyte", "sodium_mg": 0}],
+        "note": "Hydration 0 oz, electrolytes none.",
+        "source": "journal",
+    }, path)
+    html = _journal_html([{
+        "seq": 1, "date": "2026-09-11", "dist": 8,
+        "note": "Hydration 0 oz, electrolytes none.",
+    }])
+    result = run_fuel.import_journal(html, path)
+    assert result["skipped"] == 1
+    assert run_fuel.load(path)[0]["events"][0]["oz"] == 0.0
 
 
 def test_import_journal_rejects_html_without_base_runs(tmp_path):
