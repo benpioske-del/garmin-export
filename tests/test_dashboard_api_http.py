@@ -1192,3 +1192,107 @@ def test_share_target_accepts_a_json_backup(server, nutrition_file):
     assert location == "/?shared=ok"
     _, _, payload = _json(server, "/api/nutrition")
     assert payload["days"][0]["calories"] == 500
+
+
+# --------------------------------------------------------- in-run fuel
+#
+# Intake lives in a local sidecar, not the canonical database. These tests
+# cover the wire, the validation errors and the merge into /api/activities.
+
+@pytest.fixture
+def fuel_file(monkeypatch, tmp_path):
+    """Point the module at a temp store so the athlete's log is untouched."""
+    import run_fuel
+    path = tmp_path / "run_fuel.json"
+    monkeypatch.setattr(run_fuel, "STORE_FILE", str(path))
+    return path
+
+
+def test_fuel_get_starts_empty(server, fuel_file):
+    status, ctype, payload = _json(server, "/api/fuel")
+    assert status == 200
+    assert ctype == "application/json; charset=utf-8"
+    assert payload["runs"] == []
+    assert payload["count"] == 0
+
+
+def test_fuel_post_stores_and_reads_back(server, fuel_file):
+    status, _, result = _post_json(server, "/api/fuel", {
+        "date": "2026-09-09",
+        "activity_id": "garmin:1",
+        "events": [{"kind": "water", "mile": 5, "oz": 20}],
+        "note": "vest",
+    })
+    assert status == 200
+    assert result["ok"] is True
+    assert result["entry"]["events"][0]["oz"] == 20
+    _, _, payload = _json(server, "/api/fuel")
+    assert payload["count"] == 1
+    assert payload["runs"][0]["events"][0]["kind"] == "water"
+
+
+def test_fuel_post_rejects_an_unknown_kind(server, fuel_file):
+    status, _, payload = _post_json(server, "/api/fuel", {
+        "date": "2026-09-09", "events": [{"kind": "pizza"}]})
+    assert status == 400
+    assert payload["error"] == "invalid fuel payload"
+
+
+def test_fuel_post_rejects_a_bad_date(server, fuel_file):
+    status, _, payload = _post_json(server, "/api/fuel", {
+        "date": "09/09/2026", "events": []})
+    assert status == 400
+    assert payload["error"] == "invalid fuel payload"
+
+
+def test_fuel_post_rejects_non_json(server, fuel_file):
+    status, _, payload = _post_json(server, "/api/fuel", None, raw=b"nope")
+    assert status == 400
+    assert payload["error"] == "body must be JSON"
+
+
+def test_fuel_post_delete_removes_the_entry(server, fuel_file):
+    _post_json(server, "/api/fuel", {"date": "2026-09-09", "events": []})
+    status, _, result = _post_json(server, "/api/fuel", {
+        "delete": True, "date": "2026-09-09"})
+    assert status == 200
+    assert result["removed"] == 1
+    _, _, payload = _json(server, "/api/fuel")
+    assert payload["runs"] == []
+
+
+def test_fuel_post_requires_the_dash_token(server, fuel_file):
+    status, _, _ = _post_json(server, "/api/fuel",
+                              {"date": "2026-09-09", "events": []},
+                              token=None)
+    assert status == 403
+
+
+def test_fuel_get_rejects_an_unknown_query_parameter(server, fuel_file):
+    status, _, payload = _json(server, "/api/fuel?x=1")
+    assert status == 400
+    assert payload["error"] == "unsupported query parameter"
+
+
+def test_activities_carry_the_fuel_summary_for_the_matching_date(
+        server, fuel_file, migrated_db):
+    migrated_db.execute(
+        "INSERT INTO activities (activity_id, source_system,"
+        " source_activity_id, sport, start_utc, start_local, timezone_source,"
+        " distance_mi, moving_time_s, avg_hr, value_state, confidence,"
+        " confirmation, review_state, first_seen_utc, last_updated_utc)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        ("garmin:1", "garmin", "1", "Running", "2026-11-16T12:00:00Z",
+         "2026-11-16", "filename_date", 5.0, 2700, 150, "device_derived",
+         "unverified", "confirmation_required", "open",
+         "2026-11-16T12:00:00Z", "2026-11-16T12:00:00Z"))
+    migrated_db.commit()
+
+    _post_json(server, "/api/fuel", {
+        "date": "2026-11-16",
+        "events": [{"kind": "water", "mile": 2, "oz": 12}],
+    })
+    _, _, payload = _json(server, "/api/activities")
+    row = payload["activities"][0]
+    assert row["fuel"]["totals"]["oz"] == 12
+    assert payload["fuel_count"] == 1

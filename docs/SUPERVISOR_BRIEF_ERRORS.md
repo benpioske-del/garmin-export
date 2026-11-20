@@ -1687,3 +1687,75 @@ Verification: `tests/test_cloud_deploy.py` adds 20 tests. Full suite:
 `ruff check .` is clean. These replace the twenty-fifth correction's 708/2 and
 679/31.
 
+# Twenty-seventh correction: 2026-11-20, the intake that was never missing
+
+The twenty-sixth correction left the dashboard claiming that fueling was not
+recorded. The run report said so in prose, and the brief repeated it. Both were
+wrong in a specific way: the athlete had recorded in-run fluid, fuel and
+electrolytes, but only in the classic journal. Three runs carried structured
+`fnotes` (`{mi, kind, what}`) and eight narrative notes mentioned intake. When
+Aurora replaced `/`, the journal page stopped being reachable, so the data
+looked lost. It had not been deleted. No view read it and no API served it.
+
+The same round found a second count drift. The brief and this report said 74
+activities, 3 open reviews and 2 `timezone_uncertain` reviews. The 2026-11-19
+run (13.11 mi, `garmin:25135653593`) was already in the FIT directory and the
+database, and `python trainloop.py bootstrap` reported
+`{"inserted": 0, "updated": 0, "unchanged": 75, "unreadable": 0}`. The
+published CSV still held 74 because nothing had published since the import.
+This is the first observed case of the CSV lagging the database rather than the
+other way round.
+
+What is now true:
+
+- `run_fuel.py` stores per-run intake in `run_fuel.json` beside the other
+  local-only data. Entries are keyed by `activity_id` when known and by local
+  date otherwise. Events are
+  `{mile, at, kind, what, oz, kcal, carbs_g, sodium_mg}`; `kind` is
+  `water|electrolyte|fuel|other`; a blank amount is blank, not zero.
+- `GET /api/fuel` returns every entry plus proposed events for note-only rows.
+  `POST /api/fuel` replaces one run's events or deletes the entry. Both sit
+  behind the normal token/login gate.
+- `run_fuel.attach()` adds `row["fuel"]` to `/api/activities`, with totals,
+  per-hour rates, fade and the events themselves. It is never an input to
+  `loadcalc` or `recommend`.
+- `fade()` uses at least four usable lap splits and reports mean second-half
+  pace minus mean first-half pace, so a fade is a number rather than an
+  impression.
+- `python run_fuel.py import-journal` recovered 9 of 52 journal entries: three
+  with structured events and six note-only. Note-only entries are seeded with
+  `source: "journal-note"` and `needs_review: true`; prose is not silently
+  converted. The run report offers suggestions, and the athlete saves them.
+- The run report has a "Fuel & fade" card and an inline editor (add, remove,
+  save, clear, use suggestions). `#analysis` has a fuel-vs-fade scatter and a
+  worst-fades table. The `#fuel` tab is relabelled `NUTRITION` so daily
+  nutrition and in-run fuel are not confused.
+- `run_fuel.json` is in `paths.DATA_FILES`, `backup_data.DATA_FILES`,
+  `.gitignore`, `export_publish.IGNORE`, `export_publish.PUBLISHED_MODULES`
+  and the cloud migration file list.
+- The standing numbers are now 75 FIT files, 75 activities, 4 open reviews
+  (3 `timezone_uncertain` plus 1 `activity_gap`) and 75/75 with GPS.
+
+What is not fixed:
+
+- **Six of the nine recovered entries are prose, not events.** They need the
+  athlete to confirm the suggested events. A suggestion is a prompt, not a
+  record.
+- **The recovered amounts are mostly unmeasured.** "a gel" and "LMNT" do not
+  say how many calories or milligrams, so the scatter starts sparse and gets
+  better only as future runs are logged with amounts.
+- **The 2026-11-19 run is still `timezone_uncertain`.** Its local date is
+  derived from the filename until the athlete confirms it.
+- **The backup system is producing invalid zips.** The 2026-11-18 and
+  2026-11-19 archives in `%OneDrive%\CoachDashboardBackups` are not readable
+  zips. That is a separate defect and is not fixed by this correction.
+- **No VM has been provisioned.** The cloud kit is still verified as files.
+
+Verification: `tests/test_run_fuel.py` covers parsing, validation, storage,
+fade, attach, suggestions, journal import, payload and the CLI; nine HTTP tests
+cover GET, POST, delete, the token gate and the `/api/activities` merge;
+`tests/test_aurora_template.py` pins the editor and the normalize-copy
+contract. Full suite: **805 passed, 3 skipped (808 collected)**. Clean checkout
+with no FIT files, no `trainloop.db` and no `dashboard/index.html`:
+**776 passed, 32 skipped**. `ruff check .` is clean. These replace the
+twenty-sixth correction's 727/3 and 699/31.

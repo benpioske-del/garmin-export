@@ -82,6 +82,7 @@ nutrition_log.csv
 nutrition_log.records.json
 nutrition_log.hook-token
 manual_runs.json
+run_fuel.json
 
 # local-only artefacts
 garmin_sync.log
@@ -135,6 +136,7 @@ PUBLISHED_MODULES = frozenset([
     "nutrition.py",
     "paths.py",
     "recommend.py",
+    "run_fuel.py",
     "smoke_dashboard_api.py",
     "strength.py",
     "supervisor_publish.py",

@@ -305,6 +305,10 @@ function normalizeRun(r){
     // The live layer marks a typed quick-log row. normalizeRun() rebuilds the
     // object, so it has to carry the flag or the feed and report lose it.
     manual:r.manual===true,
+    // Same reason: these are rebuilt from the API on every render, so the
+    // activity id and the merged fuel summary have to survive the copy.
+    activityId:r.activityId||null,
+    fuel:r.fuel||null,
     band:r.band||band(distance)
   };
 }
@@ -514,7 +518,7 @@ function showNutritionHook(){
 
 function nav(){
   var h=location.hash||"#home";
-  var links=[["#home","H","HOME"],["#runs","R","RUNS"],["#lift","L","LIFT"],["#fuel","F","FUEL"],["#analysis","A","ANALYSIS"],["#data","D","DATA"]];
+  var links=[["#home","H","HOME"],["#runs","R","RUNS"],["#lift","L","LIFT"],["#fuel","N","NUTRITION"],["#analysis","A","ANALYSIS"],["#data","D","DATA"]];
   document.getElementById("tabs").innerHTML=links.map(function(x){
     return '<a class="'+(h.indexOf(x[0])===0?"active":"")+'" href="'+x[0]+'"><b>'+x[1]+"</b>"+x[2]+"</a>";
   }).join("");
@@ -545,6 +549,181 @@ function runs(){
     }).join(""):card('<div class="empty"><strong>No runs yet</strong>Run a Garmin sync to load activities.</div>'));
 }
 
+function fuelAmt(v,unit){return v==null?"--":(Math.round(Number(v)*10)/10)+unit}
+function fuelEnergy(f){
+  var total=null;
+  ((f&&f.items)||[]).forEach(function(e){
+    var k=e.kcal!=null?Number(e.kcal):(e.carbs_g!=null?Number(e.carbs_g)*4:null);
+    if(k!=null&&isFinite(k)){total=(total==null?0:total)+k}
+  });
+  return total;
+}
+function fuelDelta(splits){
+  var vals=(splits||[]).map(paceSec).filter(Number.isFinite);
+  if(vals.length<4)return null;
+  var half=Math.floor(vals.length/2);
+  var first=vals.slice(0,half),second=vals.slice(half);
+  var a=first.reduce(function(p,v){return p+v},0)/first.length;
+  var b=second.reduce(function(p,v){return p+v},0)/second.length;
+  if(!a)return null;
+  return {first:Math.round(a),second:Math.round(b),delta:Math.round(b-a),pct:Math.round((b-a)/a*1000)/10,n:vals.length};
+}
+function runFade(r){
+  var f=r&&r.fuel;
+  if(f&&f.fade)return {first:f.fade.first_half_s_per_mi,second:f.fade.second_half_s_per_mi,delta:f.fade.fade_s_per_mi,pct:f.fade.fade_pct,n:f.fade.splits_used};
+  return fuelDelta(r&&r.splits);
+}
+function fuelWhere(e){
+  if(e.mile!=null)return "mi "+e.mile;
+  return e.at||"unmarked";
+}
+function fuelWhat(e){
+  var out=[];
+  if(e.what)out.push(e.what);
+  if(e.oz!=null)out.push(e.oz+" oz");
+  if(e.kcal!=null)out.push(e.kcal+" kcal");
+  if(e.carbs_g!=null)out.push(e.carbs_g+" g carbs");
+  if(e.sodium_mg!=null)out.push(e.sodium_mg+" mg sodium");
+  return out.length?out.join(" &middot; "):e.kind;
+}
+function fuelRowHtml(e){
+  e=e||{};
+  var kinds=["water","electrolyte","fuel","other"];
+  var st='style="background:#ffffff09;border:1px solid var(--line);border-radius:8px;color:var(--text);padding:6px;width:100%;min-width:60px"';
+  var mile=e.mile!=null?e.mile:(e.at||"");
+  function num(v){return v==null?"":v}
+  return '<tr>'
+    +'<td><input class="fin" data-f="mile" '+st+' value="'+esc(mile)+'" placeholder="5 or start"></td>'
+    +'<td><select class="fin" data-f="kind" '+st+'>'+kinds.map(function(k){return '<option value="'+k+'"'+(e.kind===k?" selected":"")+'>'+k+'</option>'}).join("")+'</select></td>'
+    +'<td><input class="fin" data-f="what" '+st+' value="'+esc(e.what||"")+'" placeholder="gel, LMNT..."></td>'
+    +'<td><input class="fin" data-f="oz" type="number" step=".1" min="0" '+st+' value="'+num(e.oz)+'"></td>'
+    +'<td><input class="fin" data-f="kcal" type="number" step="1" min="0" '+st+' value="'+num(e.kcal)+'"></td>'
+    +'<td><input class="fin" data-f="carbs_g" type="number" step=".1" min="0" '+st+' value="'+num(e.carbs_g)+'"></td>'
+    +'<td><input class="fin" data-f="sodium_mg" type="number" step="1" min="0" '+st+' value="'+num(e.sodium_mg)+'"></td>'
+    +'<td><button class="chip" type="button" onclick="fuelRemoveRow(this)">remove</button></td>'
+    +'</tr>';
+}
+function fuelCard(r){
+  var f=r.fuel||null;
+  var t=(f&&f.totals)||{};
+  var rt=(f&&f.rates)||{};
+  var items=(f&&f.items)||[];
+  var d=runFade(r);
+  var status=f?(f.needs_review?"NEEDS REVIEW":"RECORDED"):"NOT RECORDED";
+  var statusCls=f?(f.needs_review?"warn":"good"):"warn";
+  var eventsHtml=items.length
+    ?'<div class="tablewrap"><table><thead><tr><th>Where</th><th>Kind</th><th>Taken</th></tr></thead><tbody>'+items.map(function(e){
+      return '<tr><td>'+esc(fuelWhere(e))+'</td><td>'+esc(e.kind)+'</td><td>'+esc(fuelWhat(e))+'</td></tr>';
+    }).join("")+'</tbody></table></div>'
+    :'<div class="empty"><strong>No intake events</strong>Nothing recorded for this run yet. Use the editor below, or let the journal note suggest events.</div>';
+  var fadeHtml=d
+    ?'<div class="grid g3"><div><div class="stat">'+(d.delta>0?"+":"")+d.delta+'</div><div class="label">s/mi fade</div></div><div><div class="stat">'+(d.pct>0?"+":"")+d.pct+'%</div><div class="label">second half vs first</div></div><div><div class="stat">'+d.n+'</div><div class="label">laps used</div></div></div><p class="muted">First half '+pstr(d.first)+'/mi, second half '+pstr(d.second)+'/mi. Positive fade means slowing down.</p>'
+    :'<p class="muted">Fade needs at least four lap splits; this run has '+(r.splits?r.splits.length:0)+'.</p>';
+  var note=f&&f.note?'<p class="muted">Journal note: '+esc(f.note)+'</p>':"";
+  var rows=items.map(fuelRowHtml).join("");
+  var editor='<details style="margin-top:12px"><summary class="chip">Edit intake</summary>'
+    +'<p class="muted" style="margin-top:8px">Miles accept a number, <b>start</b>, <b>mid</b> or <b>finish</b>. Leave an amount blank when it was not measured; blank is not zero.</p>'
+    +'<div class="tablewrap"><table><thead><tr><th>Where</th><th>Kind</th><th>Taken</th><th>oz</th><th>kcal</th><th>carbs g</th><th>sodium mg</th><th></th></tr></thead><tbody id="fuel-rows-'+esc(r.date)+'">'+rows+'</tbody></table></div>'
+    +'<div class="row" style="margin-top:10px;flex-wrap:wrap;gap:8px">'
+      +'<button class="btn secondary" type="button" data-date="'+esc(r.date)+'" onclick="fuelAddRow(this)">+ Add event</button>'
+      +'<button class="btn" type="button" data-date="'+esc(r.date)+'" onclick="fuelSave(this)">Save intake</button>'
+      +(f?'<button class="btn secondary" type="button" data-date="'+esc(r.date)+'" onclick="fuelClear(this)">Clear</button>':'')
+      +(f&&f.needs_review?'<button class="btn secondary" type="button" data-date="'+esc(r.date)+'" onclick="fuelSuggest(this)">Use journal suggestions</button>':'')
+    +'</div><p class="muted" id="fuel-msg-'+esc(r.date)+'"></p></details>';
+  return card('<div class="row"><div><div class="eyebrow">Fuel &amp; fade</div><div class="h2">What went in</div></div><span class="chip '+statusCls+'">'+status+'</span></div>'
+    +'<div class="grid g3">'
+      +'<div><div class="stat">'+fuelAmt(t.oz," oz")+'</div><div class="label">fluid'+(rt.oz_per_h!=null?" &middot; "+fuelAmt(rt.oz_per_h,"/h"):"")+'</div></div>'
+      +'<div><div class="stat">'+fuelAmt(t.kcal," kcal")+'</div><div class="label">energy'+(rt.kcal_per_h!=null?" &middot; "+fuelAmt(rt.kcal_per_h,"/h"):"")+'</div></div>'
+      +'<div><div class="stat">'+fuelAmt(t.carbs_g," g")+'</div><div class="label">carbs'+(rt.carbs_g_per_h!=null?" &middot; "+fuelAmt(rt.carbs_g_per_h,"/h"):"")+'</div></div>'
+      +'<div><div class="stat">'+fuelAmt(t.sodium_mg," mg")+'</div><div class="label">sodium'+(rt.sodium_mg_per_h!=null?" &middot; "+fuelAmt(rt.sodium_mg_per_h,"/h"):"")+'</div></div>'
+      +'<div><div class="stat">'+items.length+'</div><div class="label">events</div></div>'
+    +'</div>'
+    +note+fadeHtml+eventsHtml+editor);
+}
+function fuelToken(){return new URLSearchParams(location.search).get("tk")||""}
+function fuelPost(payload){
+  var h={"Content-Type":"application/json"};
+  var tk=fuelToken();if(tk)h["X-Dash-Token"]=tk;
+  return fetch("/api/fuel",{method:"POST",headers:h,credentials:"same-origin",body:JSON.stringify(payload)})
+    .then(function(r){return r.json().catch(function(){return{}}).then(function(res){
+      if(!r.ok){throw new Error(res.detail||res.error||("HTTP "+r.status))}
+      return res;
+    })});
+}
+function fuelMsg(btn,text){
+  var date=btn&&btn.getAttribute?btn.getAttribute("data-date"):null;
+  var el=date?document.getElementById("fuel-msg-"+date):null;
+  if(el)el.textContent=text;
+  if(typeof toast==="function")toast(text);
+}
+function fuelRun(date){return RUNS.find(function(x){return x.date===date})||null}
+function fuelAddRow(btn,ev){
+  var date=typeof btn==="string"?btn:(btn&&btn.getAttribute?btn.getAttribute("data-date"):null);
+  var body=date?document.getElementById("fuel-rows-"+date):null;
+  if(!body)return;
+  var tmp=document.createElement("tbody");
+  tmp.innerHTML=fuelRowHtml(ev||{});
+  if(tmp.firstElementChild)body.appendChild(tmp.firstElementChild);
+}
+function fuelRemoveRow(btn){
+  var tr=btn&&btn.closest?btn.closest("tr"):null;
+  if(tr&&tr.parentNode)tr.parentNode.removeChild(tr);
+}
+function fuelCollect(date){
+  var body=document.getElementById("fuel-rows-"+date);
+  var out=[];
+  if(!body)return out;
+  Array.prototype.forEach.call(body.querySelectorAll("tr"),function(tr){
+    var ev={};
+    Array.prototype.forEach.call(tr.querySelectorAll(".fin"),function(inp){
+      var f=inp.getAttribute("data-f");
+      var v=String(inp.value||"").trim();
+      ev[f]=v===""?null:v;
+    });
+    if(!ev.kind)return;
+    out.push(ev);
+  });
+  return out;
+}
+function fuelReload(){
+  if(window.auroraReloadAll)return window.auroraReloadAll();
+  return Promise.resolve().then(function(){render()});
+}
+function fuelSave(btn){
+  var date=btn.getAttribute("data-date");
+  var r=fuelRun(date);
+  var events=fuelCollect(date);
+  fuelMsg(btn,"Saving...");
+  fuelPost({date:date,activity_id:r?r.activityId:null,events:events,note:r&&r.fuel?r.fuel.note:"",source:"manual",needs_review:false})
+    .then(fuelReload)
+    .then(function(){fuelMsg(btn,"Intake saved")})
+    .catch(function(e){fuelMsg(btn,"Save failed: "+(e&&e.message?e.message:e))});
+}
+function fuelClear(btn){
+  var date=btn.getAttribute("data-date");
+  var r=fuelRun(date);
+  fuelMsg(btn,"Clearing...");
+  fuelPost({delete:true,date:date,activity_id:r?r.activityId:null})
+    .then(fuelReload)
+    .then(function(){fuelMsg(btn,"Intake cleared")})
+    .catch(function(e){fuelMsg(btn,"Clear failed: "+(e&&e.message?e.message:e))});
+}
+function fuelSuggest(btn){
+  var date=btn.getAttribute("data-date");
+  var h={};var tk=fuelToken();if(tk)h["X-Dash-Token"]=tk;
+  fuelMsg(btn,"Looking for intake in the journal note...");
+  fetch("/api/fuel",{headers:h,credentials:"same-origin"})
+    .then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json()})
+    .then(function(p){
+      var entry=(p.runs||[]).find(function(x){return x.date===date});
+      var items=(entry&&entry.suggested)||[];
+      if(!items.length){fuelMsg(btn,"No intake phrases found in the note");return}
+      items.forEach(function(ev){fuelAddRow(date,ev)});
+      fuelMsg(btn,"Added "+items.length+" suggestion(s). Review, then save.");
+    })
+    .catch(function(e){fuelMsg(btn,"Could not read suggestions: "+(e&&e.message?e.message:e))});
+}
+
 function report(date){
   var r=RUNS.find(function(x){return x.date===date})||last();
   if(!r){return card('<div class="empty"><strong>Run not found</strong>That date is not in the activity log.</div>')}
@@ -557,8 +736,9 @@ function report(date){
     if(idx>=0){br=(idx+1).toFixed(2)}
   }
   return '<div class="row"><a class="chip" href="#runs">&larr; Runs</a><span class="chip">'+(r.manual?'MANUAL ENTRY':'ESTIMATED')+'</span></div>'
-    +card('<div class="eyebrow">'+band(r.distance)+' RUN</div><h1 class="title">'+esc(r.date)+'</h1><div class="grid g3"><div><div class="stat">'+r.distance+'</div><div class="label">miles</div></div><div><div class="stat">'+esc(r.pace)+'</div><div class="label">pace / mi</div></div><div><div class="stat">'+(r.avgHR==null?"--":r.avgHR)+'</div><div class="label">avg HR</div></div></div><p class="muted">Score computed from pace, heart rate and consistency. Cadence, weather and fueling are not recorded.</p>')
+    +card('<div class="eyebrow">'+band(r.distance)+' RUN</div><h1 class="title">'+esc(r.date)+'</h1><div class="grid g3"><div><div class="stat">'+r.distance+'</div><div class="label">miles</div></div><div><div class="stat">'+esc(r.pace)+'</div><div class="label">pace / mi</div></div><div><div class="stat">'+(r.avgHR==null?"--":r.avgHR)+'</div><div class="label">avg HR</div></div></div><p class="muted">Score computed from pace, heart rate and consistency. Weather is not recorded.</p>')
     +card('<div class="row"><div><div class="eyebrow">Lap profile</div><div class="h2">'+(r.manual?"No lap data":(br==="NONE"?"Held pace all the way":"Breaks at mile "+br))+'</div></div><span class="chip '+(r.manual?"warn":(br==="NONE"?"good":"risk"))+'">'+(r.manual?"MANUAL ENTRY":(br==="NONE"?"NO BREAKDOWN":"ESTIMATED"))+'</span></div>'+(r.splits.length?'<div class="chartbox"><canvas id="split"></canvas></div>':'<div class="empty"><strong>Splits not recorded</strong>This activity source did not provide lap splits.</div>')+'<p class="muted">Baseline band is computed from the first third of supplied lap splits. Slow laps remain visible and are not corrected.</p>')
+    +fuelCard(r)
     +card('<div class="eyebrow">Context</div><div class="grid g2"><span class="chip">Climb / mi: '+(r.ascent!=null&&r.distance?fmt(r.ascent/r.distance):"not recorded")+' ft</span><span class="chip">HR: '+(r.avgHR==null?"not recorded":r.avgHR+"/198")+'</span><span class="chip">Max HR: '+(r.maxHR==null?"not recorded":r.maxHR)+'</span><span class="chip">Cadence: '+(r.cadence==null?"not recorded":r.cadence)+'</span><span class="chip">Calories: '+(r.calories==null?"not recorded":r.calories)+'</span><span class="chip">Laps: '+(r.laps==null?"not recorded":r.laps)+'</span></div>')
     +card('<div class="eyebrow">Written coaching report</div><div class="report"><h3>Run summary</h3><p>This '+r.distance+'-mile '+band(r.distance).toLowerCase()+' run averaged '+esc(r.pace)+'/mi at '+(r.avgHR==null?"an unrecorded heart rate":r.avgHR+" bpm")+'. '+(r.manual?"This is a manual entry; lap splits and device metrics are not recorded.":"The lap profile is preserved exactly from the audited Garmin activity.")+'</p></div>');
 }
@@ -600,7 +780,7 @@ function saveRun(e){
 
 function fuel(date){
   var rows=NUTRITION.filter(function(x){return !date||x.date===date});
-  return card('<div class="row"><div><div class="eyebrow">Fuel</div><h1 class="title">'+esc(date||"Today")+'</h1></div><label class="btn secondary">Import CSV<input id="fuelcsv" type="file" accept=".csv,.json,text/csv,application/json" hidden onchange="importCSV(event)"></label></div>')
+  return card('<div class="row"><div><div class="eyebrow">Nutrition</div><h1 class="title">'+esc(date||"Today")+'</h1></div><label class="btn secondary">Import CSV<input id="fuelcsv" type="file" accept=".csv,.json,text/csv,application/json" hidden onchange="importCSV(event)"></label></div>')
     +(rows.length?rows.map(function(x){
       return card('<a class="run-card" href="#fuel/'+esc(x.date)+'"><div><b>'+esc(x.date)+'</b><div class="muted">Calories '+(x.kcal==null?"not recorded":x.kcal)+' &middot; Protein '+(x.protein==null?"not recorded":x.protein)+'g</div></div><div class="stat">'+(x.carbs==null?"--":x.carbs)+'<small class="label"> g carbs</small></div></a>');
     }).join(""):card('<div class="empty"><strong>Nutrition unavailable</strong>No nutrition days yet. Export Daily Nutrition from cronometer.com and import the CSV below, or set up automatic upload.</div>'))
@@ -629,6 +809,8 @@ function analysis(){
     +card('<div class="eyebrow">Fitness trend</div><div class="chartbox"><canvas id="fit"></canvas></div><p class="muted">Recorded pace against average heart rate.</p>')
     +card('<div class="eyebrow">Run bubbles</div><div class="chartbox"><canvas id="bubble"></canvas></div><p class="muted">Sequence, pace and distance at a glance.</p>')
     +card('<div class="eyebrow">Pacing fade</div><div class="chartbox"><canvas id="fade"></canvas></div><p class="muted">Second-half pace vs first-half pace, per run with splits. Below zero is a negative split.</p>')
+    +card('<div class="eyebrow">Fuel vs fade</div><div class="chartbox"><canvas id="fuelfade"></canvas></div><p class="muted">Recorded in-run energy against fade, for runs that have both. More fuel is not automatically better; the question is whether the runs that fell apart are also the runs with nothing recorded.</p>')
+    +card('<div class="eyebrow">Worst fades</div><div id="worstfade" class="tablewrap"></div><p class="muted">Every run with at least four laps, worst fade first, next to what was recorded as taken in. Open a run report to add or correct its intake.</p>')
     +card('<div class="eyebrow">Pace distribution</div><div class="chartbox"><canvas id="pacedist"></canvas></div><p class="muted">How many runs landed in each 30-second pace bucket.</p>')
     +card('<div class="eyebrow">Best 5K trend</div><div class="chartbox"><canvas id="best5k"></canvas></div><p class="muted">Fastest 5K within each run, from the live split data.</p>')
     +card('<div class="eyebrow">Latest run splits</div><div class="chartbox"><canvas id="latesplits"></canvas></div><p class="muted">Per-mile splits for the most recent run that has them.</p>')
@@ -730,6 +912,33 @@ function drawAnalysis(){
   chartOrEmpty("bodyweight","line",{labels:bw.map(function(x){return x.date.slice(5)}),datasets:[{label:"Bodyweight (lb)",data:bw.map(function(x){return x.value}),borderColor:"#00f5ff",backgroundColor:"#00f5ff22",fill:true,tension:.3}]},{scales:{x:tick,y:ySoft}},"No bodyweight recorded. Add a weight measurement to a lift session to plot the trend.");
   var rm=e1rmData();
   chartOrEmpty("e1rm","line",{labels:rm.map(function(x){return x.date.slice(5)}),datasets:[{label:"Estimated 1RM (lb)",data:rm.map(function(x){return x.value}),borderColor:"#10ffa0",backgroundColor:"#10ffa022",fill:true,tension:.3}]},{scales:{x:tick,y:yAxis}},"No strength sessions. Log a session in LIFT to plot estimated 1RM.");
+  // In-run fuel: the scatter only uses runs where an amount was actually
+  // recorded, so a blank never becomes a zero point on the chart.
+  var fuelPts=RUNS.map(function(r){
+    var d=runFade(r);
+    var e=fuelEnergy(r.fuel);
+    if(!d||e==null)return null;
+    return {x:e,y:d.pct,date:r.date};
+  }).filter(Boolean);
+  chartOrEmpty("fuelfade","scatter",{datasets:[{label:"Recorded energy vs fade",data:fuelPts,backgroundColor:"#ffb300",pointRadius:5}]},{scales:{x:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Recorded intake energy (kcal)",color:"#91a0b7"}},y:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Second half vs first half %",color:"#91a0b7"}}}},"No run has both a recorded intake amount and laps yet. Open a run report and add oz, kcal or carbs to an intake event.");
+  var fades=RUNS.map(function(r){
+    var d=runFade(r);
+    if(!d)return null;
+    var f=r.fuel||null;
+    var t=(f&&f.totals)||{};
+    var desc=f?((f.events||0)+" event"+((f.events||0)===1?"":"s")+" &middot; "+fuelAmt(t.oz," oz")+" &middot; "+fuelAmt(t.kcal," kcal")):"not recorded";
+    return {date:r.date,dist:r.distance,delta:d.delta,pct:d.pct,desc:desc};
+  }).filter(Boolean).sort(function(a,b){return b.delta-a.delta});
+  var worst=document.getElementById("worstfade");
+  if(worst){
+    var withFuel=fades.filter(function(x){return x.desc!=="not recorded"}).length;
+    worst.innerHTML=(fades.length
+      ?'<p class="muted" style="padding:10px">'+fades.length+' runs with laps &middot; '+withFuel+' with intake recorded. Showing the '+Math.min(12,fades.length)+' worst fades.</p>'
+        +'<table><thead><tr><th>Date</th><th>Miles</th><th>Fade s/mi</th><th>Fade %</th><th>Intake</th></tr></thead><tbody>'+fades.slice(0,12).map(function(x){
+          return '<tr><td><a href="#runs/'+esc(x.date)+'">'+esc(x.date)+'</a></td><td>'+x.dist+'</td><td>'+(x.delta>0?"+":"")+x.delta+'</td><td>'+(x.pct>0?"+":"")+x.pct+'%</td><td>'+x.desc+'</td></tr>';
+        }).join("")+'</tbody></table>'
+      :'<div class="empty"><strong>No lap splits yet</strong>Fade appears once a run has at least four laps.</div>');
+  }
 }
 
 function render(){

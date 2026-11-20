@@ -28,6 +28,7 @@ nutrition_log.csv
 nutrition_log.records.json
 nutrition_log.hook-token
 manual_runs.json
+run_fuel.json
 
 # local canonical database: personal training history, never published.
 # migrations/ is tracked; the database built from it is not.

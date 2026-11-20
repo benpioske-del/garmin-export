@@ -86,11 +86,11 @@ def test_bootstrap_dom_targets_exist_in_template(template):
 
 
 def test_analysis_keeps_all_chart_slots(template):
-    """Nineteen run charts plus the split chart; losing them was the regression."""
-    assert template.count('class="chartbox"') == 23
+    """Every run chart plus the split and fuel charts; losing one is the regression."""
+    assert template.count('class="chartbox"') == 24
     for canvas in ("split", "load", "weekly", "monthly", "cumulative", "dist",
                    "pacehr", "tss", "calories", "hrmax", "ascentpace",
-                   "cadence", "elevation", "fit", "bubble", "fade",
+                   "cadence", "elevation", "fit", "bubble", "fade", "fuelfade",
                    "pacedist", "best5k", "latesplits", "gaps", "monthruns",
                    "bodyweight", "e1rm"):
         assert 'id="%s"' % canvas in template, canvas
@@ -123,6 +123,23 @@ def test_manual_entries_are_labelled_not_presented_as_device_runs(template):
     # normalizeRun() rebuilds each run object, so it must carry the flag or the
     # label is lost on the next render.
     assert "manual:r.manual===true" in template
+
+
+def test_in_run_fuel_survives_the_normalize_copy(template):
+    """normalizeRun() rebuilds every run, so the fuel summary must be carried."""
+    assert "activityId:r.activityId||null" in template
+    assert "fuel:r.fuel||null" in template
+    assert "fuel: a.fuel || null" in G.AURORA_LIVE_SCRIPT
+    assert "activityId: a.activity_id || null" in G.AURORA_LIVE_SCRIPT
+
+
+def test_fuel_editor_posts_to_the_server_and_shows_fade(template):
+    """The recovered intake must be editable, not read-only."""
+    assert 'fetch("/api/fuel"' in template
+    assert "function fuelSave" in template
+    assert "function fuelClear" in template
+    assert 'id="worstfade"' in template
+    assert "Fuel &amp; fade" in template
 
 
 def test_sync_reports_a_missing_token_instead_of_a_bare_status(template):

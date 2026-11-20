@@ -17,11 +17,11 @@ merged and re-wired. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-727 passed, 3 skipped (730 collected)
+805 passed, 3 skipped (808 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `699 passed, 31 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `776 passed, 32 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`; the dashboard-contract and brief checks that read the
 gitignored page skip when it is absent; one symlink case skips on Windows; the
@@ -99,17 +99,17 @@ $ python fit_audit.py
 FIT data audit
 parser: fitparse=1.2.0 reader=1.1.0
 
-files inspected           : 74
+files inspected           : 75
 parse failures            : 0
-files readable            : 74
-files with GPS            : 74
+files readable            : 75
+files with GPS            : 75
 files without GPS         : 0
-files with usable timestamp: 74
+files with usable timestamp: 75
 files without timestamp   : 0
-session messages          : 74
-lap messages              : 668
-record messages           : 69293
-position points (counted) : 69272
+session messages          : 75
+lap messages              : 682
+record messages           : 70728
+position points (counted) : 70705
 files missing fields      : 0
 
 warnings:
@@ -140,13 +140,13 @@ Re-running is a no-op. Editing an applied migration raises
 
 ## Import against the real corpus
 
-On a fresh database with the current corpus of 74 files, the first import
-inserts all 74. Re-running against a database that already holds them reports
+On a fresh database with the current corpus of 75 files, the first import
+inserts all 75. Re-running against a database that already holds them reports
 every file `unchanged`:
 
 ```
 $ python activities.py import
-{"inserted": 0, "updated": 0, "unchanged": 74, "unreadable": 0}
+{"inserted": 0, "updated": 0, "unchanged": 75, "unreadable": 0}
 ```
 
 **Idempotency verified on the real data**: no rows updated, and no new audit
@@ -154,22 +154,23 @@ rows written on the second pass.
 
 ```
 $ python activities.py summary
-{"activities": 74, "open_reviews": 3}
+{"activities": 75, "open_reviews": 4}
 ```
 
-- 74 activities
-- 2 open `timezone_uncertain` reviews: the two newest runs, 2026-11-14
-  (`garmin:25080247947`) and 2026-11-17 (`garmin:25113046573`), whose local date
+- 75 activities
+- 3 open `timezone_uncertain` reviews: the three newest runs, 2026-11-14
+  (`garmin:25080247947`), 2026-11-17 (`garmin:25113046573`) and 2026-11-19
+  (`garmin:25135653593`), whose local date
   is derived from the filename and still needs athlete confirmation. Every
   earlier local date was confirmed (US Central, UTC-5/-6 with DST applied per
   run; the 2026-11-08 run at UTC-6 on 2026-11-10, and the 2026-11-10 and
   2026-11-11 runs on 2026-11-11)
 - 1 open `activity_gap`: `no activity 2026-06-26..2026-07-05 (8 days)`
 - 0 duplicates detected
-- 74 SHA-256 raw references stored
+- 75 SHA-256 raw references stored
 
 The FIT-file inventory, the canonical table and the published CSV all agree at
-**74**. An earlier brief described a 55/56/59 discrepancy; that premise was
+**75**. An earlier brief described a 55/56/59 discrepancy; that premise was
 checked against the live corpus and is unsupported, so there is no
 reconciliation to perform.
 
@@ -192,6 +193,14 @@ run was the fourth recurrence: it was on disk but absent from the dashboard.
 `POST /sync` now runs `trainloop.py bootstrap` after `garmin_sync.py`, and the
 import is attempted even when the download fails, so the dashboard path can no
 longer stop after the download.
+
+On 2026-11-20 the 2026-11-19 run (13.11 mi, `garmin:25135653593`) was already in
+the database and the FIT directory while the published CSV still held 74.
+`python trainloop.py bootstrap` reported
+`{"inserted": 0, "updated": 0, "unchanged": 75, "unreadable": 0}`, and the next
+publish brought the CSV to 75. This is the first observed case of the CSV
+lagging the database rather than the other way round: the sync imported the run,
+but nothing had published since.
 
 ## Training load and recommendation
 
@@ -426,8 +435,8 @@ clean checkout), `/` falls back to the local page rather than returning `404`.
 - Verified in-browser against the live database at 72 runs: nineteen Analysis
   charts with data (72 points on each run-based chart, 62 weeks, 16 months, 115
   heatmap days), six mile splits on the latest run, and no console errors.
-  The corpus has since grown to 74; the same page served by the live server
-  reports 74 activities and 3 open reviews, and `/classic` still renders its ten
+  The corpus has since grown to 75; the same page served by the live server
+  reports 75 activities and 4 open reviews, and `/classic` still renders its ten
   canvases with no console errors.
 - Wire tests cover the routes and the mobile paths: `/` serves Aurora with the
   live bootstrap and PWA tags, `/aurora` remains an alias, `/classic` serves the
@@ -465,9 +474,10 @@ vanished on the next reload and a Garmin sync never saw it. It now POSTs to
 
 Verified on the live server: `POST /api/runs` stored one entry, and
 `/api/activities` then reported `count 75, manual 1` with `manual: true` on the
-new row. The probe row was removed afterwards. With a session cookie and the
+new row (74 device runs plus the typed one at the time). The probe row was
+removed afterwards. With a session cookie and the
 classic placeholder header, `POST /sync` returned `{"ok": true}` and
-`activities: 74, open reviews: 3`.
+`activities: 74, open reviews: 3` at that time.
 
 ### Nutrition ingestion (`nutrition.py`, `/api/nutrition`)
 
@@ -566,6 +576,73 @@ when the five exact columns are present and to the CalTrak parser otherwise.
   days (`Calories 2100 · Protein 150g`) and the run detail showed
   `1950 kcal · 140g protein · 200g carbs`, with no console errors.
 
+### In-run fuel and fade (`run_fuel.py`, `/api/fuel`)
+
+In-run fluid, fuel and electrolyte intake was recorded once, in the classic
+journal, and became unreachable when Aurora replaced `/`: three runs carried
+structured `fnotes` (`{mi, kind, what}`) and eight narrative notes mentioned
+intake. Nothing had been deleted. The data was still in
+`dashboard/index.html`, but no view read it and no API served it. It is now a
+first-class sidecar, and it is the input needed to test whether late-run fade
+tracks under-fuelling.
+
+- **Storage.** `paths.data_dir()/run_fuel.json`, a list of entries keyed by
+  `activity_id` when one is known and by local date otherwise. It is not the
+  canonical database: intake is athlete-entered context and must never become a
+  training-load input. `GARMIN_RUN_FUEL_FILE` overrides the path for tests.
+- **Schema.** Each entry carries `date`, optional `activity_id`, `events`,
+  `note`, `source` (`manual`, `journal`, `journal-note`) and `needs_review`.
+  An event is `{mile, at, kind, what, oz, kcal, carbs_g, sodium_mg}`. `kind` is
+  one of `water|electrolyte|fuel|other`; `mile` accepts a number, `start`,
+  `mid` or `finish`; amounts may be blank. Blank is not zero, and a blank never
+  becomes a chart point or a total.
+- **Validation.** `normalize_entry()` rejects a non-ISO or impossible date, a
+  non-list `events`, more than 40 events, overlong text, NaN and out-of-range
+  amounts, and a non-string `activity_id`. Writes are atomic, so a crash cannot
+  leave a half-written store. `upsert()` matches by activity id before date and
+  keeps a known id when a later body omits it.
+- **Fade.** `fade()` uses at least four usable lap splits, ignores blank,
+  zero and non-numeric values, and reports mean second-half pace minus mean
+  first-half pace as `fade_s_per_mi` and `fade_pct`. Positive means slowing
+  down. The definition is shared by the API and the page.
+- **Serving.** `GET /api/fuel` returns `{runs, count, fields, storage}`;
+  `POST /api/fuel` replaces one run's events, or removes the entry when
+  `delete: true` is set. Unknown kinds and bad dates return a `400` with
+  `invalid fuel payload`; an unwritable store returns a `500`. The route sits
+  behind the same token/login gate as the rest of the API.
+- **Merging.** `attach()` adds `row["fuel"]` to `/api/activities`, where the
+  summary carries `events`, `items`, `totals`, per-hour `rates`, `fade`,
+  `note`, `source` and `needs_review`. `items` exists so the editor renders the
+  stored events, not just a count. The merge runs after the manual-run merge
+  and is never fed to `loadcalc` or `recommend`.
+- **Journal recovery.** `python run_fuel.py import-journal` scanned 52 journal
+  entries and seeded 9: three with structured events (`journal`, no review
+  needed) and six note-only (`journal-note`, `needs_review: true`). A
+  note-only entry is not silently converted: `suggest_events()` proposes events
+  in the editor and the athlete saves them. Suggestions turn "no water" and
+  "no gel" into explicit zeroes, keep a mile marker, and leave unmeasured
+  amounts blank.
+- **Editing.** The run report has a "Fuel & fade" card with totals, rates,
+  events and the fade, plus an inline editor: add or remove rows, Save, Clear,
+  and "Use journal suggestions" for note-only entries. `#analysis` adds a
+  "Fuel vs fade" scatter (recorded energy against fade, only where both exist)
+  and a "Worst fades" table showing each run's fade next to what was recorded
+  as taken in. The `#fuel` tab is now labelled `NUTRITION`, so daily nutrition
+  and in-run fuel are not confused.
+- **What the recovered notes already say.** 2026-06-07 was a bonk at mile 14
+  after water ran out; 2026-06-04 was deliberately under-hydrated; 2026-05-28
+  was LMNT only with no gel. The point of the scatter and the table is to test
+  that pattern against the runs that did not fade, rather than to assume it.
+- **Plumbing.** `run_fuel.json` is in `paths.DATA_FILES`,
+  `backup_data.DATA_FILES`, `.gitignore`, `export_publish.IGNORE`,
+  `export_publish.PUBLISHED_MODULES` (`run_fuel.py`) and the cloud migration
+  file list, so it is backed up, never published, and carried to a VM.
+- `tests/test_run_fuel.py` covers parsing, validation, the store, fade, attach,
+  suggestions, journal import, payload and the CLI; nine HTTP tests cover
+  GET/POST/delete, the token gate, validation and the `/api/activities` merge;
+  `tests/test_aurora_template.py` pins the editor, the scatter and the
+  normalize-copy contract.
+
 ## Local data backup and restore
 
 `backup_data.py` bundles the data that git does not carry: the FIT corpus,
@@ -641,10 +718,10 @@ Run directly, with `GARMIN_REPO` pointed at a temporary directory:
 
 ```
 $ python deploy/cloud/refresh_export.py
-export refreshed: 74 runs, latest 2026-11-17
+export refreshed: 75 runs, latest 2026-11-19
 ```
 
-The generated `garmin_export.csv` was 20,846 bytes, the same size as the
+The generated `garmin_export.csv` was 21,155 bytes, the same size as the
 published copy, so the cloud path uses the same builder as the laptop.
 
 The PowerShell migration script parses cleanly with
@@ -729,7 +806,7 @@ Recorded so they are not reintroduced by a later brief:
   prevents the error from reaching the UI. The API queries every count; none is
   written down. See [SUPERVISOR_BRIEF_ERRORS.md](SUPERVISOR_BRIEF_ERRORS.md).
 - **"55 audit records and a historical 59-record source."** Both counts are
-  unsupported. The live corpus is 74 across every source.
+  unsupported. The live corpus is 75 across every source.
 
 ## Reproducing this report
 

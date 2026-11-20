@@ -43,6 +43,9 @@ DATA_FILES = (
     # Quick-log runs typed into the dashboard. Not rebuilt from Garmin, so a
     # backup that omitted it would lose them.
     "manual_runs.json",
+    # In-run fluid, fuel and electrolyte events. Athlete-entered context that
+    # no sync can reconstruct.
+    "run_fuel.json",
 )
 
 # Repository files that are not in git. ``trainloop.db`` is rebuilt by

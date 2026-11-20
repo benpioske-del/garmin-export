@@ -53,6 +53,7 @@ $dataFiles = @(
     'nutrition_log.records.json',
     'nutrition_log.hook-token',
     'manual_runs.json',
+    'run_fuel.json',
     'garmin_last_sync.json',
     'garmin_sleep.csv',
     'garmin_hr.csv',

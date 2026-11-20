@@ -389,8 +389,10 @@ def api_coaching(conn, hr_max, as_of=None):
 API_ROUTES = {
     # Manual quick-log rows are display-only: they are merged after the
     # canonical query so loadcalc and coaching never count a typed entry as a
-    # device activity.
-    "/api/activities": lambda conn, hr, at: manual_runs.merge(api_activities(conn)),
+    # device activity. In-run fuel is attached last for the same reason: it is
+    # context for a human reading the fade, never an input to the load formula.
+    "/api/activities": lambda conn, hr, at: run_fuel.attach(
+        manual_runs.merge(api_activities(conn))),
     "/api/load": lambda conn, hr, at: api_load(conn, hr, as_of=at),
     "/api/coaching": lambda conn, hr, at: api_coaching(conn, hr, as_of=at),
 }
@@ -415,6 +417,7 @@ import loadcalc            # noqa: E402
 import manual_runs         # noqa: E402
 import nutrition           # noqa: E402
 import recommend           # noqa: E402
+import run_fuel            # noqa: E402
 import trainingdb          # noqa: E402
 import trainloop           # noqa: E402
 
@@ -863,6 +866,10 @@ AURORA_LIVE_SCRIPT = """
       // Typed quick-log rows arrive with source_system "manual"; the feed
       // labels them so a hand-entered run never looks device-recorded.
       manual: a.source_system === "manual",
+      // The fuel sidecar is keyed by the canonical activity id when there is
+      // one, so the editor must keep the id it was merged against.
+      activityId: a.activity_id || null,
+      fuel: a.fuel || null,
       band: band(mi)
     };
   }
@@ -1549,6 +1556,59 @@ class Handler(BaseHTTPRequestHandler):
                 "error": "could not write the manual run log"})
         return self._send_json(200, {"ok": True, "activity": row})
 
+    def _handle_fuel_post(self):
+        """POST /api/fuel - store or clear one run's in-run intake.
+
+        The editor sends the whole entry, not a patch: the athlete sees every
+        event at once, so replacing the list is what the form means. A body
+        with ``delete`` set removes the entry instead. Intake is athlete data
+        in a local sidecar; it never becomes a training-load input.
+        """
+        try:
+            length = int(self.headers.get("Content-Length") or "0")
+        except ValueError:
+            length = 0
+        if length < 1 or length > run_fuel.MAX_BODY:
+            return self._send_json(413, {
+                "error": "fuel payload must be 1..%d bytes"
+                         % run_fuel.MAX_BODY})
+        try:
+            body = json.loads(self.rfile.read(length).decode("utf-8"))
+        except Exception:
+            return self._send_json(400, {"error": "body must be JSON"})
+        if not isinstance(body, dict):
+            return self._send_json(400, {
+                "error": "invalid fuel payload",
+                "detail": "body must be a JSON object",
+            })
+
+        if body.get("delete"):
+            date = str(body.get("date") or "").strip()
+            if not date:
+                return self._send_json(400, {
+                    "error": "invalid fuel payload",
+                    "detail": "date is required to delete",
+                })
+            try:
+                removed = run_fuel.delete(
+                    date, body.get("activity_id") or None)
+            except OSError:
+                return self._send_json(500, {
+                    "error": "could not write the fuel log"})
+            return self._send_json(200, {"ok": True, "removed": removed})
+
+        try:
+            entry = run_fuel.upsert(body)
+        except run_fuel.FuelError as exc:
+            return self._send_json(400, {
+                "error": "invalid fuel payload",
+                "detail": str(exc),
+            })
+        except OSError:
+            return self._send_json(500, {
+                "error": "could not write the fuel log"})
+        return self._send_json(200, {"ok": True, "entry": entry})
+
     def _handle_nutrition_hook(self):
         """POST /api/nutrition/hook - the phone bridge's token-only endpoint.
 
@@ -1892,6 +1952,20 @@ class Handler(BaseHTTPRequestHandler):
                         "error": "nutrition log unreadable",
                         "detail": str(exc),
                     })
+            if path == "/api/fuel":
+                # In-run intake lives in a sidecar, not the database, so it is
+                # dispatched before _api() opens a connection.
+                if query:
+                    return self._send_json(400, {
+                        "error": "unsupported query parameter",
+                        "parameter": sorted(query)[0],
+                        "supported": [],
+                    })
+                try:
+                    return self._send_json(200, run_fuel.payload())
+                except OSError:
+                    return self._send_json(500, {
+                        "error": "could not read the fuel log"})
             return self._api(path, query)
         if path.startswith("/fit/"):
             name = path[len("/fit/"):].replace("/", "")
@@ -1985,6 +2059,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._handle_nutrition_post()
         if path == "/api/runs":
             return self._handle_manual_run_post()
+        if path == "/api/fuel":
+            return self._handle_fuel_post()
         return self._deny(404, "not found")
 
     def log_message(self, fmt, *args):
