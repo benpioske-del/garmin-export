@@ -1730,6 +1730,12 @@ What is now true:
   save, clear, use suggestions). `#analysis` has a fuel-vs-fade scatter and a
   worst-fades table. The `#fuel` tab is relabelled `NUTRITION` so daily
   nutrition and in-run fuel are not confused.
+- A manual run is editable end to end. Its report links to `#log/run/<date>`,
+  which prefills distance, time, HR, RPE, fuel events and note. The date is
+  read-only because it is the run's identity. `POST /api/runs` now takes an
+  optional `fuel` object, validates it before either sidecar is written, forces
+  the key to `manual:YYYY-MM-DD`, and accepts `{delete:true}` to clear intake.
+  A plain distance edit leaves existing fuel alone.
 - `run_fuel.json` is in `paths.DATA_FILES`, `backup_data.DATA_FILES`,
   `.gitignore`, `export_publish.IGNORE`, `export_publish.PUBLISHED_MODULES`
   and the cloud migration file list.
@@ -1756,10 +1762,11 @@ What is not fixed:
   `commit` in `brief_facts.json` or use the contents API.
 
 Verification: `tests/test_run_fuel.py` covers parsing, validation, storage,
-fade, attach, suggestions, journal import, payload and the CLI; nine HTTP tests
-cover GET, POST, delete, the token gate and the `/api/activities` merge;
-`tests/test_aurora_template.py` pins the editor and the normalize-copy
-contract. Full suite: **805 passed, 3 skipped (808 collected)**. Clean checkout
-with no FIT files, no `trainloop.db` and no `dashboard/index.html`:
-**776 passed, 32 skipped**. `ruff check .` is clean. These replace the
-twenty-sixth correction's 727/3 and 699/31.
+fade, attach, suggestions, journal import, payload and the CLI; twelve HTTP
+tests cover GET, POST, delete, the token gate, the `/api/activities` merge and
+the combined run-and-fuel path; `tests/test_aurora_template.py` pins the editor,
+the normalize-copy contract and the manual-run edit form. Full suite:
+**809 passed, 3 skipped (812 collected)**. Clean checkout with no FIT files,
+no `trainloop.db` and no `dashboard/index.html`: **780 passed, 32 skipped**.
+`ruff check .` is clean. These replace the twenty-sixth correction's 727/3 and
+699/31.

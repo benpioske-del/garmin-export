@@ -861,6 +861,7 @@ AURORA_LIVE_SCRIPT = """
       descent: a.total_descent_ft == null ? null : Math.round(Number(a.total_descent_ft)),
       calories: a.calories == null ? null : Number(a.calories),
       laps: a.laps == null ? null : Number(a.laps),
+      rpe: a.rpe == null ? null : Number(a.rpe),
       bestLap: null,
       source: a.source_file || "trainloop.db",
       // Typed quick-log rows arrive with source_system "manual"; the feed
@@ -1524,13 +1525,19 @@ class Handler(BaseHTTPRequestHandler):
         return self._send_json(200, result)
 
     def _handle_manual_run_post(self):
-        """POST /api/runs - store one typed run from the quick-log form.
+        """POST /api/runs - store one typed run, and its intake, from the form.
 
         The quick log used to write only to localStorage, so the entry
         disappeared on the next reload and never reached the server. It is
         stored in the local manual-run sidecar and merged into
         /api/activities for display; it is deliberately not a canonical
         device activity, so load and coaching do not count it.
+
+        An optional ``fuel`` object is written to the run_fuel sidecar in the
+        same request. That is what makes a hand-entered run editable as one
+        record: distance and fuel are saved together. The date is the identity
+        of a manual run, so the server overwrites the client's fuel key with
+        the canonical ``manual:YYYY-MM-DD`` id instead of trusting the form.
         """
         try:
             length = int(self.headers.get("Content-Length") or "0")
@@ -1544,6 +1551,39 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length).decode("utf-8"))
         except Exception:
             return self._send_json(400, {"error": "body must be JSON"})
+
+        # Validate both halves before writing either one. A bad fuel row must
+        # not leave a freshly saved run whose intake silently failed.
+        try:
+            canonical = manual_runs.normalize(body)
+        except manual_runs.ManualRunError as exc:
+            return self._send_json(400, {
+                "error": "invalid run payload",
+                "detail": str(exc),
+            })
+
+        fuel_body = body.get("fuel")
+        prepared_fuel = None
+        delete_fuel = False
+        if fuel_body is not None:
+            if not isinstance(fuel_body, dict):
+                return self._send_json(400, {
+                    "error": "invalid fuel payload",
+                    "detail": "fuel must be a JSON object",
+                })
+            delete_fuel = bool(fuel_body.get("delete"))
+            if not delete_fuel:
+                candidate = dict(fuel_body)
+                candidate["date"] = canonical["date"]
+                candidate["activity_id"] = canonical["activity_id"]
+                try:
+                    prepared_fuel = run_fuel.normalize_entry(candidate)
+                except run_fuel.FuelError as exc:
+                    return self._send_json(400, {
+                        "error": "invalid fuel payload",
+                        "detail": str(exc),
+                    })
+
         try:
             row = manual_runs.upsert(body)
         except manual_runs.ManualRunError as exc:
@@ -1554,7 +1594,20 @@ class Handler(BaseHTTPRequestHandler):
         except OSError:
             return self._send_json(500, {
                 "error": "could not write the manual run log"})
-        return self._send_json(200, {"ok": True, "activity": row})
+
+        fuel_result = None
+        if fuel_body is not None:
+            try:
+                if delete_fuel:
+                    run_fuel.delete(row["date"], row["activity_id"])
+                    fuel_result = {"deleted": True}
+                else:
+                    fuel_result = run_fuel.upsert(prepared_fuel)
+            except OSError:
+                return self._send_json(500, {
+                    "error": "could not write the run's fuel"})
+        return self._send_json(200, {
+            "ok": True, "activity": row, "fuel": fuel_result})
 
     def _handle_fuel_post(self):
         """POST /api/fuel - store or clear one run's in-run intake.

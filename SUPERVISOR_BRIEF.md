@@ -37,10 +37,10 @@ data-layer-and-provenance | 4051291 | migrations 001-006
 fit-audit-and-guard | evidence from SUPERVISOR_BRIEF.md | 0 parse failures, 75/75 GPS, guard verified
 formalize-continuity-review-without-synthetic-activities | evidence from docs/VERIFICATION_REPORT.md | 1 open activity_gap; no synthetic activities may be created; accepted corpus is 75 activities
 make-coaching-rationales-deterministic-and-auditable | evidence from docs/IMPLEMENTATION_INVENTORY.md | tests/recommend_snapshots.py pins every reachable coaching branch to golden JSON with fixed as_of and supplied hr_max
-harden-bridge-and-release-quality-gates | evidence from docs/VERIFICATION_REPORT.md | 805 passed, 3 skipped; facts gate, rejected-brief staging, content-derived idempotency, and publish protections are tested
+harden-bridge-and-release-quality-gates | evidence from docs/VERIFICATION_REPORT.md | 809 passed, 3 skipped; facts gate, rejected-brief staging, content-derived idempotency, and publish protections are tested
 connect-dashboard-to-data-layer | evidence from docs/IMPLEMENTATION_INVENTORY.md and docs/VERIFICATION_REPORT.md | GET /api/activities, GET /api/load, and GET /api/coaching are served on the same origin and the dashboard fetches them
 caltrak-nutrition-ingestion | evidence from docs/VERIFICATION_REPORT.md and docs/IMPLEMENTATION_INVENTORY.md | nutrition.py parses and aggregates Cronometer and CalTrak CSV; GET/POST /api/nutrition serve and upsert daily totals; the FUEL tab consumes live nutrition data
-in-run-fuel-and-fade | evidence from docs/VERIFICATION_REPORT.md | run_fuel.py stores per-run fluid, fuel and electrolyte events recovered from the journal, computes fade from lap splits, and serves GET/POST /api/fuel; the run report has an inline editor and #analysis has a fuel-vs-fade scatter and worst-fades table
+in-run-fuel-and-fade | evidence from docs/VERIFICATION_REPORT.md | run_fuel.py stores per-run fluid, fuel and electrolyte events recovered from the journal, computes fade from lap splits, and serves GET/POST /api/fuel; the run report has an inline editor and #analysis has a fuel-vs-fade scatter and worst-fades table; the quick log doubles as an edit form so a manual run's distance, HR, RPE and intake save in one request
 
 ---
 ## VERIFICATION (open tasks from previous brief)
@@ -60,7 +60,7 @@ establish-authenticated-athlete-ownership | BLOCKED / PARKED AND DEMOTED | Authe
 - FIT file count: 75. Source: docs/VERIFICATION_REPORT.md, "files inspected           : 75".
 - Activity count: 75. Source: docs/VERIFICATION_REPORT.md, `{"activities": 75, "open_reviews": 4}`.
 - Open review count: 4. Source: docs/VERIFICATION_REPORT.md, `{"activities": 75, "open_reviews": 4}`.
-- Test result: 805 passed, 3 skipped. Source: docs/VERIFICATION_REPORT.md, "805 passed, 3 skipped (808 collected)".
+- Test result: 809 passed, 3 skipped. Source: docs/VERIFICATION_REPORT.md, "809 passed, 3 skipped (812 collected)".
 - Parse failures: 0. Source: docs/VERIFICATION_REPORT.md, "parse failures            : 0".
 - Files with GPS: 75. Source: docs/VERIFICATION_REPORT.md, "files with GPS            : 75".
 - Open timezone_uncertain reviews: 3. Source: docs/VERIFICATION_REPORT.md, "3 open `timezone_uncertain` reviews".
@@ -70,6 +70,7 @@ establish-authenticated-athlete-ownership | BLOCKED / PARKED AND DEMOTED | Authe
 - Nutrition rows: 0 in the committed repository; `nutrition_log.csv` is headers only. Ingested rows are written to the local data directory and are not published. Source: docs/IMPLEMENTATION_INVENTORY.md, "Nutrition ingestion".
 - Lifting rows: 0 in the committed repository; `lifting_log.csv` is headers only. Source: the committed file at `d775add`.
 - Raw CSV freshness: the unpinned `raw.githubusercontent.com/.../main/garmin_export.csv` URL can serve a cached older revision. A reader that needs current numbers should pin the URL to the `commit` in `brief_facts.json`, or use the GitHub contents API. Source: docs/VERIFICATION_REPORT.md, "Raw URL freshness, observed 2026-11-20".
+- Editable manual-run status: implemented. The quick log opens prefilled from a manual run's report, keeps the date fixed as the run's identity, and saves distance, time, HR, RPE, intake events and note in one `POST /api/runs`. The server validates both halves before writing either, derives the fuel key from the canonical `manual:YYYY-MM-DD` id, and accepts `{delete:true}` to clear intake. Source: docs/VERIFICATION_REPORT.md, "Quick log (`POST /api/runs`, `manual_runs.py`)".
 - Nutrition integration status: implemented. `nutrition.py` parses and aggregates Cronometer CSV exports (exact macro columns) and CalTrak CSV and JSON backups; `GET`/`POST /api/nutrition` serve and upsert daily totals; the FUEL tab consumes live data; the PWA share target posts an exported nutrition CSV straight to the server; and `POST /api/nutrition/hook` accepts Health Connect payloads from the phone bridge with a dedicated token. Source: docs/VERIFICATION_REPORT.md, "Nutrition ingestion".
 - Seamless phone nutrition status: implemented server-side, unverified on the athlete's device. Cronometer's Android app writes Food to Health Connect; the HC Webhook app POSTs Nutrition to `/api/nutrition/hook` on an interval or on demand, with Daily resolution producing one authoritative total per local day. One-time setup, then no export or file picker. Cronometer itself has no personal webhook or public API, so the manual CSV export from cronometer.com is the free fallback. Source: docs/VERIFICATION_REPORT.md, "Seamless Android path".
 - One-tap Garmin sync status: implemented. The home view's `Sync Garmin now` button POSTs `/sync`, which runs `garmin_sync.py` then `trainloop.py bootstrap`, from the phone or the laptop. Source: docs/VERIFICATION_REPORT.md, "One-tap Garmin sync".

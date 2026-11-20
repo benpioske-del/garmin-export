@@ -142,6 +142,24 @@ def test_fuel_editor_posts_to_the_server_and_shows_fade(template):
     assert "Fuel &amp; fade" in template
 
 
+def test_manual_runs_are_editable_with_fuel_in_one_form(template):
+    """Quick log and edit share one form, so fuel goes in with the run."""
+    assert "function log(editDate)" in template
+    assert 'id="fuel-rows-log"' in template
+    assert 'data-editing=' in template
+    assert 'data-had-fuel=' in template
+    # Single quotes inside the single-quoted JS string are HTML-encoded, not
+    # backslash-escaped; a stray quote here used to kill the whole script.
+    assert 'onclick="fuelAddRow(&apos;log&apos;)"' in template
+    assert "payload.fuel={events:events,note:note" in template
+    assert "payload.fuel={delete:true}" in template
+    assert 'h.indexOf("#log/run/")===0?log(' in template
+    assert "Edit run</a>" in template
+    # The edit form needs the athlete-reported RPE back from the API.
+    assert "rpe:r.rpe==null?null:Number(r.rpe)" in template
+    assert "rpe: a.rpe == null ? null : Number(a.rpe)" in G.AURORA_LIVE_SCRIPT
+
+
 def test_sync_reports_a_missing_token_instead_of_a_bare_status(template):
     """A stale ?tk= used to surface as 'Sync failed: HTTP 403'."""
     assert "dashboard token missing" in template

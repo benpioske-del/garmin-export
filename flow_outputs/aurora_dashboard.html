@@ -301,6 +301,7 @@ function normalizeRun(r){
     descent:r.descent==null?null:Number(r.descent),
     calories:r.calories==null?null:Number(r.calories),
     laps:r.laps==null?splits.length:Number(r.laps),
+    rpe:r.rpe==null?null:Number(r.rpe),
     source:r.source||null,
     // The live layer marks a typed quick-log row. normalizeRun() rebuilds the
     // object, so it has to carry the flag or the feed and report lose it.
@@ -735,7 +736,7 @@ function report(date){
     var idx=vals.findIndex(function(v,i){return i>1&&v>base+20});
     if(idx>=0){br=(idx+1).toFixed(2)}
   }
-  return '<div class="row"><a class="chip" href="#runs">&larr; Runs</a><span class="chip">'+(r.manual?'MANUAL ENTRY':'ESTIMATED')+'</span></div>'
+  return '<div class="row"><a class="chip" href="#runs">&larr; Runs</a>'+(r.manual?'<a class="chip" href="#log/run/'+encodeURIComponent(r.date)+'">Edit run</a>':'')+'<span class="chip">'+(r.manual?'MANUAL ENTRY':'ESTIMATED')+'</span></div>'
     +card('<div class="eyebrow">'+band(r.distance)+' RUN</div><h1 class="title">'+esc(r.date)+'</h1><div class="grid g3"><div><div class="stat">'+r.distance+'</div><div class="label">miles</div></div><div><div class="stat">'+esc(r.pace)+'</div><div class="label">pace / mi</div></div><div><div class="stat">'+(r.avgHR==null?"--":r.avgHR)+'</div><div class="label">avg HR</div></div></div><p class="muted">Score computed from pace, heart rate and consistency. Weather is not recorded.</p>')
     +card('<div class="row"><div><div class="eyebrow">Lap profile</div><div class="h2">'+(r.manual?"No lap data":(br==="NONE"?"Held pace all the way":"Breaks at mile "+br))+'</div></div><span class="chip '+(r.manual?"warn":(br==="NONE"?"good":"risk"))+'">'+(r.manual?"MANUAL ENTRY":(br==="NONE"?"NO BREAKDOWN":"ESTIMATED"))+'</span></div>'+(r.splits.length?'<div class="chartbox"><canvas id="split"></canvas></div>':'<div class="empty"><strong>Splits not recorded</strong>This activity source did not provide lap splits.</div>')+'<p class="muted">Baseline band is computed from the first third of supplied lap splits. Slow laps remain visible and are not corrected.</p>')
     +fuelCard(r)
@@ -743,25 +744,61 @@ function report(date){
     +card('<div class="eyebrow">Written coaching report</div><div class="report"><h3>Run summary</h3><p>This '+r.distance+'-mile '+band(r.distance).toLowerCase()+' run averaged '+esc(r.pace)+'/mi at '+(r.avgHR==null?"an unrecorded heart rate":r.avgHR+" bpm")+'. '+(r.manual?"This is a manual entry; lap splits and device metrics are not recorded.":"The lap profile is preserved exactly from the audited Garmin activity.")+'</p></div>');
 }
 
-function log(){
-  return card('<div class="eyebrow">Quick log</div><h1 class="title">Capture the effort.</h1><form id="runform" class="form" onsubmit="saveRun(event)"><label>Date<input name="date" type="date" value="'+new Date().toISOString().slice(0,10)+'" required></label><label>Distance, miles<input name="distance" type="number" step=".01" required></label><label>Time<input name="time" placeholder="45:00" required></label><label>Average HR<input name="hr" type="number" required></label><label>RPE <input name="rpe" type="range" min="1" max="10" value="5"></label><button class="btn">Save and view report</button></form><p class="muted">Saved to this dashboard as a manual entry. A Garmin sync for the same day replaces it.</p>');
+function log(editDate){
+  var r=editDate?RUNS.find(function(x){return x.date===editDate&&x.manual}):null;
+  var editing=!!r;
+  var date=r?r.date:new Date().toISOString().slice(0,10);
+  var items=(r&&r.fuel&&r.fuel.items)||[];
+  var note=r&&r.fuel?(r.fuel.note||""):"";
+  var hadFuel=!!(r&&r.fuel);
+  var label=editing?"Save changes":"Save and view report";
+  return card('<div class="row"><div><div class="eyebrow">'+(editing?'Edit run':'Quick log')+'</div><h1 class="title">'+(editing?'Tune the effort.':'Capture the effort.')+'</h1></div><a class="chip" href="#runs">Back to runs</a></div>'
+    +'<form id="runform" class="form" data-editing="'+(editing?'true':'false')+'" data-had-fuel="'+(hadFuel?'true':'false')+'" onsubmit="saveRun(event)">'
+    +'<label>Date<input name="date" type="date" value="'+esc(date)+'" required'+(editing?' readonly':'')+'></label>'
+    +(editing?'<p class="muted">The date is this run&apos;s identity. To log another run on the same day, use a new quick log.</p>':'')
+    +'<label>Distance, miles<input name="distance" type="number" step=".01" value="'+esc(r?r.distance:"")+'" required></label>'
+    +'<label>Time<input name="time" placeholder="45:00" value="'+esc(r?(r.time||""):"")+'" required></label>'
+    +'<label>Average HR<input name="hr" type="number" value="'+esc(r&&r.avgHR!=null?r.avgHR:"")+'" required></label>'
+    +'<label>RPE <input name="rpe" type="range" min="1" max="10" value="'+esc(r&&r.rpe!=null?r.rpe:5)+'"></label>'
+    +'<div class="eyebrow" style="margin-top:14px">Fuel during the run <span class="muted">optional</span></div>'
+    +'<p class="muted">Miles accept a number, <b>start</b>, <b>mid</b> or <b>finish</b>. Leave an amount blank when it was not measured; blank is not zero.</p>'
+    +'<div class="tablewrap"><table><thead><tr><th>Where</th><th>Kind</th><th>Taken</th><th>oz</th><th>kcal</th><th>carbs g</th><th>sodium mg</th><th></th></tr></thead><tbody id="fuel-rows-log">'+items.map(fuelRowHtml).join("")+'</tbody></table></div>'
+    +'<button class="btn secondary" type="button" onclick="fuelAddRow(&apos;log&apos;)">+ Add event</button>'
+    +'<label style="margin-top:10px">Note (optional)<input name="note" type="text" value="'+esc(note)+'" placeholder="water ran out at mile 14"></label>'
+    +'<p class="muted" id="fuel-msg-log"></p>'
+    +'<button class="btn">'+label+'</button></form>'
+    +'<p class="muted">Saved to this dashboard as a manual entry, with its intake in the same record. A Garmin sync for the same day replaces the run copy but leaves your fuel entry.</p>');
 }
 function saveRun(e){
   e.preventDefault();
   var form=e.target;
   var f=new FormData(form);
-  var date=f.get("date"),t=f.get("time")||"0:00",dist=+f.get("distance")||0;
-  var btn=form.querySelector("button");
-  if(btn){btn.disabled=true;btn.textContent="Saving..."}
+  var date=String(f.get("date")||"").trim();
+  var t=f.get("time")||"0:00",dist=+f.get("distance")||0;
+  var events=fuelCollect("log");
+  var note=String(f.get("note")||"").trim();
+  var hadFuel=form.getAttribute("data-had-fuel")==="true";
+  var editing=form.getAttribute("data-editing")==="true";
+  var label=editing?"Save changes":"Save and view report";
+  var payload={date:date,distance:dist,time:t,hr:f.get("hr"),rpe:f.get("rpe")};
+  // A blank fuel table on a run that had no intake means "do not create an
+  // empty sidecar". On an edit it means "remove the old intake".
+  if(events.length||note){
+    payload.fuel={events:events,note:note,source:"manual",needs_review:false};
+  }else if(hadFuel){
+    payload.fuel={delete:true};
+  }
+  var btn=form.querySelector("button.btn:not(.secondary)");
+  if(btn){btn.disabled=true;btn.textContent=editing?"Saving changes...":"Saving..."}
   var tk=new URLSearchParams(location.search).get("tk")||"";
   var h={"Content-Type":"application/json"};if(tk)h["X-Dash-Token"]=tk;
   function done(msg){
-    if(btn){btn.disabled=false;btn.textContent="Save and view report"}
+    if(btn){btn.disabled=false;btn.textContent=label}
     if(msg){toast(msg)}
   }
   // Persist on the server. The old version wrote only to localStorage, so the
   // run vanished on the next reload and a Garmin sync never saw it.
-  fetch("/api/runs",{method:"POST",headers:h,credentials:"same-origin",body:JSON.stringify({date:date,distance:dist,time:t,hr:f.get("hr"),rpe:f.get("rpe")})})
+  fetch("/api/runs",{method:"POST",headers:h,credentials:"same-origin",body:JSON.stringify(payload)})
     .then(function(r){
       return r.json().catch(function(){return{}}).then(function(res){
         if(!r.ok||!res.ok){throw new Error((res&&(res.detail||res.error))||("HTTP "+r.status))}
@@ -769,7 +806,7 @@ function saveRun(e){
       });
     })
     .then(function(){
-      done("Run saved");
+      done(editing?"Run and fuel updated":"Run saved");
       if(window.auroraReloadAll){
         return window.auroraReloadAll().then(function(){go("#runs/"+date)});
       }
@@ -950,6 +987,7 @@ function render(){
   var view=h==="#home"?home()
     :h==="#runs"?runs()
     :h==="#log/run"?log()
+    :h.indexOf("#log/run/")===0?log(decodeURIComponent(h.split("/")[2]||""))
     :(h==="#analysis"||h.indexOf("#analysis/")===0)?analysis()
     :h==="#data"?data()
     :h==="#lift"?lift()

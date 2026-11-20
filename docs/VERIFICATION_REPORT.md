@@ -17,11 +17,11 @@ merged and re-wired. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-805 passed, 3 skipped (808 collected)
+809 passed, 3 skipped (812 collected)
 ```
 
 The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `776 passed, 32 skipped`. The live-corpus tests
+and no `dashboard/index.html`: `780 passed, 32 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`; the dashboard-contract and brief checks that read the
 gitignored page skip when it is absent; one symlink case skips on Windows; the
@@ -480,6 +480,28 @@ vanished on the next reload and a Garmin sync never saw it. It now POSTs to
 - `tests/test_manual_runs.py` (30 tests) covers duration parsing, validation,
   atomic writes, date replacement, merge, same-day dedupe, idempotence and the
   refusal to claim device provenance.
+- The same form is now an editor. A manual run's report links back to
+  `#log/run/<date>`; `log(editDate)` prefills distance, time, HR, RPE, the fuel
+  event table and the note. The date is read-only because it is the identity of
+  a manual run. Saving posts the run and its intake together: `POST /api/runs`
+  accepts an optional `fuel` object with `events`, `note`, `source` and
+  `needs_review`, validates it with `run_fuel.normalize_entry()` before writing
+  either sidecar, and forces the key to the canonical `manual:YYYY-MM-DD` id so
+  a form cannot attach intake to a device activity. `{delete:true}` removes the
+  intake entry; editing with an empty table and no note sends that delete.
+  Omitting `fuel` leaves existing intake untouched.
+- In-browser check through a token-free local proxy: `#log/run` rendered the
+  fuel table and `+ Add event` added a row; a synthetic manual run's report
+  showed `Edit run`, and `#log/run/2026-11-20` prefilled `6.25` miles, `52:30`,
+  HR `151`, RPE `7`, one `fuel` event and the note. A fetch spy confirmed the
+  submit body carried those fields plus `fuel.events` and `fuel.note`. Nothing
+  was written to the live data sidecars and no dashboard token entered the
+  browser URL or history.
+- `tests/test_dashboard_api_http.py` covers combined run-and-fuel storage,
+  canonical fuel identity, editing that replaces the events, the delete path,
+  and validation failure that saves neither sidecar;
+  `tests/test_aurora_template.py` pins the editor form, the `#log/run/<date>`
+  route and the RPE round-trip.
 
 Verified on the live server: `POST /api/runs` stored one entry, and
 `/api/activities` then reported `count 75, manual 1` with `manual: true` on the
@@ -638,6 +660,11 @@ tracks under-fuelling.
   and a "Worst fades" table showing each run's fade next to what was recorded
   as taken in. The `#fuel` tab is now labelled `NUTRITION`, so daily nutrition
   and in-run fuel are not confused.
+- **Manual runs.** The quick log is the same editor, opened prefilled from the
+  manual run's report at `#log/run/<date>`. Intake events and the note travel in
+  the `POST /api/runs` body beside distance, time, HR and RPE, so a typed run and
+  its fuel are one editable record. See "Quick log" above for the validation and
+  identity rules.
 - **What the recovered notes already say.** 2026-06-07 was a bonk at mile 14
   after water ran out; 2026-06-04 was deliberately under-hydrated; 2026-05-28
   was LMNT only with no gel. The point of the scatter and the table is to test
@@ -647,10 +674,10 @@ tracks under-fuelling.
   `export_publish.PUBLISHED_MODULES` (`run_fuel.py`) and the cloud migration
   file list, so it is backed up, never published, and carried to a VM.
 - `tests/test_run_fuel.py` covers parsing, validation, the store, fade, attach,
-  suggestions, journal import, payload and the CLI; nine HTTP tests cover
-  GET/POST/delete, the token gate, validation and the `/api/activities` merge;
-  `tests/test_aurora_template.py` pins the editor, the scatter and the
-  normalize-copy contract.
+  suggestions, journal import, payload and the CLI; twelve HTTP tests cover
+  GET/POST/delete, the token gate, validation, the `/api/activities` merge and
+  the combined run-and-fuel path; `tests/test_aurora_template.py` pins the
+  editor, the scatter, the normalize-copy contract and the manual-run edit form.
 
 ## Local data backup and restore
 

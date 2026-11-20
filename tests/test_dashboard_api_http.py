@@ -870,6 +870,73 @@ def test_manual_run_same_date_replaces_the_entry(server, manual_file):
     assert payload["activities"][0]["distance_mi"] == 7.0
 
 
+def test_manual_run_stores_fuel_in_the_same_request(server, manual_file,
+                                                     fuel_file):
+    status, _, result = _post_json(server, "/api/runs", {
+        "date": "2026-11-16", "distance": 5, "time": "45:00",
+        "fuel": {
+            # A form must not be able to attach intake to a device activity.
+            "activity_id": "garmin:999",
+            "events": [{"mile": 5, "kind": "water", "oz": 16}],
+            "note": "water at 5",
+        },
+    })
+    assert status == 200
+    assert result["ok"] is True
+    assert result["fuel"]["activity_id"] == "manual:2026-11-16"
+    assert result["fuel"]["events"][0]["oz"] == 16
+
+    _, _, fuel = _json(server, "/api/fuel")
+    assert fuel["count"] == 1
+    assert fuel["runs"][0]["events"][0]["kind"] == "water"
+    assert fuel["runs"][0]["note"] == "water at 5"
+
+    _, _, activities = _json(server, "/api/activities")
+    row = activities["activities"][0]
+    assert row["fuel"]["totals"]["oz"] == 16
+    assert activities["fuel_count"] == 1
+
+
+def test_manual_run_edit_replaces_fuel_and_clear_deletes_it(server, manual_file,
+                                                             fuel_file):
+    base = {"date": "2026-11-16", "distance": 5, "time": "45:00"}
+    first = dict(base, fuel={"events": [{"mile": 3, "kind": "water", "oz": 12}]})
+    second = dict(base, distance=6,
+                  fuel={"events": [{"mile": 4, "kind": "fuel", "kcal": 100}]})
+    assert _post_json(server, "/api/runs", first)[0] == 200
+    assert _post_json(server, "/api/runs", second)[0] == 200
+
+    _, _, fuel = _json(server, "/api/fuel")
+    assert fuel["count"] == 1
+    assert fuel["runs"][0]["events"][0]["kind"] == "fuel"
+    assert fuel["runs"][0]["events"][0]["kcal"] == 100
+
+    # Editing the distance without a fuel block must not erase the intake.
+    assert _post_json(server, "/api/runs", dict(base, distance=7))[0] == 200
+    _, _, fuel = _json(server, "/api/fuel")
+    assert fuel["count"] == 1
+
+    assert _post_json(server, "/api/runs",
+                      dict(base, fuel={"delete": True}))[0] == 200
+    _, _, fuel = _json(server, "/api/fuel")
+    assert fuel["count"] == 0
+    _, _, activities = _json(server, "/api/activities")
+    assert activities["activities"][0]["distance_mi"] == 5.0
+    assert "fuel" not in activities["activities"][0]
+
+
+def test_manual_run_rejects_bad_fuel_without_saving_either(server, manual_file,
+                                                           fuel_file):
+    status, _, payload = _post_json(server, "/api/runs", {
+        "date": "2026-11-16", "distance": 5, "time": "45:00",
+        "fuel": {"events": [{"kind": "lava"}]},
+    })
+    assert status == 400
+    assert payload["error"] == "invalid fuel payload"
+    assert not manual_file.exists()
+    assert not fuel_file.exists()
+
+
 def test_manual_run_rejects_a_malformed_payload(server, manual_file):
     status, _, payload = _post_json(server, "/api/runs", {
         "date": "nope", "distance": 5, "time": "45:00"})
