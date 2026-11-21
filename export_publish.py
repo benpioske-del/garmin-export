@@ -125,6 +125,7 @@ PUBLISHED_MODULES = frozenset([
     "capture_supervisor_brief.py",
     "dashboard_contract.py",
     "export_publish.py",
+    "fade_points.py",
     "fit_audit.py",
     "fit_gps_validate.py",
     "garmin_fit_reader.py",

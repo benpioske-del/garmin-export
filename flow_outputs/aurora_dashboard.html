@@ -310,6 +310,9 @@ function normalizeRun(r){
     // activity id and the merged fuel summary have to survive the copy.
     activityId:r.activityId||null,
     fuel:r.fuel||null,
+    // Rebuilt from the API on every render. The server computes one canonical
+    // fade point for every run with laps; keep it through the copy.
+    fadePoint:r.fadePoint||null,
     band:r.band||band(distance)
   };
 }
@@ -570,6 +573,10 @@ function fuelDelta(splits){
   return {first:Math.round(a),second:Math.round(b),delta:Math.round(b-a),pct:Math.round((b-a)/a*1000)/10,n:vals.length};
 }
 function runFade(r){
+  // Prefer the server's canonical fade point. It covers runs with no fuel
+  // entry too, and uses the same >=4-split rule as run_fuel.fade().
+  var p=r&&r.fadePoint;
+  if(p)return {first:p.first_half_s_per_mi,second:p.second_half_s_per_mi,delta:p.fade_s_per_mi,pct:p.fade_pct,n:p.splits_used};
   var f=r&&r.fuel;
   if(f&&f.fade)return {first:f.fade.first_half_s_per_mi,second:f.fade.second_half_s_per_mi,delta:f.fade.fade_s_per_mi,pct:f.fade.fade_pct,n:f.fade.splits_used};
   return fuelDelta(r&&r.splits);
@@ -848,6 +855,7 @@ function analysis(){
     +card('<div class="eyebrow">Pacing fade</div><div class="chartbox"><canvas id="fade"></canvas></div><p class="muted">Second-half pace vs first-half pace, per run with splits. Below zero is a negative split.</p>')
     +card('<div class="eyebrow">Fuel vs fade</div><div class="chartbox"><canvas id="fuelfade"></canvas></div><p class="muted">Recorded in-run energy against fade, for runs that have both. More fuel is not automatically better; the question is whether the runs that fell apart are also the runs with nothing recorded.</p>')
     +card('<div class="eyebrow">Worst fades</div><div id="worstfade" class="tablewrap"></div><p class="muted">Every run with at least four laps, worst fade first, next to what was recorded as taken in. Open a run report to add or correct its intake.</p>')
+    +card('<div class="eyebrow">Fade intersections</div><div id="fadeanalysis" class="tablewrap"></div><p class="muted">Median fade by hydration, fuel, electrolytes and notes-temperature. Groups under three runs are hidden. Descriptive only: distance, hills and effort also move fade, and an unlogged amount is not a zero.</p>')
     +card('<div class="eyebrow">Pace distribution</div><div class="chartbox"><canvas id="pacedist"></canvas></div><p class="muted">How many runs landed in each 30-second pace bucket.</p>')
     +card('<div class="eyebrow">Best 5K trend</div><div class="chartbox"><canvas id="best5k"></canvas></div><p class="muted">Fastest 5K within each run, from the live split data.</p>')
     +card('<div class="eyebrow">Latest run splits</div><div class="chartbox"><canvas id="latesplits"></canvas></div><p class="muted">Per-mile splits for the most recent run that has them.</p>')
@@ -961,20 +969,46 @@ function drawAnalysis(){
   var fades=RUNS.map(function(r){
     var d=runFade(r);
     if(!d)return null;
+    var p=r.fadePoint||null;
     var f=r.fuel||null;
     var t=(f&&f.totals)||{};
     var desc=f?((f.events||0)+" event"+((f.events||0)===1?"":"s")+" &middot; "+fuelAmt(t.oz," oz")+" &middot; "+fuelAmt(t.kcal," kcal")):"not recorded";
-    return {date:r.date,dist:r.distance,delta:d.delta,pct:d.pct,desc:desc};
+    var tp=p&&p.temperature;
+    var temp=tp?(tp.temp_f!=null?Math.round(tp.temp_f)+"F":(tp.feels_like_f!=null?"feels "+Math.round(tp.feels_like_f)+"F":"--")):"--";
+    return {date:r.date,dist:r.distance,delta:d.delta,pct:d.pct,desc:desc,temp:temp};
   }).filter(Boolean).sort(function(a,b){return b.delta-a.delta});
   var worst=document.getElementById("worstfade");
   if(worst){
     var withFuel=fades.filter(function(x){return x.desc!=="not recorded"}).length;
     worst.innerHTML=(fades.length
       ?'<p class="muted" style="padding:10px">'+fades.length+' runs with laps &middot; '+withFuel+' with intake recorded. Showing the '+Math.min(12,fades.length)+' worst fades.</p>'
-        +'<table><thead><tr><th>Date</th><th>Miles</th><th>Fade s/mi</th><th>Fade %</th><th>Intake</th></tr></thead><tbody>'+fades.slice(0,12).map(function(x){
-          return '<tr><td><a href="#runs/'+esc(x.date)+'">'+esc(x.date)+'</a></td><td>'+x.dist+'</td><td>'+(x.delta>0?"+":"")+x.delta+'</td><td>'+(x.pct>0?"+":"")+x.pct+'%</td><td>'+x.desc+'</td></tr>';
+        +'<table><thead><tr><th>Date</th><th>Miles</th><th>Fade s/mi</th><th>Fade %</th><th>Intake</th><th>Temp</th></tr></thead><tbody>'+fades.slice(0,12).map(function(x){
+          return '<tr><td><a href="#runs/'+esc(x.date)+'">'+esc(x.date)+'</a></td><td>'+x.dist+'</td><td>'+(x.delta>0?"+":"")+x.delta+'</td><td>'+(x.pct>0?"+":"")+x.pct+'%</td><td>'+x.desc+'</td><td>'+x.temp+'</td></tr>';
         }).join("")+'</tbody></table>'
       :'<div class="empty"><strong>No lap splits yet</strong>Fade appears once a run has at least four laps.</div>');
+  }
+  // Intersections are computed from the same canonical fade points on the
+  // server. The page only formats them; it never recomputes a statistic from a
+  // snapshot that may still be showing the committed sample data.
+  var fa=window.FADE_ANALYSIS||null;
+  var box=document.getElementById("fadeanalysis");
+  if(box){
+    if(!fa||!fa.dimensions||!fa.dimensions.length){
+      box.innerHTML='<div class="empty"><strong>Live fade analysis unavailable</strong>Refresh with live data to load the intersections.</div>';
+    }else{
+      var rows=[];
+      fa.dimensions.forEach(function(dim){
+        dim.groups.forEach(function(g){
+          rows.push('<tr><td>'+esc(dim.label)+'</td><td>'+esc(g.key)+'</td><td>'+g.n+'</td><td>'+(g.median_fade_pct>0?"+":"")+g.median_fade_pct+'%</td><td>'+(g.mean_fade_pct>0?"+":"")+g.mean_fade_pct+'%</td></tr>');
+        });
+        dim.suppressed.forEach(function(s){
+          rows.push('<tr class="muted"><td>'+esc(dim.label)+'</td><td>'+esc(s.key)+'</td><td>'+s.n+'</td><td colspan="2">hidden (fewer than '+fa.min_group+' runs)</td></tr>');
+        });
+      });
+      box.innerHTML='<p class="muted" style="padding:10px">'+fa.count+' fade points &middot; '+esc(fa.caveat)+'</p>'
+        +(rows.length?'<table><thead><tr><th>Dimension</th><th>Group</th><th>Runs</th><th>Median</th><th>Mean</th></tr></thead><tbody>'+rows.join("")+'</tbody></table>'
+          :'<div class="empty"><strong>No fade points yet</strong>At least four usable laps are needed for a fade measurement.</div>');
+    }
   }
 }
 

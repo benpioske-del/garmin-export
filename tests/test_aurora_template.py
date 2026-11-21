@@ -133,6 +133,17 @@ def test_in_run_fuel_survives_the_normalize_copy(template):
     assert "activityId: a.activity_id || null" in G.AURORA_LIVE_SCRIPT
 
 
+def test_fade_points_survive_the_live_and_normalize_copies(template):
+    """Aurora rebuilds every run; the canonical fade point must ride along."""
+    assert "fadePoint:r.fadePoint||null" in template
+    assert "fadePoint: a.fadePoint || null" in G.AURORA_LIVE_SCRIPT
+    assert "var p=r&&r.fadePoint;" in template
+    assert "window.FADE_ANALYSIS = payload.fade_analysis || null" \
+        in G.AURORA_LIVE_SCRIPT
+    assert 'id="fadeanalysis"' in template
+    assert "Fade intersections" in template
+
+
 def test_fuel_editor_posts_to_the_server_and_shows_fade(template):
     """The recovered intake must be editable, not read-only."""
     assert 'fetch("/api/fuel"' in template

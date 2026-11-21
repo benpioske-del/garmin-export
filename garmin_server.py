@@ -391,8 +391,11 @@ API_ROUTES = {
     # canonical query so loadcalc and coaching never count a typed entry as a
     # device activity. In-run fuel is attached last for the same reason: it is
     # context for a human reading the fade, never an input to the load formula.
-    "/api/activities": lambda conn, hr, at: run_fuel.attach(
-        manual_runs.merge(api_activities(conn))),
+    # Fade points ride on the same payload: one per run with four usable splits,
+    # including runs with no intake entry at all. They stay display-only too and
+    # add no fourth route to the pinned API surface.
+    "/api/activities": lambda conn, hr, at: fade_points.attach(
+        run_fuel.attach(manual_runs.merge(api_activities(conn)))),
     "/api/load": lambda conn, hr, at: api_load(conn, hr, as_of=at),
     "/api/coaching": lambda conn, hr, at: api_coaching(conn, hr, as_of=at),
 }
@@ -413,6 +416,7 @@ MEGACMD_REMOTE = "/CoachDashboard"
 # Imported for the JSON API. These are the canonical implementations; the
 # server must not grow a second parser, a second load formula or a second
 # coaching rule, or the dashboard and the CLI would drift apart.
+import fade_points         # noqa: E402
 import loadcalc            # noqa: E402
 import manual_runs         # noqa: E402
 import nutrition           # noqa: E402
@@ -871,11 +875,19 @@ AURORA_LIVE_SCRIPT = """
       // one, so the editor must keep the id it was merged against.
       activityId: a.activity_id || null,
       fuel: a.fuel || null,
+      // Canonical fade point from /api/activities, present for every run with
+      // four usable splits, not only runs that have an intake entry.
+      fadePoint: a.fadePoint || null,
       band: band(mi)
     };
   }
   function isRun(a) { return a && a.sport && /run/i.test(String(a.sport)); }
   function applyActivities(payload) {
+    // Fade intersections are computed once on the server from the same rows.
+    // They are a view of the feed, not a second source of truth, so the page
+    // never recomputes statistics from a partially loaded snapshot.
+    window.FADE_ANALYSIS = payload.fade_analysis || null;
+    window.FADE_POINTS = payload.fade_points || [];
     var runs = (payload.activities || []).filter(isRun).map(mapRun)
       .filter(function (r) { return r.date; })
       .sort(function (a, b) { return a.date.localeCompare(b.date); });

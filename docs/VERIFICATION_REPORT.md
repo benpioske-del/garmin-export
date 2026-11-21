@@ -17,11 +17,11 @@ merged and re-wired. Commands and results are reproduced as observed.
 
 ```
 $ python -m pytest
-820 passed, 3 skipped (823 collected)
+853 passed, 3 skipped (856 collected)
 ```
 
-The same suite passes on a clean checkout with no FIT files, no `trainloop.db`
-and no `dashboard/index.html`: `791 passed, 32 skipped`. The live-corpus tests
+The same suite passes with an empty `GARMIN_DATA_DIR` and no local FIT corpus:
+`832 passed, 24 skipped`. The live-corpus tests
 skip via `requires_real_fit`, `requires_real_db` and `requires_live_corpus` in
 `tests/conftest.py`; the dashboard-contract and brief checks that read the
 gitignored page skip when it is absent; one symlink case skips on Windows; the
@@ -684,13 +684,58 @@ tracks under-fuelling.
   that did not fade, rather than to guess unlocated fuel or assume it.
 - **Plumbing.** `run_fuel.json` is in `paths.DATA_FILES`,
   `backup_data.DATA_FILES`, `.gitignore`, `export_publish.IGNORE`,
-  `export_publish.PUBLISHED_MODULES` (`run_fuel.py`) and the cloud migration
-  file list, so it is backed up, never published, and carried to a VM.
+  `export_publish.PUBLISHED_MODULES` (`run_fuel.py`, `fade_points.py`) and the
+  cloud migration file list, so it is backed up, never published, and carried
+  to a VM.
 - `tests/test_run_fuel.py` covers parsing, validation, the store, fade, attach,
   suggestions, journal import, payload and the CLI; twelve HTTP tests cover
   GET/POST/delete, the token gate, validation, the `/api/activities` merge and
   the combined run-and-fuel path; `tests/test_aurora_template.py` pins the
   editor, the scatter, the normalize-copy contract and the manual-run edit form.
+
+### Fade points and intersections (`fade_points.py`)
+
+The old fade only surfaced on runs that also had a fuel entry. Of the live
+corpus's 73 runs with at least four usable splits, 62 had no intake record, so
+their fade was invisible to the analysis. `fade_points.attach()` now adds one
+canonical fade point to **every** such run in `/api/activities`, using
+`run_fuel.fade()` rather than a second formula. The per-row copy is what Aurora
+maps into each run; the top-level `fade_points` list and `fade_analysis` block
+are the same data for the analysis view. No new route was added, so the pinned
+three-route API surface is unchanged.
+
+- **Intake stays honest.** Each point reports totals and hourly rates from the
+  fuel summary, plus a status for water, fuel and electrolytes: `recorded` (a
+  positive amount was logged), `none` (an explicit zero was logged),
+  `unmeasured` (an item was logged without an amount) or `not recorded` (no
+  event). `None` and `0.0` are never merged, and a note-only entry stays
+  `needs_review: true` rather than becoming an invented event.
+- **Temperature is read from the athlete's own words only.** The parser accepts
+  an explicit `88F`, a range (`85-86F` → 85.5), a decade with a modifier
+  (`low-70s` → 72, `80s` → 85) and a recorded `tempF` from the classic journal.
+  A bare "heat" or "hot" is never a temperature. `feels-like 100F` stays in
+  `feels_like_f` and is kept out of the air-temperature band. The journal is
+  gitignored and read through a cached, mtime-keyed helper; a clean checkout
+  simply has no journal context. This module does not use the weather gate,
+  call a provider or make a weather-performance claim.
+- **Intersections are descriptive and gated.** `intersections()` groups fade
+  percentages by hydration, fuel, electrolyte and temperature band. Groups with
+  fewer than three runs are hidden and listed with their `n` rather than shown
+  as a shaky median. On the live corpus the current readout is 73 fade points;
+  the 80s band has seven runs (median +6.5% fade) against 61 runs with no notes
+  temperature (median +3.3%). That difference is confounded by distance, hills
+  and effort and is presented with an explicit caveat, not as a finding.
+- **Aurora.** The run report's worst-fades table now has a temperature column
+  and uses the canonical fade point for every run. `#analysis` adds a "Fade
+  intersections" card with the gated medians and the suppressed-group counts.
+  The live layer stores the server's analysis on `window.FADE_ANALYSIS`; the
+  page formats it synchronously and never recomputes statistics from a stale
+  snapshot. `normalizeRun()` and the live `mapRun()` both carry `fadePoint`.
+- `tests/test_fade_points.py` adds 26 tests for the parser, the four intake
+  statuses, explicit zeros, note-only entries, group gating, feels-like
+  separation and idempotent attach; four `journal_notes()` tests were added to
+  `tests/test_run_fuel.py`, one template contract and two HTTP tests cover the
+  carried field and the unchanged route registry.
 
 ## Local data backup and restore
 

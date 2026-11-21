@@ -1341,6 +1341,44 @@ def test_fuel_get_rejects_an_unknown_query_parameter(server, fuel_file):
     assert payload["error"] == "unsupported query parameter"
 
 
+def test_activities_publish_fade_points_and_analysis(server):
+    """The feed carries the analysis; no fourth route is needed."""
+    _, _, payload = _json(server, "/api/activities")
+    assert "fade_points" in payload
+    assert "fade_analysis" in payload
+    assert payload["fade_analysis"]["count"] == len(payload["fade_points"])
+    assert "Descriptive only" in payload["fade_analysis"]["caveat"]
+    assert sorted(G.API_ROUTES) == ["/api/activities", "/api/coaching", "/api/load"]
+
+
+def test_a_run_without_fuel_still_gets_a_canonical_fade_point(
+        server, monkeypatch, migrated_db):
+    """Most runs have splits and no intake entry; they still have a fade."""
+    monkeypatch.setattr(G, "_source_files", lambda conn: {"garmin:1": "fake.fit"})
+    monkeypatch.setattr(G, "_csv_run_extras", lambda: {
+        "fake.fit": {"splits": [600, 610, 700, 720],
+                     "best_5k_s": None, "laps": 4}})
+    migrated_db.execute(
+        "INSERT INTO activities (activity_id, source_system,"
+        " source_activity_id, sport, start_utc, start_local, timezone_source,"
+        " distance_mi, moving_time_s, avg_hr, value_state, confidence,"
+        " confirmation, review_state, first_seen_utc, last_updated_utc)"
+        " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        ("garmin:1", "garmin", "1", "Running", "2026-11-16T12:00:00Z",
+         "2026-11-16", "filename_date", 5.0, 2700, 150, "device_derived",
+         "unverified", "confirmation_required", "open",
+         "2026-11-16T12:00:00Z", "2026-11-16T12:00:00Z"))
+    migrated_db.commit()
+
+    _, _, payload = _json(server, "/api/activities")
+    row = payload["activities"][0]
+    assert "fuel" not in row
+    assert row["fadePoint"]["fade_s_per_mi"] == 105
+    assert row["fadePoint"]["intake"]["water_oz"] is None
+    assert row["fadePoint"]["hydration"] == "not recorded"
+    assert payload["fade_points"][0]["date"] == "2026-11-16"
+
+
 def test_activities_carry_the_fuel_summary_for_the_matching_date(
         server, fuel_file, migrated_db):
     migrated_db.execute(

@@ -1835,3 +1835,43 @@ events. Full suite: **820 passed, 3 skipped (823 collected)**. Clean checkout
 with no FIT files, no `trainloop.db`, no `dashboard/index.html` and an empty
 `GARMIN_DATA_DIR`: **791 passed, 32 skipped (823 collected)**. `ruff check .`
 is clean. These replace the twenty-seventh correction's 809/3 and 780/32.
+
+# Twenty-ninth correction: 2026-11-20, fade points and intersections
+
+The previous correction finished the historical intake sweep but left the
+analysis one-sided: `run_fuel.fade()` only reached Aurora when a run also had a
+fuel entry. Only 11 of the 73 runs with four or more usable splits had one, so
+62 fades had no point at all and could not be compared with anything.
+
+What is now true:
+
+- `fade_points.py` builds one point per run with at least four usable splits,
+  using the canonical `run_fuel.fade()`. It adds `row["fadePoint"]` for Aurora
+  plus a top-level `fade_points` list and a `fade_analysis` block to
+  `/api/activities`. The API still has exactly three routes; nothing was added
+  to `API_ROUTES` and no CORS, `OPTIONS` or new endpoint was introduced.
+- Intake status is four-valued: `recorded`, `none` (an explicit zero),
+  `unmeasured` (an item without an amount) and `not recorded`. A blank is never
+  a zero and a note-only entry is never silently promoted.
+- Temperature is parsed only from text the athlete wrote (explicit `88F`,
+  `85-86F`, `low-70s`, `80s`, `84F/feels-90F`) or a recorded `tempF` in the
+  classic journal. "Heat" alone is not a temperature, and feels-like values
+  stay out of the air-temperature band. No provider is called and no causal or
+  personalised weather-performance claim is made; the weather gate remains
+  unchanged and unavailable.
+- `intersections()` hides any group with fewer than three runs, reports the
+  hidden groups' sizes, and labels the result descriptive and confounded. On
+  the live corpus 73 points are computed; the 80s notes-temperature band has
+  seven runs and a +6.5% median fade against +3.3% for the 61 runs with no
+  notes temperature. That is a prompt to look closer, not a finding.
+- Aurora's worst-fades table gained a temperature column, now driven by the
+  canonical point, and `#analysis` gained a "Fade intersections" card. The live
+  script publishes the server's analysis on `window.FADE_ANALYSIS`; the page
+  formats it synchronously so a hidden or restored tab still renders it.
+
+Verification: `tests/test_fade_points.py` adds 26 tests, `tests/test_run_fuel.py`
+adds four `journal_notes()` tests, and the Aurora and HTTP suites each gain
+contract tests (`fadePoint` carry-through, payload shape, no fourth route).
+Full suite: **853 passed, 3 skipped (856 collected)**. Empty `GARMIN_DATA_DIR`:
+**832 passed, 24 skipped (856 collected)**. `ruff check .` is clean. These
+replace the twenty-eighth correction's 820/3 and 791/32.

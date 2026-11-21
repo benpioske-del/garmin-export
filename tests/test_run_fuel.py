@@ -427,6 +427,40 @@ def _journal_html(runs):
     return "<script>const baseRuns = %s; const baseWeights=[];</script>" % payload
 
 
+def test_journal_notes_reads_notes_and_recorded_temperature(tmp_path):
+    path = tmp_path / "index.html"
+    path.write_text(_journal_html([
+        {"date": "2026-09-11", "note": "no water", "note2": "Hydration 0 oz",
+         "tempF": 86.1},
+        {"date": "2026-07-12", "note": "Feels-like 100F"},
+        {"date": "bad-date", "note": "ignored"},
+    ]), encoding="utf-8")
+    result = run_fuel.journal_notes(str(path))
+    assert result["2026-09-11"]["temp_f"] == 86.1
+    assert "Hydration 0 oz" in result["2026-09-11"]["note"]
+    assert result["2026-07-12"]["temp_f"] is None
+    assert "bad-date" not in result
+
+
+def test_journal_notes_is_empty_on_a_clean_checkout(tmp_path):
+    assert run_fuel.journal_notes(str(tmp_path / "absent.html")) == {}
+
+
+def test_journal_notes_ignores_an_unparseable_page(tmp_path):
+    path = tmp_path / "index.html"
+    path.write_text("<html>nothing here</html>", encoding="utf-8")
+    assert run_fuel.journal_notes(str(path)) == {}
+
+
+def test_journal_notes_returns_a_copy_the_caller_cannot_mutate(tmp_path):
+    path = tmp_path / "index.html"
+    path.write_text(_journal_html([{"date": "2026-09-11", "note": "windy"}]),
+                    encoding="utf-8")
+    first = run_fuel.journal_notes(str(path))
+    first["2026-09-11"]["note"] = "changed"
+    assert run_fuel.journal_notes(str(path))["2026-09-11"]["note"] == "windy"
+
+
 def test_import_journal_seeds_structured_events(tmp_path):
     path = str(tmp_path / "run_fuel.json")
     html = _journal_html([{

@@ -653,6 +653,53 @@ def _journal_runs(html_text):
     return runs
 
 
+# The journal is gitignored and absent on a clean checkout. The cache is keyed
+# by mtime and size so an edit to the classic page is picked up without reread-
+# ing a ~1 MB file on every /api/activities request.
+_JOURNAL_CACHE = {"key": None, "value": {}}
+
+
+def journal_notes(path=None):
+    """Date -> journal note and recorded ``tempF`` from the local classic page.
+
+    Read-only context for fade analysis. A missing or malformed journal yields
+    an empty map rather than an error, so clean checkouts and the cloud VM work
+    without a file that is deliberately never published.
+    """
+    html_path = path or os.path.join(paths.repo_dir(), "dashboard", "index.html")
+    try:
+        stat = os.stat(html_path)
+        key = (html_path, stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        return {}
+    if _JOURNAL_CACHE["key"] == key:
+        return {date: dict(value) for date, value in _JOURNAL_CACHE["value"].items()}
+    try:
+        with open(html_path, "r", encoding="utf-8", errors="replace") as fh:
+            runs = _journal_runs(fh.read())
+    except (OSError, FuelError, ValueError):
+        return {}
+
+    out = {}
+    for run in runs:
+        if not isinstance(run, dict):
+            continue
+        date = str(run.get("date") or "")[:10]
+        if not _DATE.match(date):
+            continue
+        temp = run.get("tempF")
+        if isinstance(temp, bool) or not isinstance(temp, (int, float)):
+            temp = None
+        out[date] = {
+            "note": (str(run.get("note") or "") + " "
+                     + str(run.get("note2") or "")).strip(),
+            "temp_f": temp,
+        }
+    _JOURNAL_CACHE["key"] = key
+    _JOURNAL_CACHE["value"] = out
+    return {date: dict(value) for date, value in out.items()}
+
+
 def import_journal(html_text, path=None, overwrite=False):
     """Recover the journal's fuel entries into the store.
 
