@@ -1,0 +1,444 @@
+{
+  "source": "Classic dashboard baseRuns (local-only), privacy-filtered",
+  "note": "Comments and recorded weather only. No raw coordinates, no place names.",
+  "runs": {
+    "2026-04-14": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Predates the analyzed chat history — one of the two sub-2:00 halfs referenced as prior context in later notes. No narrative detail available from the export for this one."
+      ]
+    },
+    "2026-04-16": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Predates the analyzed chat history. No narrative detail available from the export."
+      ]
+    },
+    "2026-04-20": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Predates the analyzed chat history. No narrative detail available from the export."
+      ]
+    },
+    "2026-04-22": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Predates the analyzed chat history. No narrative detail available from the export."
+      ]
+    },
+    "2026-04-24": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Verified half-marathon PR for the season — the fastest half in the whole dataset, and the anchor used for the conservative marathon pace prediction elsewhere in this report."
+      ]
+    },
+    "2026-05-01": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Disappointing half-effort; two prior sub-2:00 halfs before this. No pop, early cramping."
+      ]
+    },
+    "2026-05-03": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Hilly route, brutal hill mid-run, watch glitch."
+      ]
+    },
+    "2026-05-05": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Easy, deliberately unpushed."
+      ]
+    },
+    "2026-05-08": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Dehydration bonk in low-70s breezy weather; stopped early by choice."
+      ]
+    },
+    "2026-05-11": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Forefoot/sesamoid irritation phase; felt spectacular, foot a non-factor."
+      ]
+    },
+    "2026-05-15": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "88F heat; gel + LMNT mid-run."
+      ]
+    },
+    "2026-05-21": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Set 1K, mile, 5K, 10K PRs same run (~1.5mo on Garmin)."
+      ]
+    },
+    "2026-05-25": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Self-graded 'bad run' - raced early out of competitiveness."
+      ]
+    },
+    "2026-05-28": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "85-86F, little shade, grindy; LMNT only, no gel."
+      ]
+    },
+    "2026-05-31": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Longest run to date; rainy/cloudy 70s; stopped once for water/directions."
+      ]
+    },
+    "2026-06-02": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Post-19-miler stiffness check; sub-9 min miles goal hit."
+      ]
+    },
+    "2026-06-04": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Deliberately under-hydrated (no water, vest only); 85F, miserable."
+      ]
+    },
+    "2026-06-07": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Major bonk: mile 14 blew up to 21:51 after water ran out; heat-driven."
+      ]
+    },
+    "2026-06-13": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Slow, flat; old left hip labrum + left knee flared."
+      ]
+    },
+    "2026-06-16": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Breakout day: 1K 4:36, mile 7:33, 5K 24:34 PRs; peak HR 195."
+      ]
+    },
+    "2026-06-21": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Bad breakdown: legs stopped responding, watch off last 3.2mi; soreness spiked. First real hamstring warning sign."
+      ]
+    },
+    "2026-06-23": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Cautious check-in run mid recovery week, right after the hamstring's first real warning sign."
+      ]
+    },
+    "2026-06-26": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "'Felt good, no lingering issues' after long run + recovery run."
+      ]
+    },
+    "2026-07-05": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Hamstring tight-not-painful; watch HR possibly deflated (forgot lap)."
+      ]
+    },
+    "2026-07-07": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "84F/feels-90F; shoulder/neck also flagged as a watch item."
+      ]
+    },
+    "2026-07-09": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Hamstring loosened as it went; swapped a rest day to accommodate."
+      ]
+    },
+    "2026-07-12": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Feels-like 100F; run deliberately shortened for hamstring + heat."
+      ]
+    },
+    "2026-07-14": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Feels-like 101F; hamstring + heat both limiting."
+      ]
+    },
+    "2026-07-18": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "90F; hamstring 'a little sore but nothing terrible' - encouraging."
+      ]
+    },
+    "2026-07-21": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Goal was 13.1; walked final 1.1 when both hamstrings gave out; GU+electrolytes."
+      ]
+    },
+    "2026-07-23": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Knee rough for first 2mi, then ran 'with authority'."
+      ]
+    },
+    "2026-07-25": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "80s/feels-90 humid; legs not sore, missing top-end strength vs prior 7-miler."
+      ]
+    },
+    "2026-07-26": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Unplanned bonus run, hot/humid but easy effort, no pain."
+      ]
+    },
+    "2026-07-27": {
+      "location": "GPS recorded at start",
+      "tempF": 92.3,
+      "weather": {
+        "tempF": 92.3,
+        "feelsF": 98.1,
+        "humidityPct": 49.0,
+        "dewF": 70.5,
+        "precipIn": 0.0,
+        "windMph": 12.0
+      },
+      "comments": [
+        "Imported from Garmin CSV · +466ft gain, -430ft loss"
+      ]
+    },
+    "2026-07-31": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "'Easiest run in months' - rainy, 60s, HR under 160 for first 2mi."
+      ]
+    },
+    "2026-08-02": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Legs loosened; graded self 6/10 effort. Prompted this exact report."
+      ]
+    },
+    "2026-08-04": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "First double-digit long run since the hamstring block — nearly identical distance to the May 1st half-effort (13.10mi) at a comparable HR, a clean before/after comparison point on the season."
+      ]
+    },
+    "2026-08-07": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Imported from Garmin CSV · +107ft gain, -109ft loss · 8 splits imported"
+      ]
+    },
+    "2026-08-09": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Imported from Garmin CSV · +381ft gain, -390ft loss"
+      ]
+    },
+    "2026-08-11": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "GI distress. Heat also a factor. Long run soon."
+      ]
+    },
+    "2026-08-13": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Imported from Garmin CSV · +62ft gain, -72ft loss · 9 splits imported"
+      ]
+    },
+    "2026-08-16": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Imported from Garmin CSV · +49ft gain, -52ft loss · 5 splits imported"
+      ]
+    },
+    "2026-08-18": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Imported from Garmin CSV · +101ft gain, -83ft loss · 8 splits imported"
+      ]
+    },
+    "2026-08-20": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Imported from Garmin CSV · +74ft gain, -77ft loss · 5 splits imported"
+      ]
+    },
+    "2026-08-26": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Imported from Garmin CSV · +80ft gain, -83ft loss · 5 splits imported"
+      ]
+    },
+    "2026-08-28": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Imported from Garmin CSV · +120ft gain, -127ft loss · 8 splits imported"
+      ]
+    },
+    "2026-09-01": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Imported from Garmin CSV · +166ft gain, -172ft loss · 13 splits imported"
+      ]
+    },
+    "2026-09-03": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Imported from Garmin CSV · +66ft gain, -76ft loss · 9 splits imported"
+      ]
+    },
+    "2026-09-07": {
+      "location": "not recorded",
+      "tempF": null,
+      "weather": {},
+      "comments": [
+        "Imported from Garmin CSV · +98ft gain, -101ft loss · 6 splits imported"
+      ]
+    },
+    "2026-09-09": {
+      "location": "Default weather location",
+      "tempF": 80.0,
+      "weather": {
+        "tempF": 78.2,
+        "feelsF": 75.4,
+        "humidityPct": 44.0,
+        "dewF": 54.7,
+        "precipIn": 0.0,
+        "windMph": 14.0
+      },
+      "comments": [
+        "Hydration vest, a gel, 2 fruit snacks, refilled hydration vest, a gu, and an LMNT..... Fruit snacks at miles 5/7.  Refilled vest between 8 and 9.  Cramped hard at 13.  Super frustrating run..."
+      ]
+    },
+    "2026-09-11": {
+      "location": "GPS recorded at start",
+      "tempF": 86.1,
+      "weather": {},
+      "comments": [
+        "Imported from Garmin CSV · +587ft gain, -682ft loss · Felt good, no electrolytes, no water, really windy. Hydration 0 oz, electrolytes none."
+      ]
+    },
+    "2026-09-13": {
+      "location": "GPS recorded at start · Default weather location",
+      "tempF": 69.2,
+      "weather": {
+        "tempF": 69.2,
+        "feelsF": 66.8,
+        "humidityPct": 38.0,
+        "dewF": 42.4,
+        "precipIn": 0.0,
+        "windMph": 5.0
+      },
+      "comments": [
+        "Imported from Garmin CSV · +295ft gain, -335ft loss",
+        "Imported from Garmin CSV · Recovery / shake-out Sunday. · hydration 0 oz · electrolytes none"
+      ]
+    }
+  }
+}

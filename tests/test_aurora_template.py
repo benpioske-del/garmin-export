@@ -12,7 +12,9 @@ pixels: a new visual design is welcome as long as the features survive.
 """
 
 import io
+import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -23,6 +25,7 @@ import garmin_server as G
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEMPLATE = os.path.join(HERE, "flow_outputs", "aurora_dashboard.html")
+CONTEXT = os.path.join(HERE, "flow_outputs", "run_context.json")
 
 
 @pytest.fixture(scope="module")
@@ -256,3 +259,91 @@ def test_injection_is_idempotent(template):
     twice = G.inject_aurora_live(once)
     assert once == twice
     assert twice.decode("utf-8").count(G.AURORA_LIVE_MARK) == 1
+
+
+def test_run_context_is_tracked_and_privacy_filtered():
+    """Classic context is tracked because dashboard/index.html is local-only.
+
+    Only comments, recorded temperature and weather scalars survive. Raw
+    coordinates and the Classic place-name default must never reach the public
+    repo, even though the source dashboard contains both.
+    """
+    with io.open(CONTEXT, encoding="utf-8") as fh:
+        data = json.load(fh)
+    runs = data["runs"]
+    assert len(runs) >= 52
+    hot = runs["2026-09-09"]
+    assert hot["tempF"] == 80
+    assert hot["weather"]["windMph"] == 14
+    assert hot["comments"]
+    raw = json.dumps(data)
+    for key in ('"lat"', '"lon"', '"latitude"', '"longitude"'):
+        assert key not in raw
+    assert "Chaska" not in raw
+
+
+def test_template_embeds_the_tracked_context_verbatim(template):
+    """The snapshot must work without the server as well as with it."""
+    with io.open(CONTEXT, encoding="utf-8") as fh:
+        data = json.load(fh)
+    lines = [ln for ln in template.splitlines()
+             if ln.startswith("const RUN_CONTEXT=")]
+    assert len(lines) == 1
+    inline = lines[0][len("const RUN_CONTEXT="):].rstrip(";")
+    assert json.loads(inline) == data
+    # A literal angle bracket in a comment could close the <script> element.
+    assert "<" not in inline and ">" not in inline
+
+
+def test_run_detail_restores_location_weather_and_comments(template):
+    """The Classic run report fields belong on the detail page only."""
+    for marker in (
+        "function weatherCard(r)", "function commentsCard(r)",
+        "+weatherCard(r)", "+commentsCard(r)",
+        "Location &amp; weather", "Weather-adjusted time",
+        "function contextFor(r)", "esc(c.location", "commentHtml(n)",
+        "Weather at start:", "Start location",
+    ):
+        assert marker in template, marker
+
+
+def test_weather_adjusted_time_uses_recorded_temperature_only(template):
+    """No temperature means no number; the Classic heat rule is descriptive."""
+    assert "function adjustedSeconds(r)" in template
+    assert "if(!c||c.tempF==null)return null" in template
+    assert "(t>50?(t-50)*0.2:0)" in template
+    assert "raw/(1+" in template
+    assert 'adj==null?"not recorded"' in template
+    assert "Illustrative only" in template
+    assert "does not predict performance" in template
+    assert "no live weather lookup" in template
+
+
+def test_pace_is_shown_as_minutes_seconds(template):
+    """Chart axes and fade cells used to print raw seconds per mile."""
+    for marker in (
+        "function mss(n)", "function paceTick(v){return mss(v)}",
+        "function paceAxis(title)", "callback:paceTick",
+        "Pace m:ss/mi", "pace m:ss/mi", "m:ss/mi fade",
+        "Fade m:ss/mi",
+    ):
+        assert marker in template, marker
+    for stale in ("label:\"pace sec/mi\"", "Pace s/mi", "Seconds per mile",
+                  ">s/mi fade", "Fade s/mi"):
+        assert stale not in template, stale
+
+
+def test_template_script_is_valid_javascript(template):
+    """A broken quote in the new report cards would kill the whole page."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed; JavaScript syntax check unavailable")
+    match = re.search(r"<script>\s*(const SUMMARY=.*?)</script>", template, re.S)
+    assert match, "main inline script not found"
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "aurora.js")
+        with io.open(path, "w", encoding="utf-8") as fh:
+            fh.write(match.group(1))
+        proc = subprocess.run([node, "--check", path],
+                              capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr or proc.stdout
