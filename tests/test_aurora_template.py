@@ -262,18 +262,25 @@ def test_injection_is_idempotent(template):
 
 
 def test_run_context_is_tracked_and_privacy_filtered():
-    """Classic context is tracked because dashboard/index.html is local-only.
+    """Garmin-derived context is tracked because the source dashboard is local-only.
 
-    Only comments, recorded temperature and weather scalars survive. Raw
-    coordinates and the Classic place-name default must never reach the public
-    repo, even though the source dashboard contains both.
+    Every Garmin run gets a start time, Lap Splits and archived weather values.
+    Raw coordinates and the Classic place-name default must never reach the
+    public repo, even though the source dashboard contains both.
     """
     with io.open(CONTEXT, encoding="utf-8") as fh:
         data = json.load(fh)
     runs = data["runs"]
-    assert len(runs) >= 52
+    assert len(runs) >= 75
+    assert len(data["byActivity"]) == len(runs)
+    for date, item in runs.items():
+        assert item["activityId"].startswith("garmin:"), date
+        assert re.match(r"\d{4}-\d{2}-\d{2} \d{2}:00", item["startLocal"]), date
+        assert item["tempF"] is not None, date
+        assert item["weather"].get("tempF") is not None, date
+        assert item["splits"], date
     hot = runs["2026-09-09"]
-    assert hot["tempF"] == 80
+    assert hot["tempF"] == 80  # Classic's recorded athlete/heat value wins
     assert hot["weather"]["windMph"] == 14
     assert hot["comments"]
     raw = json.dumps(data)
@@ -305,6 +312,20 @@ def test_run_detail_restores_location_weather_and_comments(template):
         "Weather at start:", "Start location",
     ):
         assert marker in template, marker
+
+
+def test_garmin_start_time_and_splits_feed_the_report(template):
+    """The report uses the Garmin CSV, not Classic's partial weather table."""
+    for marker in (
+        "function contextSplits(r)", "RUN_CONTEXT.byActivity",
+        "var key=r&&r.activityId", "c.startLocal", "Start time (Garmin)",
+        "splits=(contextSplits(r)||[]).slice()",
+        "else{splits=(contextSplits(r)||[]).slice()}",
+    ):
+        assert marker in template, marker
+    # No stale hard-coded "we have no splits" wording in the detail card.
+    assert "This activity source did not provide lap splits." in template
+    assert "Splits not recorded" in template  # only for a truly empty run
 
 
 def test_weather_adjusted_time_uses_recorded_temperature_only(template):
