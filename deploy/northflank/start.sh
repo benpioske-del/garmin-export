@@ -61,7 +61,8 @@ fi
         fi
         sleep $((target - now))
         "$PY" "$APP_DIR/garmin_sync.py" || true
-        "$PY" "$APP_DIR/trainloop.py" || true
+        # Bare trainloop.py only prints help; new FITs would never reach the DB.
+        "$PY" "$APP_DIR/trainloop.py" bootstrap || true
         "$PY" "$APP_DIR/deploy/cloud/refresh_export.py" || true
     done
 ) &

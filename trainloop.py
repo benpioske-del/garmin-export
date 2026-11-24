@@ -44,7 +44,17 @@ import paths  # noqa: E402
 import recommend  # noqa: E402
 import trainingdb  # noqa: E402
 
-DEFAULT_FIT_GLOB = r"C:\Users\benpi\Downloads\garmin_fit\*.fit"
+def default_fit_glob():
+    """Resolve the FIT source from the data directory at call time.
+
+    The Northflank container sets GARMIN_DATA_DIR=/data. A literal Windows path
+    here made every server-triggered import and the nightly refresh silently
+    report "no FIT files matched", even though the files were on the volume.
+    """
+    return os.path.join(paths.fit_dir(), "*.fit")
+
+
+DEFAULT_FIT_GLOB = default_fit_glob()
 
 
 # --------------------------------------------------------------- helpers
@@ -435,7 +445,7 @@ def build_parser():
         formatter_class=argparse.RawDescriptionHelpFormatter)
     # Set here rather than per subcommand so that commands which delegate to
     # each other (bootstrap -> import) always find these attributes present.
-    p.set_defaults(pattern=DEFAULT_FIT_GLOB, hr_max=None, as_of=None)
+    p.set_defaults(pattern=default_fit_glob(), hr_max=None, as_of=None)
     sub = p.add_subparsers(dest="command")
 
     def add(name, func, help_text):
@@ -446,14 +456,14 @@ def build_parser():
     add("status", cmd_status, "what exists and what is missing")
     add("doctor", cmd_doctor, "diagnose a broken setup")
     sp = add("bootstrap", cmd_bootstrap, "migrate + import, safe to re-run")
-    sp.add_argument("--pattern", default=DEFAULT_FIT_GLOB)
+    sp.add_argument("--pattern", default=default_fit_glob())
 
     sp = add("migrate", cmd_migrate, "apply pending schema migrations")
     sp = add("import", cmd_import, "import FIT files into the database")
-    sp.add_argument("--pattern", default=DEFAULT_FIT_GLOB)
+    sp.add_argument("--pattern", default=default_fit_glob())
 
     sp = add("audit", cmd_audit, "reproducible FIT data audit")
-    sp.add_argument("--pattern", default=DEFAULT_FIT_GLOB)
+    sp.add_argument("--pattern", default=default_fit_glob())
     sp.add_argument("--json", default=None, help="write the manifest here")
 
     sp = add("load", cmd_load, "training load, 7/14/28-day windows")

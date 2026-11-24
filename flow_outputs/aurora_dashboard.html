@@ -260,6 +260,9 @@ const rawSplits=`2026-04-14|13.1|1:59:46|167|89|9:09|1540|1030|8:35,8:51,8:51,8:
 2026-11-11|6.48|1:00:24|155|90|9:19|726|715|9:12,9:07,9:07,9:30,9:37,9:26`;
 const NUTRITION=JSON.parse(localStorage.getItem("aurora_nutrition")||"[]");
 const LIFTS=JSON.parse(localStorage.getItem("aurora_lifts")||"[]");
+// Simple is the default: a felt effort plus any PRs hit. Advanced keeps every
+// set-level field. The choice is per-browser, like the log itself.
+let LIFT_MODE=localStorage.getItem("aurora_lift_mode")==="advanced"?"advanced":"simple";
 let charts=[];
 
 function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
@@ -460,6 +463,64 @@ function fadePct(splits){
   if(!a)return null;
   return Math.round((b-a)/a*1000)/10;
 }
+// A 1-100 execution score next to the letter grade. It compares a run with
+// earlier runs at a similar effort and distance band, then credits long-run
+// completion and pacing discipline. It is descriptive, never a prediction.
+function runScore(r){
+  if(!r)return {grade:"—",score:null,reason:"No run selected."};
+  var pace=paceSec(r.pace);
+  if(!isFinite(pace)||pace<=0)return {grade:"—",score:null,reason:"No recorded pace, so no score can be calculated."};
+  var hr=r.avgHR==null?null:Number(r.avgHR),dist=Number(r.distance)||0;
+  var currentBand=r.band||band(r.distance);
+  function normalised(x){
+    var p=paceSec(x.pace),h=x.avgHR==null?null:Number(x.avgHR),d=Number(x.distance)||0;
+    if(!isFinite(p)||p<=0)return null;
+    return (h!=null&&isFinite(h)&&h>0&&d>0)?p*(h/170)*Math.pow(6/d,0.035):p;
+  }
+  var before=RUNS.filter(function(x){return x!==r&&x.date<r.date});
+  function baseline(list){
+    var vals=list.map(normalised).filter(function(v){return v!=null&&isFinite(v)&&v>0});
+    return vals.length?vals.reduce(function(a,b){return a+b},0)/vals.length:null;
+  }
+  var sameBase=baseline(before.filter(function(x){return (x.band||band(x.distance))===currentBand}));
+  var allBase=baseline(before);
+  var base=sameBase!=null?sameBase*0.72+(allBase!=null?allBase*0.28:0):allBase;
+  var pctDiff=base!=null&&base>0?((normalised(r)-base)/base)*100:null;
+  var score=76-(pctDiff||0)*1.9,notes=[],long=dist>=10;
+  var fade=fadePct(r.splits);
+  if(long){
+    score+=5;
+    if(hr!=null&&isFinite(hr)&&hr<=165){score+=4;notes.push("heart rate stayed controlled for the distance")}
+    else if(hr!=null&&isFinite(hr)&&hr>=178){score-=4;notes.push("heart rate ran high for the distance")}
+    if(fade!=null){
+      if(fade<=2){score+=5;notes.push("pace held steady")}
+      else if(fade<=5){score+=2;notes.push("only a small fade")}
+      else if(fade>10){score-=6;notes.push("a large second-half fade")}
+    }
+    var c=contextFor(r),temp=c&&c.tempF!=null?Number(c.tempF):null;
+    if(temp!=null&&isFinite(temp)&&temp>80&&hr!=null){score-=Math.max(0,Math.min(5,(hr-165)*0.12));notes.push("warm conditions at the start")}
+    notes.push("long runs are credited for finishing the distance, not matched to short-run pace");
+  }else if(fade!=null){
+    if(fade>5){score-=(fade-5);notes.push("second half faded "+fade+"%")}
+    else if(fade<0){score+=Math.min(8,-fade*0.8);notes.push("negative split of "+fade+"%")}
+  }
+  if(hr==null||!isFinite(hr))notes.push("heart rate was not recorded");
+  if(fade==null)notes.push("no lap splits, so consistency was not scored");
+  if(pctDiff==null)notes.push("no earlier comparable runs yet");
+  score=Math.max(1,Math.min(100,Math.round(score)));
+  var grade=score>=90?"A":score>=78?"B":score>=65?"C":score>=50?"D":"F";
+  var paceNote=pctDiff==null?""
+    :"Pace was "+Math.abs(Math.round(pctDiff))+"% "+(pctDiff<=0?"faster":"slower")
+      +" than your recent "+currentBand.toLowerCase()+" baseline at a comparable effort. ";
+  var reason=paceNote+(notes.length?notes.join(". ")+". ":"")
+    +"Descriptive only: hills, effort, weather and fatigue also move these numbers.";
+  return {grade:grade,score:score,reason:reason};
+}
+function scoreCard(r){
+  var s=runScore(r);
+  if(s.score==null)return card('<div class="eyebrow">Run score</div><p class="muted">'+esc(s.reason)+'</p>');
+  return card('<div class="eyebrow">Run score</div><div class="row"><div class="stat">'+s.score+'<small class="label"> /100</small></div><div class="chip '+(s.score>=78?"good":s.score>=50?"warn":"risk")+'">'+s.grade+'</div></div><p class="muted">'+esc(s.reason)+'</p>');
+}
 function e1rmData(){
   var out=[];
   LIFTS.forEach(function(s){
@@ -469,6 +530,38 @@ function e1rmData(){
 }
 function bodyweightData(){
   return LIFTS.filter(function(s){return s.bodyweight!=null&&isFinite(+s.bodyweight)}).map(function(s){return {date:s.date,value:+s.bodyweight}});
+}
+// A null means nothing was recorded. Zero means a deliberate zero, so it is
+// never turned into a missing value or into a false PR.
+function liftE1rm(w,reps){
+  w=w==null?null:+w;reps=reps==null?null:+reps;
+  return w>0&&reps>0?Math.round(w*(1+reps/30)):null;
+}
+function liftBestBefore(index){
+  var best={};
+  for(var i=0;i<index;i++){
+    var s=LIFTS[i]||{},name=String(s.exercise||"").trim().toLowerCase();
+    var est=liftE1rm(s.weight,s.reps);
+    if(name&&est!=null&&(best[name]==null||est>best[name]))best[name]=est;
+  }
+  return best;
+}
+function liftPrFor(s,best){
+  var name=String(s.exercise||"").trim(),est=liftE1rm(s.weight,s.reps);
+  if(!name||est==null)return null;
+  var prev=best[name.toLowerCase()];
+  return prev!=null&&est>prev?name+" e1RM "+est+" lb (previous "+prev+")":null;
+}
+function liftPrList(s,index){
+  var out=[],auto=liftPrFor(s,liftBestBefore(index));
+  if(auto)out.push(auto);
+  (s.prs||[]).forEach(function(p){if(String(p||"").trim())out.push(String(p).trim())});
+  return out;
+}
+function setLiftMode(m){
+  LIFT_MODE=m==="advanced"?"advanced":"simple";
+  localStorage.setItem("aurora_lift_mode",LIFT_MODE);
+  go("#lift");
 }
 
 var SYNC_STATUS="";
@@ -584,7 +677,10 @@ function home(){
 function runs(){
   return '<div class="row"><div><div class="eyebrow">Activity feed</div><h1 class="title">Every run, ready.</h1></div><a class="btn" href="#log/run">Log run</a></div>'
     +(RUNS.length?RUNS.slice().reverse().map(function(r){
-      return card('<a class="run" href="#runs/'+esc(r.date)+'"><div class="row"><div><b>'+esc(r.date)+'</b><div class="muted">'+r.distance+' mi &middot; '+band(r.distance)+' &middot; '+esc(r.pace)+'/mi</div></div><div><b>'+(r.avgHR==null?"--":r.avgHR)+'</b><div class="muted">bpm</div></div></div><div class="row" style="margin-top:12px"><span class="chip">'+r.splits.length+' laps</span>'+(r.manual?'<span class="chip warn">manual entry</span>':'')+'<span class="chip '+(r.distance>9?"warn":"good")+'">'+(r.distance>9?"long":"steady")+'</span><span class="muted">estimated breakdown</span></div></a>');
+      var s=runScore(r);
+      var scoreChip=s.score==null?'<span class="chip">score unavailable</span>'
+        :'<span class="chip '+(s.score>=78?"good":s.score>=50?"warn":"risk")+'">'+s.grade+' &middot; '+s.score+'/100</span>';
+      return card('<a class="run" href="#runs/'+esc(r.date)+'"><div class="row"><div><b>'+esc(r.date)+'</b><div class="muted">'+r.distance+' mi &middot; '+band(r.distance)+' &middot; '+esc(r.pace)+'/mi</div></div><div><b>'+(r.avgHR==null?"--":r.avgHR)+'</b><div class="muted">bpm</div></div></div><div class="row" style="margin-top:12px"><span class="chip">'+r.splits.length+' laps</span>'+scoreChip+(r.manual?'<span class="chip warn">manual entry</span>':'')+'<span class="chip '+(r.distance>9?"warn":"good")+'">'+(r.distance>9?"long":"steady")+'</span><span class="muted">estimated breakdown</span></div></a>');
     }).join(""):card('<div class="empty"><strong>No runs yet</strong>Run a Garmin sync to load activities.</div>'));
 }
 
@@ -814,7 +910,8 @@ function report(date){
   var fast=vals.length?mss(Math.min.apply(null,vals)):null;
   var slow=vals.length?mss(Math.max.apply(null,vals)):null;
   return '<div class="row"><a class="chip" href="#runs">&larr; Runs</a>'+(r.manual?'<a class="chip" href="#log/run/'+encodeURIComponent(r.date)+'">Edit run</a>':'')+'<span class="chip">'+(r.manual?'MANUAL ENTRY':'ESTIMATED')+'</span></div>'
-    +card('<div class="eyebrow">'+band(r.distance)+' RUN</div><h1 class="title">'+esc(r.date)+'</h1><div class="grid g3"><div><div class="stat">'+r.distance+'</div><div class="label">miles</div></div><div><div class="stat">'+esc(r.pace)+'</div><div class="label">pace m:ss/mi</div></div><div><div class="stat">'+(r.avgHR==null?"--":r.avgHR)+'</div><div class="label">avg HR</div></div></div><p class="muted">Score computed from pace, heart rate and consistency. Recorded weather and comments appear below when available.</p>')
+    +card('<div class="eyebrow">'+band(r.distance)+' RUN</div><h1 class="title">'+esc(r.date)+'</h1><div class="grid g3"><div><div class="stat">'+r.distance+'</div><div class="label">miles</div></div><div><div class="stat">'+esc(r.pace)+'</div><div class="label">pace m:ss/mi</div></div><div><div class="stat">'+(r.avgHR==null?"--":r.avgHR)+'</div><div class="label">avg HR</div></div></div><p class="muted">The 1-100 execution score, recorded weather and comments appear below.</p>')
+    +scoreCard(r)
     +weatherCard(r)
     +card('<div class="row"><div><div class="eyebrow">Lap profile</div><div class="h2">'+(r.manual?"No lap data":(br==="NONE"?"Held pace all the way":"Breaks at mile "+br))+'</div>'+(vals.length?'<div class="muted">Splits '+fast+'&ndash;'+slow+'/mi</div>':'')+'</div><span class="chip '+(r.manual?"warn":(br==="NONE"?"good":"risk"))+'">'+(r.manual?"MANUAL ENTRY":(br==="NONE"?"NO BREAKDOWN":"ESTIMATED"))+'</span></div>'+(r.splits.length?'<div class="chartbox"><canvas id="split"></canvas></div>':'<div class="empty"><strong>Splits not recorded</strong>This activity source did not provide lap splits.</div>')+'<p class="muted">Baseline band is computed from the first third of supplied lap splits. Slow laps remain visible and are not corrected.</p>')
     +fuelCard(r)
@@ -946,12 +1043,13 @@ function analysis(){
 
 function data(){
   return card('<div class="row"><div><div class="eyebrow">Data vault</div><h1 class="title">Source of truth.</h1></div><button class="btn secondary" onclick="downloadCSV()">Export CSV</button></div><p class="muted">'+RUNS.length+' activity rows retained. Optional Garmin fields not present in the source are shown as not recorded.</p>')
-    +card('<div class="row"><div class="h2">Activity log</div><input id="search" placeholder="Search date or band" oninput="filterRows()" style="max-width:240px;background:#ffffff09;border:1px solid var(--line);border-radius:11px;color:var(--text);padding:10px"></div><div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Distance</th><th>Pace</th><th>HR</th><th>Cadence</th><th>Ascent</th><th>Calories</th></tr></thead><tbody id="rows">'+RUNS.slice().reverse().map(row).join("")+'</tbody></table></div>')
+    +card('<div class="row"><div class="h2">Activity log</div><input id="search" placeholder="Search date or band" oninput="filterRows()" style="max-width:240px;background:#ffffff09;border:1px solid var(--line);border-radius:11px;color:var(--text);padding:10px"></div><div class="tablewrap" style="margin-top:12px"><table><thead><tr><th>Date</th><th>Distance</th><th>Pace</th><th>HR</th><th>Cadence</th><th>Ascent</th><th>Calories</th><th>Score</th></tr></thead><tbody id="rows">'+RUNS.slice().reverse().map(row).join("")+'</tbody></table></div>')
     +card('<div class="eyebrow">Audit and data quality</div><p class="muted">'+RUNS.length+' records retained. No duplicates or corrections. Title, average stride length, training stress score and steps may be blank in the source. Classic weather and comments appear on each run detail report.</p><p class="muted">Review required: the 2026-07-26 local activity date and filename versus the 2026-07-27 UTC timestamp.</p>')
     +card('<div class="eyebrow">Lifting data</div>'+(LIFTS.length?'<p class="muted">'+LIFTS.length+' local lift session(s) stored in this browser.</p>':'<div class="empty"><strong>NO DATA: lifting_log_url returned nothing.</strong>Audit returned no lifting sessions. Start a lift session to begin tracking.</div>'));
 }
 function row(r){
-  return "<tr onclick=\"go('#runs/"+esc(r.date)+"')\"><td>"+esc(r.date)+"</td><td>"+r.distance+"</td><td>"+esc(r.pace)+"</td><td>"+(r.avgHR==null?"not recorded":r.avgHR)+"</td><td>"+(r.cadence==null?"not recorded":r.cadence)+"</td><td>"+(r.ascent==null?"not recorded":r.ascent)+"</td><td>"+(r.calories==null?"not recorded":r.calories)+"</td></tr>";
+  var s=runScore(r);
+  return "<tr onclick=\"go('#runs/"+esc(r.date)+"')\"><td>"+esc(r.date)+"</td><td>"+r.distance+"</td><td>"+esc(r.pace)+"</td><td>"+(r.avgHR==null?"not recorded":r.avgHR)+"</td><td>"+(r.cadence==null?"not recorded":r.cadence)+"</td><td>"+(r.ascent==null?"not recorded":r.ascent)+"</td><td>"+(r.calories==null?"not recorded":r.calories)+"</td><td>"+(s.score==null?"not recorded":s.grade+" "+s.score+"/100")+"</td></tr>";
 }
 function filterRows(){
   var q=((document.getElementById("search")||{}).value||"").toLowerCase();
@@ -960,19 +1058,86 @@ function filterRows(){
   body.innerHTML=RUNS.slice().reverse().filter(function(r){return (r.date+" "+band(r.distance)).toLowerCase().indexOf(q)>=0}).map(row).join("");
 }
 
+function liftModeButton(m,label){
+  return '<button class="btn'+(LIFT_MODE===m?"":" secondary")+'" onclick="setLiftMode(&apos;'+m+'&apos;)">'+label+'</button>';
+}
+function liftRow(s,index){
+  var prs=liftPrList(s,index);
+  var detail;
+  if(s.mode==="simple"){
+    detail='Effort: '+esc(s.effort||"not recorded");
+  }else{
+    detail=esc(s.exercise||"not recorded")+' &middot; '+(s.sets||1)+' x '+(s.reps==null?"not recorded":s.reps)+' &middot; '
+      +(s.weight==null?"not recorded":s.weight)+' lb'
+      +(s.rpe!=null?' &middot; RPE '+esc(s.rpe):'')
+      +(s.restSec!=null?' &middot; rest '+esc(s.restSec)+'s':'');
+  }
+  var chips=prs.length?prs.map(function(p){return '<span class="chip good">PR '+esc(p)+'</span>'}).join(""):'';
+  return card('<div class="row"><div><b>'+esc(s.date)+'</b><div class="muted">'+detail+'</div></div><div class="muted">BW '+(s.bodyweight==null?"not recorded":esc(s.bodyweight))+'</div></div>'
+    +(chips?'<div class="row" style="margin-top:10px">'+chips+'</div>':'')
+    +(s.notes?'<p class="muted">'+commentHtml(s.notes)+'</p>':''));
+}
+function liftForm(){
+  var mode=LIFT_MODE==="advanced"?"advanced":"simple";
+  var head='<div class="row" style="margin-bottom:12px"><div class="eyebrow">Entry mode</div><div>'+liftModeButton("simple","Simple")+' '+liftModeButton("advanced","Advanced")+'</div></div>';
+  if(mode==="simple"){
+    return head+'<form id="liftform" class="form" onsubmit="saveLift(event)">'
+      +'<input type="hidden" name="mode" value="simple">'
+      +'<label>Bodyweight, lb<input name="bw" type="number" step="0.1" placeholder="not recorded"></label>'
+      +'<label>How did the lift feel?<select name="effort"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></label>'
+      +'<label>PRs hit today <span class="muted">(comma separated; blank means none)</span><input name="prs" placeholder="e.g. Bench press 185 lb x 5"></label>'
+      +'<button class="btn">SAVE SESSION</button></form>'
+      +'<p class="muted">Simple records an effort and any PRs you hit. Switch to Advanced for every set detail.</p>';
+  }
+  return head+'<form id="liftform" class="form" onsubmit="saveLift(event)">'
+    +'<input type="hidden" name="mode" value="advanced">'
+    +'<label>Bodyweight, lb<input name="bw" type="number" step="0.1" placeholder="not recorded"></label>'
+    +'<label>Exercise<input name="ex" placeholder="Exercise name"></label>'
+    +'<div class="grid g3"><label>Weight, lb<input name="weight" type="number" step="0.5" value="0"></label>'
+    +'<label>Sets<input name="sets" type="number" min="1" value="1"></label>'
+    +'<label>Reps per set<input name="reps" type="number" min="1" value="5"></label></div>'
+    +'<div class="grid g2"><label>RPE (optional)<input name="rpe" type="number" step="0.5" min="1" max="10" placeholder="not recorded"></label>'
+    +'<label>Rest, sec (optional)<input name="rest" type="number" min="0" placeholder="not recorded"></label></div>'
+    +'<label>How it moved / notes<textarea name="notes" rows="2" placeholder="optional"></textarea></label>'
+    +'<label>PRs hit today <span class="muted">(comma separated; blank means none)</span><input name="prs" placeholder="optional"></label>'
+    +'<button class="btn">SAVE SESSION</button></form>'
+    +'<p class="muted">Advanced keeps weight, sets, reps, RPE, rest and notes. A higher estimated 1RM than a previous session is flagged as a PR.</p>';
+}
 function lift(){
-  var rows=LIFTS.map(function(s){
-    return card('<div class="row"><div><b>'+esc(s.date)+'</b><div class="muted">'+esc(s.exercise||"not recorded")+' &middot; '+s.reps+' reps &middot; '+(s.weight||0)+' lb</div></div><div class="muted">BW '+(s.bodyweight||"not recorded")+'</div></div>');
-  }).join("");
-  return card('<div class="eyebrow">Strength</div><h1 class="title">Start a session.</h1><form id="liftform" class="form" onsubmit="saveLift(event)"><label>Bodyweight, lb<input name="bw" type="number" placeholder="not recorded"></label><label>Exercise<input name="ex" placeholder="Exercise name"></label><label>Reps<input name="reps" type="number" value="5"></label><label>Added weight, lb<input name="weight" type="number" value="0"></label><button class="btn">END SESSION</button></form><p class="muted">Sessions stay in this browser. They are not uploaded to the server.</p>')
+  var rows=LIFTS.map(function(s,i){return liftRow(s,i)}).reverse().join("");
+  var prCount=LIFTS.reduce(function(n,s,i){return n+liftPrList(s,i).length},0);
+  return card('<div class="eyebrow">Strength</div><h1 class="title">Start a session.</h1>'
+    +liftForm()
+    +'<p class="muted">'+LIFTS.length+' session(s) &middot; '+prCount+' PR(s) recorded. Sessions stay in this browser; they are not uploaded to the server.</p>')
     +(rows||card('<div class="empty"><strong>NO DATA: lifting_log_url returned nothing.</strong>Audit returned no lifting sessions. Your own sessions can be logged here.</div>'));
 }
 function saveLift(e){
   e.preventDefault();
   var f=new FormData(e.target);
-  LIFTS.push({date:new Date().toISOString().slice(0,10),bodyweight:f.get("bw")||null,exercise:f.get("ex")||"not recorded",reps:+f.get("reps"),weight:+f.get("weight")});
+  var mode=f.get("mode")==="advanced"?"advanced":"simple";
+  var bw=f.get("bw"),rpe=f.get("rpe"),rest=f.get("rest");
+  var prs=String(f.get("prs")||"").split(",").map(function(x){return x.trim()}).filter(Boolean);
+  var best=liftBestBefore(LIFTS.length);
+  var rec={
+    id:Date.now()+"-"+Math.random().toString(36).slice(2,8),
+    date:new Date().toISOString().slice(0,10),
+    mode:mode,
+    bodyweight:(bw==null||bw==="")?null:+bw,
+    exercise:mode==="advanced"?(String(f.get("ex")||"").trim()||"not recorded"):null,
+    sets:mode==="advanced"?Math.max(1,+f.get("sets")||1):null,
+    reps:mode==="advanced"?(+f.get("reps")||0):null,
+    weight:mode==="advanced"?(+f.get("weight")||0):null,
+    rpe:mode==="advanced"&&rpe!=null&&rpe!==""?+rpe:null,
+    restSec:mode==="advanced"&&rest!=null&&rest!==""?+rest:null,
+    notes:mode==="advanced"?String(f.get("notes")||""):"",
+    effort:mode==="simple"?String(f.get("effort")||"medium"):null,
+    prs:prs,
+    autoPr:null
+  };
+  rec.autoPr=liftPrFor(rec,best);
+  LIFTS.push(rec);
   localStorage.setItem("aurora_lifts",JSON.stringify(LIFTS));
-  toast("Session saved");
+  toast(rec.autoPr||prs.length?"Session saved - PR recorded":"Session saved");
   go("#lift");
 }
 

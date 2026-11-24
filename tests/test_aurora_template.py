@@ -354,6 +354,132 @@ def test_pace_is_shown_as_minutes_seconds(template):
         assert stale not in template, stale
 
 
+def test_run_score_adds_a_number_and_reason_to_the_letter(template):
+    """A letter alone hid why one run scored differently from another."""
+    for marker in (
+        "function runScore(r)", "function scoreCard(r)", "+scoreCard(r)",
+        "score>=90?\"A\":score>=78?\"B\"", "Math.max(1,Math.min(100,Math.round(score)))",
+        "Descriptive only: hills, effort, weather and fatigue",
+        "<th>Score</th>", "s.grade+' &middot; '+s.score+'/100",
+        "Pace was ", "than your recent ", "no lap splits, so consistency was not scored",
+    ):
+        assert marker in template, marker
+    # The old hero promised a score but displayed none.
+    assert "Score computed from pace, heart rate and consistency" not in template
+
+
+def test_lifting_has_simple_and_advanced_modes_with_prs(template):
+    """Simple is one tap plus effort; Advanced keeps every set detail."""
+    for marker in (
+        "let LIFT_MODE=", "aurora_lift_mode", "function setLiftMode(m)",
+        "function liftForm()", "function liftPrFor(s,best)", "function liftPrList(s,index)",
+        "setLiftMode(&apos;'+m+'&apos;)", "name=\"effort\"",
+        "value=\"easy\"", "value=\"medium\"", "value=\"hard\"",
+        "name=\"sets\"", "name=\"rpe\"", "name=\"rest\"", "name=\"notes\"",
+        "name=\"prs\"", ">PR '+esc(p)+'", "PR(s) recorded",
+    ):
+        assert marker in template, marker
+    # The form id and inline submit binding are shared by both modes.
+    assert 'id="liftform"' in template
+    assert 'onsubmit="saveLift(event)"' in template
+
+
+def _function_source(template, name):
+    """Extract one top-level function by brace matching, not by line number."""
+    m = re.search(r"(?m)^function " + re.escape(name) + r"\(", template)
+    assert m, name
+    start = template.index("{", m.start())
+    depth = 0
+    for i in range(start, len(template)):
+        if template[i] == "{":
+            depth += 1
+        elif template[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return template[m.start():i + 1]
+    raise AssertionError("unbalanced function " + name)
+
+
+def test_run_score_and_lift_modes_behave_in_javascript(template):
+    """Exercise the new logic with node, using the committed snapshot."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed; JavaScript behaviour check unavailable")
+
+    stubs = """
+var store={};
+var localStorage={getItem:function(k){return Object.prototype.hasOwnProperty.call(store,k)?store[k]:null},
+                  setItem:function(k,v){store[k]=String(v)}};
+var location={search:"",hash:"#home"};
+var document={getElementById:function(){return null}};
+function render(){}
+var window={};
+"""
+    lines = [ln for ln in template.splitlines() if ln.startswith((
+        "const SUMMARY=", "const COACH=", "const RUN_CONTEXT=",
+        "const NUTRITION=", "const LIFTS=", "let LIFT_MODE=",
+    ))]
+    assert len(lines) == 6
+    blocks = []
+    for name in ("rawMeta", "rawSplits"):
+        m = re.search(r"const " + name + r"=`(.*?)`;", template, re.S)
+        assert m, name
+        blocks.append("const " + name + "=`" + m.group(1) + "`;")
+    names = (
+        "esc", "paceSec", "pstr", "sec", "band", "card", "commentHtml",
+        "contextFor", "contextSplits", "normalizeRun", "fadePct", "runScore",
+        "scoreCard", "liftE1rm", "liftBestBefore", "liftPrFor", "liftPrList",
+        "setLiftMode", "liftModeButton", "liftRow", "liftForm", "lift", "saveLift",
+        "toast", "go",
+    )
+    iife = re.search(r"const RUNS=\[\];\n\(function\(\)\{.*?\n\}\)\(\);", template, re.S)
+    assert iife
+    harness = "\n".join(
+        [stubs] + lines + blocks + [_function_source(template, n) for n in names]
+        + [iife.group(0)] + ["""
+var scores=RUNS.map(function(r){return runScore(r)});
+if(scores.length<70)throw new Error("snapshot not loaded");
+scores.forEach(function(s){
+  if(!(s.score>=1&&s.score<=100)||!/^[A-F]$/.test(s.grade)||!s.reason)
+    throw new Error("invalid score "+JSON.stringify(s));
+});
+if(new Set(scores.map(function(s){return s.score})).size<10)
+  throw new Error("score is not discriminating between runs");
+var card=scoreCard(RUNS[RUNS.length-1]);
+if(card.indexOf("/100")<0||card.indexOf("Descriptive only")<0)
+  throw new Error("score card missing number or reason");
+LIFT_MODE="simple";
+var simple=liftForm();
+if(simple.indexOf('name="effort"')<0||simple.indexOf('name="prs"')<0||simple.indexOf('name="reps"')>=0)
+  throw new Error("simple form wrong");
+LIFT_MODE="advanced";
+var advanced=liftForm();
+["ex","weight","sets","reps","rpe","rest","notes","prs"].forEach(function(f){
+  if(advanced.indexOf('name="'+f+'"')<0)throw new Error("advanced missing "+f);
+});
+function submit(v){global.FormData=function(){return {get:function(k){return v[k]==null?null:v[k]}}};
+  saveLift({preventDefault:function(){},target:{}})}
+LIFTS.length=0;
+submit({mode:"advanced",bw:"180",ex:"Bench press",weight:"135",sets:"3",reps:"5",rpe:"",rest:"",notes:"",prs:""});
+submit({mode:"advanced",bw:"",ex:"Bench press",weight:"185",sets:"3",reps:"5",rpe:"8",rest:"120",notes:"ok",prs:""});
+if(!LIFTS[1].autoPr||LIFTS[1].autoPr.indexOf("Bench press e1RM")<0)throw new Error("PR not detected");
+if(LIFTS[0].rpe!==null||LIFTS[1].restSec!==120)throw new Error("blank/zero handling wrong");
+LIFT_MODE="simple";
+submit({mode:"simple",bw:"180",effort:"hard",prs:"Squat 225 x 3"});
+if(LIFTS[2].prs.length!==1||LIFTS[2].weight!==null)throw new Error("simple record wrong");
+if(lift().indexOf("PR Squat 225 x 3")<0)throw new Error("PR not rendered");
+setLiftMode("advanced");
+if(store["aurora_lift_mode"]!=="advanced")throw new Error("mode not persisted");
+"""]
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "features.js")
+        with io.open(path, "w", encoding="utf-8") as fh:
+            fh.write(harness)
+        proc = subprocess.run([node, path], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+
+
 def test_template_script_is_valid_javascript(template):
     """A broken quote in the new report cards would kill the whole page."""
     node = shutil.which("node")

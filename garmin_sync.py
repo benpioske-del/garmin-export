@@ -115,8 +115,9 @@ for pkg in PACKAGES:
             sys.exit(
                 f"Missing package '{pkg}'.\n\n"
                 "Install dependencies first:\n"
-                "    pip install garminconnect\n"
-                "\nIf 'pip' isn't on PATH, try:  py -m pip install garminconnect\n"
+                "    pip install " + " ".join(PACKAGES) + "\n"
+                "\nIf 'pip' isn't on PATH, try:  py -m pip install "
+                + " ".join(PACKAGES) + "\n"
             )
 
 try:
