@@ -63,7 +63,12 @@ fi
         "$PY" "$APP_DIR/garmin_sync.py" || true
         # Bare trainloop.py only prints help; new FITs would never reach the DB.
         "$PY" "$APP_DIR/trainloop.py" bootstrap || true
+        # The CSV carries the per-mile splits for runs the DB cannot store.
         "$PY" "$APP_DIR/deploy/cloud/refresh_export.py" || true
+        # Weather is archived at build time, never looked up by the page. Rebuild
+        # the baked context after the CSV so phone-synced runs get weather and
+        # splits too; a failed fetch leaves the previous context serving.
+        "$PY" "$APP_DIR/build_run_context.py" || true
     done
 ) &
 

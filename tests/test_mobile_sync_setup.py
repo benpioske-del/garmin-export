@@ -43,6 +43,15 @@ def test_nightly_refresh_imports_after_the_download():
     assert not re.search(r'trainloop\.py"\s*\|\|', text)
 
 
+def test_nightly_loop_rebuilds_context_after_the_export():
+    """A phone-synced run needs archived weather, but the page never fetches it."""
+    text = _read("deploy/northflank/start.sh")
+    export = text.index("refresh_export.py")
+    context = text.index("build_run_context.py")
+    assert context > export > text.index("trainloop.py", text.index("garmin_sync.py"))
+    assert "no live lookup" in _read("build_run_context.py")
+
+
 def test_container_declares_every_sync_dependency():
     requirements = _read("requirements.txt")
     pyproject = _read("pyproject.toml")
