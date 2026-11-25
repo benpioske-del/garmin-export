@@ -188,6 +188,23 @@ def test_env_shape_reports_only_shape(fake_cronometer, capsys):
     assert PASSWORD not in out
 
 
+def test_show_days_prints_only_date_and_macros(fake_cronometer, capsys):
+    nutrition.upsert_days([
+        {"date": "2026-11-23", "calories": 2200, "protein": 160,
+         "carbs": 210, "fat": 72},
+        {"date": "2026-11-24", "calories": 2100, "protein": 150,
+         "carbs": 200, "fat": 70},
+    ])
+    assert cronometer_sync.main(["--show-days", "1"]) == 0
+    out = capsys.readouterr().out.strip()
+    rows = json.loads(out)
+    assert len(rows) == 1
+    assert set(rows[0]) == {"date", "calories", "protein", "carbs", "fat"}
+    assert rows[0]["date"] == "2026-11-24"
+    assert USER not in out
+    assert PASSWORD not in out
+
+
 def test_login_errors_are_classified_without_echoing_the_body():
     assert cronometer_sync._login_error_reason(
         '{"error":"Invalid username or password"}'

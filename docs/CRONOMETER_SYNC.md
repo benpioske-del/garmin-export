@@ -48,6 +48,7 @@ cd /workspace
 python3 cronometer_sync.py --check      # Cronometer credentials: configured
 python3 cronometer_sync.py              # Cronometer sync: accepted N day(s), upserted N, total N
 python3 cronometer_sync.py --status     # state, last_success, counts; no secrets
+python3 cronometer_sync.py --show-days 2  # date + macros only, no credentials
 ```
 
 The dashboard's **Sync** button also runs this pull alongside the Garmin sync.

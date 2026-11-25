@@ -156,6 +156,20 @@ def read_status(path=None):
         return {"state": "missing", "ok": False, "error": None}
 
 
+def recent_days(count=2, path=None):
+    """Return only the date and macro totals from the newest local days.
+
+    Used for a support preview. It never reads credentials or contacts
+    Cronometer, and it deliberately omits every field except the five the
+    athlete sees in the Fuel view.
+    """
+    if count < 1:
+        raise ValueError("count must be at least 1")
+    rows = nutrition.read_days(path)
+    keys = ("date", "calories", "protein", "carbs", "fat")
+    return [{key: row.get(key) for key in keys} for row in rows[-count:]]
+
+
 def _utc_offset_minutes():
     """Offset Cronometer should use when interpreting the login handshake."""
     override = os.environ.get("CRONOMETER_UTC_OFFSET_MINUTES")
@@ -332,6 +346,14 @@ def main(argv=None):
         return 0 if ready else 1
     if "--diagnose-env" in args:
         print(json.dumps(env_shape(), sort_keys=True, indent=2))
+        return 0
+    if "--show-days" in args:
+        index = args.index("--show-days")
+        try:
+            count = int(args[index + 1])
+        except (IndexError, ValueError):
+            count = 2
+        print(json.dumps(recent_days(count), indent=2))
         return 0
     days = 7
     if "--days" in args:
