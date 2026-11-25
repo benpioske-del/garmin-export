@@ -184,6 +184,8 @@ def test_env_shape_reports_only_shape(fake_cronometer, capsys):
     assert shape["password_edge_space"] is False
     assert shape["username_equals_key"] is False
     assert shape["password_equals_key"] is False
+    assert shape["status_path"] == os.environ["CRONOMETER_SYNC_STATUS"]
+    assert isinstance(shape["data_dir"], str)
     assert USER not in out
     assert PASSWORD not in out
 

@@ -79,6 +79,8 @@ def env_shape():
         "password_len_bucket": _length_bucket(password),
         "username_equals_key": username.upper() == "CRONOMETER_USERNAME",
         "password_equals_key": password.upper() == "CRONOMETER_PASSWORD",
+        "data_dir": paths.data_dir(),
+        "status_path": status_path(),
     }
 
 

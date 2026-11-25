@@ -45,11 +45,18 @@ Then verify inside the running container (values are never printed):
 
 ```sh
 cd /workspace
+# A manual exec session does not inherit the server's exported GARMIN_DATA_DIR.
+# Set it explicitly so checks read and write the same persistent volume as the
+# nightly loop and the dashboard's Sync button.
+export GARMIN_DATA_DIR=/data
 python3 cronometer_sync.py --check      # Cronometer credentials: configured
 python3 cronometer_sync.py              # Cronometer sync: accepted N day(s), upserted N, total N
 python3 cronometer_sync.py --status     # state, last_success, counts; no secrets
 python3 cronometer_sync.py --show-days 2  # date + macros only, no credentials
 ```
+
+`--diagnose-env` prints the resolved `data_dir` and `status_path` as well as
+shape booleans, so a future check can confirm it is using `/data`.
 
 The dashboard's **Sync** button also runs this pull alongside the Garmin sync.
 Its result includes a `nutrition_ok` flag; a missing credential does not turn a
