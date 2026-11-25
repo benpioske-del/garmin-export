@@ -69,6 +69,10 @@ fi
         # the baked context after the CSV so phone-synced runs get weather and
         # splits too; a failed fetch leaves the previous context serving.
         "$PY" "$APP_DIR/build_run_context.py" || true
+        # Cronometer has no public API; this pulls the Daily Nutrition CSV the
+        # website itself exports and upserts it into the same local log. The
+        # script skips quietly when the credentials are not configured.
+        "$PY" "$APP_DIR/cronometer_sync.py" || true
     done
 ) &
 

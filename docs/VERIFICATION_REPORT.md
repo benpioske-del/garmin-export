@@ -548,14 +548,22 @@ when the five exact columns are present and to the CalTrak parser otherwise.
   shorter no-id record is a time bucket and is summed. Deletions are applied by
   id. Dates the webhook manages are replaced wholesale, so a deleted record can
   remove a day, while manually imported dates are preserved.
-- **Seamless Android path.** Cronometer's Android app writes Food entries to
+- **Server-side Cronometer pull.** The nightly loop and the dashboard's Sync
+  button both run `cronometer_sync.py`. It logs in with the athlete's
+  Cronometer credentials held as Northflank secrets, asks the private web
+  export for `dailySummary`, and feeds the CSV through the existing
+  `nutrition.parse_export` / `upsert_days` path. No credential, session token or
+  export nonce is logged or persisted; the sanitised local status file records
+  the last attempt. This is an unofficial integration, with
+  `CRONOMETER_GWT_PERMUTATION` as the override when Cronometer rotates its GWT
+  values. See `docs/CRONOMETER_SYNC.md`.
+- **Optional phone path.** Cronometer's Android app writes Food entries to
   Android Health Connect (Cronometer documents Food and Water as export types).
-  HC Webhook reads Nutrition from Health Connect on an interval or on demand and
-  POSTs it to `/api/nutrition/hook`. Setup is one-time: enable Nutrition at Daily
-  resolution, add the webhook URL and custom header, then use its interval,
-  widget, Quick Settings tile or broadcast trigger. No export and no file picker
-  are needed after that. It is the only no-export path, because Cronometer has no
-  personal webhook or public API. The manual CSV import remains the free
+  The paid HC Webhook Play Store app reads Nutrition and POSTs it to
+  `/api/nutrition/hook`. Setup is one-time: enable Nutrition at Daily resolution
+  and Local time, add the webhook URL and custom header, then use its interval
+  or Quick Settings tile. No live phone payload has been observed yet, so this
+  path is documented, not relied upon. The manual CSV import remains the free
   fallback.
 - The log is stored at `paths.data_dir()/nutrition_log.csv`, never in the
   committed template, so athlete nutrition is not published.

@@ -1622,18 +1622,27 @@ which reads the same export and confirms `Energy (kcal)`, `Net Carbs (g)` and
 
 ## What this does not fix
 
-- **Cronometer has no personal webhook and no public API.** Its only automatic
-  path is Cronometer Android -> Health Connect (Food) -> a bridge -> 
-  `POST /api/nutrition/hook`. The bridge that can do that, HC Webhook, is not
-  installed, and no live phone payload has ever reached the hook. The automatic
-  path stays documented and unverified until one does.
-- **The free path is still an export.** Cronometer exports only on its website,
-  so the athlete must open cronometer.com, choose More -> Account -> Export Data
-  -> Export Daily Nutrition, and import the CSV. The Android share sheet shortens
-  the last step to one tap after the download, but it is not hands-free.
-- **The unofficial API was not adopted.** Cronometer's private GWT endpoints are
-  capped at 10 exports per day and their magic values change without notice. That
-  is not a dependable integration for a daily habit.
+- **Cronometer still has no personal webhook and no public API.** Its official
+  automatic path remains Cronometer Android -> Health Connect (Food) -> a paid
+  bridge -> `POST /api/nutrition/hook`. No live phone payload has reached that
+  hook, so it is still documented and unverified on the athlete's device.
+- **A server-side pull now covers the daily habit without a phone app.**
+  `cronometer_sync.py` drives the same private web export the site calls, using
+  credentials held as Northflank secrets, and feeds the Daily Nutrition CSV
+  through the existing `nutrition.parse_export` / `upsert_days` code. It runs in
+  the nightly loop and on the dashboard's Sync button. It is an unofficial
+  integration: Cronometer rotates GWT values, so
+  `CRONOMETER_GWT_PERMUTATION` is an override and the sync status records a
+  sanitised failure instead of inventing data. See `docs/CRONOMETER_SYNC.md`.
+- **The free manual path is still an export.** Cronometer exports on its website;
+  the athlete can choose More -> Account -> Export Data -> Export Daily
+  Nutrition and import the CSV. The Android share sheet shortens the last step
+  to one tap after the download, but it is not hands-free.
+- **The unofficial endpoints are a tradeoff, not a guarantee.** The private GWT
+  export is capped at about 10 requests per day; one nightly pull is well inside
+  that. Their magic values change without notice, so the status file reports a
+  sanitised failure and keeps serving the last good nutrition log instead of
+  inventing rows.
 - **History before the newest backup is still unrecoverable.** The nutrition log
   lives in the local data directory and is gitignored, so the repository holds a
   header-only schema file, not the athlete's rows.

@@ -16,7 +16,7 @@ import os
 DATA_SUBDIRS = (".garmin_tokens", "garmin_fit")
 DATA_FILES = ("garmin_sleep.csv", "garmin_hr.csv", "garmin_last_sync.json",
               "garmin_sync.log", "garmin_tokens.json", "manual_runs.json",
-              "run_fuel.json")
+              "run_fuel.json", "nutrition_sync_status.json")
 
 
 def _default_data_dir():

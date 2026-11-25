@@ -214,6 +214,19 @@ def test_nutrition_hook_buttons_do_not_terminate_the_script_early():
     assert "copyNutritionHook('token')" not in script
 
 
+def test_nutrition_setup_links_the_exact_play_store_app():
+    """Two similarly named bridge apps exist; link the one we verified.
+
+    The old local-host hint also referred to a laptop tunnel window that no
+    longer exists now that the dashboard runs in the cloud.
+    """
+    script = G.AURORA_LIVE_SCRIPT
+    assert ("href='https://play.google.com/store/apps/details?"
+            "id=com.hcwebhook.app'") in script
+    assert "start-dashboard window" not in script
+    assert "Open the public dashboard URL on your phone" in script
+
+
 def test_signal_heading_uses_the_api_state():
     """A confirmation refusal is not the same refusal as missing history."""
     script = G.AURORA_LIVE_SCRIPT

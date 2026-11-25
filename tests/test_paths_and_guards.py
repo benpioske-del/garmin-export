@@ -52,7 +52,8 @@ def test_repo_dir_honours_override(monkeypatch, tmp_path):
 
 def test_known_sensitive_names_are_declared():
     """Everything garmin_sync.py writes locally must be in the ignore list."""
-    for name in ("garmin_sleep.csv", "garmin_hr.csv", "garmin_last_sync.json"):
+    for name in ("garmin_sleep.csv", "garmin_hr.csv", "garmin_last_sync.json",
+                 "nutrition_sync_status.json"):
         assert name in paths.DATA_FILES
     assert ".garmin_tokens" in paths.DATA_SUBDIRS
 

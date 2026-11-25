@@ -409,6 +409,7 @@ ALLOWED_HOSTS = {"127.0.0.1", "localhost"}
 last_request: float = time.time()
 SYNC_SCRIPT = os.path.join(ROOT, "garmin_sync.py")
 IMPORT_SCRIPT = os.path.join(ROOT, "trainloop.py")
+CRONOMETER_SYNC_SCRIPT = os.path.join(ROOT, "cronometer_sync.py")
 _sync_lock = threading.Lock()
 MEGACMD = ""
 MEGACMD_REMOTE = "/CoachDashboard"
@@ -476,12 +477,23 @@ def _run_sync():
     output = "== Garmin sync ==\n%s\n\n== Database import ==\n%s" % (
         download["output"] or "(no output)",
         imported["output"] or "(no output)")
+    # Nutrition is a separate pull from Cronometer's web export. It is best
+    # effort: a missing credential or a Cronometer outage must not turn a
+    # successful Garmin sync into a failure. The dedicated status file records
+    # the truth, and the output line tells the athlete what happened.
+    nutrition_step = None
+    if os.path.isfile(CRONOMETER_SYNC_SCRIPT):
+        nutrition_step = _run_step([CRONOMETER_SYNC_SCRIPT], 180,
+                                   "Cronometer sync")
+        output += "\n\n== Cronometer sync ==\n%s" % (
+            nutrition_step["output"] or "(no output)")
     result = {
         "ok": download["ok"] and imported["ok"],
         "exit": imported["exit"] if download["ok"] else download["exit"],
         "output": output[-4000:],
         "download_ok": download["ok"],
         "import_ok": imported["ok"],
+        "nutrition_ok": (nutrition_step["ok"] if nutrition_step else None),
     }
     # garmin_sync.py reports "Done: N new run(s) downloaded, M already current."
     # The page needs that number to say what the sync did: "complete" alone left
@@ -1043,7 +1055,7 @@ AURORA_LIVE_SCRIPT = """
       var local = origin.indexOf("//localhost") >= 0 ||
         origin.indexOf("//127.0.0.1") >= 0;
       var note = local
-        ? '<p class="sub"><b>Heads up:</b> you are viewing this on the laptop. Replace the address below with the tunnel address you use on your phone (the one shown in the start-dashboard window).</p>'
+        ? '<p class="sub"><b>Heads up:</b> you are viewing this on the laptop at a local address. Open the public dashboard URL on your phone and tap <b>Set up automatic upload</b> there, then copy the URL and token from that page.</p>'
         : "";
       var last = info.last_received
         ? "Last upload: <b>" + esc(info.last_received) + "</b> &middot; " +
@@ -1066,7 +1078,7 @@ AURORA_LIVE_SCRIPT = """
           '<button class="btn ghost" onclick="copyNutritionHook(&apos;token&apos;)">Copy token</button>' +
         "</div>" +
         '<ol class="sub" style="margin-top:14px;padding-left:18px;line-height:1.6">' +
-          "<li>Install <b>HC Webhook</b> from the Play Store (about $14.99, one-time). There is no free store listing, and sideloading an APK is not required or recommended.</li>" +
+          "<li>Install <b>HC Webhook</b> from the <a href='https://play.google.com/store/apps/details?id=com.hcwebhook.app' target='_blank' rel='noopener noreferrer'>Play Store</a> (about $14.99, one-time). There is no free store listing, and sideloading an APK is not required or recommended.</li>" +
           "<li>In HC Webhook: <b>Data Types</b> &rarr; enable <b>Nutrition</b> and grant Health Connect read access. Set its resolution to <b>Daily</b>.</li>" +
           "<li>In HC Webhook: <b>Webhooks</b> &rarr; add a JSON webhook with the URL above and a custom header <b>" +
             esc(info.header) + "</b> set to the token above.</li>" +

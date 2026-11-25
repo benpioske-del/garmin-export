@@ -81,6 +81,7 @@ garmin_last_sync.json
 nutrition_log.csv
 nutrition_log.records.json
 nutrition_log.hook-token
+nutrition_sync_status.json
 manual_runs.json
 run_fuel.json
 

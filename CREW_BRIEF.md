@@ -280,18 +280,26 @@ laptop is then only a browser, and the dashboard survives it being off, asleep
 or broken. The free ngrok plan allows one agent per static domain, so the laptop
 watchdog must be stopped before the VM tunnel starts.
 
-**Phone nutrition has a seamless path.** Cronometer's Android app writes food
-entries to Android Health Connect. The free, open-source **HC Webhook** app can
-read Nutrition from Health Connect and POST it to `POST /api/nutrition/hook` on
-an interval or on demand. That route uses a dedicated `X-Nutrition-Token`,
-separate from the dashboard login token; `GET /api/nutrition/hook-info` (behind
-the normal gate) shows the URL, header and token in the Fuel view's setup card.
-Configure Nutrition at **Daily** resolution and **Local time** so each day has
-one authoritative total. One-time setup, then no export or file picker.
-Cronometer has no personal webhook or public API of its own, so the free fallback
-is a Daily Nutrition CSV export from cronometer.com imported on the dashboard or
-shared from Android's share sheet. CalTrak CSV and JSON imports still work. Do
-not put the token in the repository, a brief, a commit, or chat.
+**Nutrition has two automatic paths.** The server-side pull is the same shape as
+Garmin: `cronometer_sync.py` runs nightly in the container, signs in with
+`CRONOMETER_USERNAME` / `CRONOMETER_PASSWORD` held as Northflank secrets, and
+imports the Daily Nutrition CSV through the existing `nutrition.parse_export`
+and `upsert_days` code. It also runs on the dashboard's Sync button. Cronometer
+has no public API, so this uses the private web export its own site calls; the
+GWT permutation can be overridden with `CRONOMETER_GWT_PERMUTATION` if a
+Cronometer deploy breaks the handshake. No credential, token or nonce is logged
+or written to the repository; the local status file is sanitised.
+
+The phone path is optional redundancy: Cronometer's Android app writes food
+entries to Android Health Connect, and the paid **HC Webhook** Play Store app
+($14.99, one-time) can read Nutrition and POST it to `POST /api/nutrition/hook`.
+That route uses a dedicated `X-Nutrition-Token`, separate from the dashboard
+login token; `GET /api/nutrition/hook-info` shows the URL, header and token in
+the Fuel view's setup card. Configure Nutrition at **Daily** resolution and
+**Local time**. The free fallback is a Daily Nutrition CSV export from
+cronometer.com imported on the dashboard or shared from Android's share sheet.
+CalTrak CSV and JSON imports still work. Do not put a token or password in the
+repository, a brief, a commit, or chat.
 
 **A password login now exists (added at the athlete's request).** For access
 from outside the home WiFi, `--password`/`GARMIN_DASH_PASSWORD` enables a login:
