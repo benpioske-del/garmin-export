@@ -44,9 +44,10 @@ $env:Path = "C:\Program Files\nodejs;$env:APPDATA\npm;" + $env:Path
 Then verify inside the running container (values are never printed):
 
 ```sh
-python3 /app/cronometer_sync.py --check      # Cronometer credentials: configured
-python3 /app/cronometer_sync.py              # Cronometer sync: accepted N day(s), upserted N, total N
-python3 /app/cronometer_sync.py --status     # state, last_success, counts; no secrets
+cd /workspace
+python3 cronometer_sync.py --check      # Cronometer credentials: configured
+python3 cronometer_sync.py              # Cronometer sync: accepted N day(s), upserted N, total N
+python3 cronometer_sync.py --status     # state, last_success, counts; no secrets
 ```
 
 The dashboard's **Sync** button also runs this pull alongside the Garmin sync.
