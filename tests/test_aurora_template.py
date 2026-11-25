@@ -214,6 +214,88 @@ def test_nutrition_hook_buttons_do_not_terminate_the_script_early():
     assert "copyNutritionHook('token')" not in script
 
 
+def test_signal_heading_uses_the_api_state():
+    """A confirmation refusal is not the same refusal as missing history."""
+    script = G.AURORA_LIVE_SCRIPT
+    assert "String(c.state || (refused ? \"data_insufficient\" : \"unavailable\"))" in script
+    assert 'c.refused ? "DATA INSUFFICIENT"' not in script
+    assert '(refused ? "refused" : "live") + " /api/coaching<' in script
+    # The heading must still carry refusal styling, never advice styling.
+    assert '(refused ? "warn" : "good")' in script
+
+
+def test_paint_signal_uses_the_true_refusal_state():
+    """Exercise the injected card with node and the real paint function."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed; JavaScript behaviour check unavailable")
+    match = re.search(r"(?m)^  function paintSignal\(\) \{",
+                      G.AURORA_LIVE_SCRIPT)
+    assert match, "paintSignal not found in the live script"
+    start = G.AURORA_LIVE_SCRIPT.index("{", match.start())
+    depth = 0
+    end = None
+    for i in range(start, len(G.AURORA_LIVE_SCRIPT)):
+        if G.AURORA_LIVE_SCRIPT[i] == "{":
+            depth += 1
+        elif G.AURORA_LIVE_SCRIPT[i] == "}":
+            depth -= 1
+            if depth == 0:
+                end = i + 1
+                break
+    assert end, "unbalanced paintSignal"
+    function = G.AURORA_LIVE_SCRIPT[match.start():end]
+    harness = """
+var card = { innerHTML: "STATIC CARD" };
+var document = { querySelector: function(){ return card; } };
+var LIVE = { coaching: null, load: null };
+function esc(s){ return String(s == null ? "" : s)
+  .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+  .replace(/"/g,"&quot;"); }
+function acwr(load){
+  var w = (load && load.windows) || {};
+  var acute = (w["7d"]||{}).combined_load, chronic = (w["28d"]||{}).combined_load;
+  return (isFinite(acute) && isFinite(chronic) && chronic > 0)
+    ? acute / (chronic / 4) : null;
+}
+""" + function + """
+LIVE.coaching = { state: "confirmation_required", refused: true,
+  blocking_conditions: ["5 recent activities are awaiting confirmation"] };
+LIVE.load = { windows: { "7d": { combined_load: 870.7 },
+                          "28d": { combined_load: 2719.2 } } };
+paintSignal();
+if (card.innerHTML.indexOf("CONFIRMATION REQUIRED") < 0)
+  throw new Error("confirmation state was masked: " + card.innerHTML);
+if (card.innerHTML.indexOf("DATA INSUFFICIENT") >= 0)
+  throw new Error("wrong refusal heading");
+if (card.innerHTML.indexOf("awaiting confirmation") < 0
+    || card.innerHTML.indexOf('class="warn"') < 0
+    || card.innerHTML.indexOf("refused /api/coaching") < 0)
+  throw new Error("refusal detail lost: " + card.innerHTML);
+LIVE.coaching = { state: "data_insufficient", refused: true,
+  blocking_conditions: ["only 2 training days with runs in 7 days, need 3"] };
+paintSignal();
+if (card.innerHTML.indexOf("DATA INSUFFICIENT") < 0)
+  throw new Error("data refusal heading lost");
+LIVE.coaching = { state: "recover", refused: false, blocking_conditions: [] };
+paintSignal();
+if (card.innerHTML.indexOf("RECOVER") < 0 || card.innerHTML.indexOf('class="good"') < 0
+    || card.innerHTML.indexOf("live /api/coaching") < 0)
+  throw new Error("advisory state changed: " + card.innerHTML);
+card.innerHTML = "STATIC CARD";
+LIVE.coaching = null;
+paintSignal();
+if (card.innerHTML !== "STATIC CARD")
+  throw new Error("static card was overwritten without coaching data");
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "signal.js")
+        with io.open(path, "w", encoding="utf-8") as fh:
+            fh.write(harness)
+        proc = subprocess.run([node, path], capture_output=True, text=True)
+    assert proc.returncode == 0, proc.stderr or proc.stdout
+
+
 def test_injected_live_script_is_valid_javascript():
     """Parse the injected script with node when it is available.
 

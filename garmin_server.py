@@ -951,17 +951,21 @@ AURORA_LIVE_SCRIPT = """
     if (!card || !LIVE.coaching) { return; }
     var c = LIVE.coaching;
     var a = acwr(LIVE.load);
-    var state = c.refused ? "DATA INSUFFICIENT"
-      : String(c.state || "unavailable").toUpperCase();
+    var refused = !!c.refused;
+    // The API state is the truth: confirmation_required is a different refusal
+    // from data_insufficient. Masking both as DATA INSUFFICIENT hid the action
+    // the athlete needed to take. Refusals keep the warn styling.
+    var state = String(c.state || (refused ? "data_insufficient" : "unavailable"))
+      .toUpperCase();
     var why = (c.blocking_conditions && c.blocking_conditions.length)
       ? c.blocking_conditions.slice(0, 3).join(" \\u00b7 ")
       : "Coaching state from /api/coaching";
     card.innerHTML =
       '<div class="eyebrow">Training signal</div>' +
-      '<h2 class="' + (c.refused ? "warn" : "good") + '">' + esc(state) + "</h2>" +
+      '<h2 class="' + (refused ? "warn" : "good") + '">' + esc(state) + "</h2>" +
       '<p class="sub">' + esc(why) + "</p>" +
       '<span class="pill">ACWR ' + (a == null ? "unavailable" : a.toFixed(2)) +
-      " \\u00b7 live /api/coaching</span>";
+      " \\u00b7 " + (refused ? "refused" : "live") + " /api/coaching</span>";
   }
   function badge(text, title) {
     var el = document.getElementById("aurora-live-badge");

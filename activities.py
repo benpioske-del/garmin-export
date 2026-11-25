@@ -25,6 +25,7 @@ import json
 import os
 import sys
 
+import paths
 import terms
 import trainingdb
 from garmin_fit_reader import FILENAME_DATE, hms_sec, pace_min
@@ -365,7 +366,85 @@ def detect_date_gaps(conn, gap_days=7):
     return opened
 
 
-def confirm_timezone(conn, activity_id, offset_hours, actor="athlete"):
+def timezone_policy():
+    """Return the athlete-confirmed zone from profile.json, or None.
+
+    An explicit confirmation date is required. Without one, a filename-derived
+    local date stays provisional and its review stays open: absence is recorded,
+    never filled in by a guess.
+    """
+    try:
+        with open(os.path.join(paths.repo_dir(), "profile.json"),
+                  encoding="utf-8") as fh:
+            profile = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if not profile.get("timezone_policy_confirmed_utc"):
+        return None
+    zone = profile.get("timezone_policy")
+    return str(zone).strip() if zone else None
+
+
+def _nth_sunday(year, month, nth):
+    first = datetime.date(year, month, 1)
+    delta = (6 - first.weekday()) % 7  # Sunday is weekday 6
+    return first + datetime.timedelta(days=delta + 7 * (nth - 1))
+
+
+def offset_for_policy(zone, start_utc):
+    """UTC offset in hours for an athlete-confirmed zone, or None.
+
+    FIT files carry no offset. The only supported policy is the athlete's
+    documented US Central zone. DST is derived from the observed UTC instant
+    with the current US rule (second Sunday in March to first Sunday in
+    November), so a winter run gets -6 and a summer run gets -5. An unknown
+    zone returns None rather than inventing an offset.
+    """
+    if zone != "America/Chicago":
+        return None
+    start = _parse(start_utc)
+    if start is None:
+        return None
+    utc = datetime.timezone.utc
+    start = (start.replace(tzinfo=utc) if start.tzinfo is None
+             else start.astimezone(utc))
+    march = _nth_sunday(start.year, 3, 2)
+    november = _nth_sunday(start.year, 11, 1)
+    dst_on = datetime.datetime(march.year, march.month, march.day, 8,
+                               tzinfo=utc)
+    dst_off = datetime.datetime(november.year, november.month, november.day, 7,
+                                tzinfo=utc)
+    return -5 if dst_on <= start < dst_off else -6
+
+
+def auto_confirm_timezones(conn, zone=None, actor="autoconfirm"):
+    """Confirm provisional local dates using the athlete's confirmed zone.
+
+    Idempotent: once a row is confirmed it no longer matches the pending query,
+    so a later import writes no second audit row. The policy name is recorded
+    in every audit event, so an automatic decision is never mistaken for a
+    hand-entered one.
+    """
+    zone = timezone_policy() if zone is None else zone
+    if not zone:
+        return {"zone": None, "confirmed": 0}
+    pending = conn.execute(
+        "SELECT activity_id, start_utc FROM activities WHERE confirmation = ? "
+        "AND start_utc IS NOT NULL ORDER BY start_utc",
+        (terms.CONFIRMATION_REQUIRED,)).fetchall()
+    confirmed = 0
+    for row in pending:
+        offset = offset_for_policy(zone, row["start_utc"])
+        if offset is None:
+            continue
+        confirm_timezone(conn, row["activity_id"], offset, actor=actor,
+                         reason="policy %s" % zone)
+        confirmed += 1
+    return {"zone": zone, "confirmed": confirmed}
+
+
+def confirm_timezone(conn, activity_id, offset_hours, actor="athlete",
+                     reason=None):
     """Apply an athlete-confirmed UTC offset to an activity's local date.
 
     This is the only path that upgrades a local date from assumed to confirmed.
@@ -378,7 +457,14 @@ def confirm_timezone(conn, activity_id, offset_hours, actor="athlete"):
     if row is None:
         raise KeyError(activity_id)
     start = _parse(row["start_utc"])
+    if start is None:
+        raise ValueError("unparseable start_utc")
     local = (start + datetime.timedelta(hours=offset_hours)).replace(tzinfo=None)
+    note = "offset %+dh" % offset_hours
+    audit_reason = note
+    if reason:
+        note += "; %s" % reason
+        audit_reason += "; %s" % reason
     stamp = now_utc()
     conn.execute(
         """UPDATE activities SET start_local = ?, timezone_source = ?,
@@ -397,12 +483,12 @@ def confirm_timezone(conn, activity_id, offset_hours, actor="athlete"):
     conn.execute(
         """UPDATE review_items SET state = ?, resolved_utc = ?, resolved_by = ?,
            resolution_note = ? WHERE activity_id = ? AND reason = ? AND state = ?""",
-        (terms.RESOLVED, stamp, actor, "offset %+dh" % offset_hours,
+        (terms.RESOLVED, stamp, actor, note,
          activity_id, terms.REVIEW_TIMEZONE, terms.OPEN),
     )
     _audit(conn, activity_id, "timezone_confirmed", actor,
            field="timezone_source", old_value=terms.TZ_FILENAME_DATE,
-           new_value=terms.TZ_CONFIRMED_OFFSET, reason="offset %+dh" % offset_hours)
+           new_value=terms.TZ_CONFIRMED_OFFSET, reason=audit_reason)
 
 
 def _parse(value):
@@ -441,11 +527,13 @@ def summary(conn):
     return {"activities": total, "open_reviews": open_reviews}
 
 
-def import_dir(pattern, db=None):
+def import_dir(pattern, db=None, auto_confirm=True):
     """Import every FIT under a glob. Returns a per-file event tally.
 
     Only closes the connection when it opened it, so a caller can keep querying
-    afterwards.
+    afterwards. When the athlete has configured a timezone policy, provisional
+    local dates are confirmed here, before gap detection, so newly synced runs
+    do not leave coaching blocked by a queue of timezone reviews.
     """
     import glob
     import garmin_fit_reader
@@ -466,6 +554,8 @@ def import_dir(pattern, db=None):
             tally[event] += 1
         except Exception:
             tally["unreadable"] += 1
+    if auto_confirm:
+        auto_confirm_timezones(conn)
     detect_duplicates(conn)
     detect_date_gaps(conn)
     conn.commit()
