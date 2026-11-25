@@ -73,8 +73,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if (form.get("username") != [USER]
                     or form.get("password") != [PASSWORD]
                     or form.get("anticsrf") != ["csrf-123"]):
-                return self._reply(200, '{"error":"bad login"}',
-                                   "application/json")
+                return self._reply(
+                    200, '{"error":"Invalid username or password"}',
+                    "application/json")
             self._reply(200, '{"ok":true}', "application/json")
         elif self.path == "/cronometer/app":
             if "authenticate" in body:
@@ -160,7 +161,7 @@ def test_bad_login_fails_safely(fake_cronometer, monkeypatch):
     result = cronometer_sync.sync(
         3, client=cronometer_sync.CronometerClient(base_url=fake_cronometer))
     assert result["ok"] is False
-    assert result["error"] == "login was rejected by Cronometer"
+    assert result["error"] == "credentials rejected by Cronometer"
     status = cronometer_sync.read_status()
     assert status["state"] == "failed"
     assert "wrong-value" not in json.dumps(status)
@@ -170,6 +171,34 @@ def test_bad_login_fails_safely(fake_cronometer, monkeypatch):
 def test_check_does_not_print_the_secret(fake_cronometer, capsys):
     assert cronometer_sync.main(["--check"]) == 0
     assert capsys.readouterr().out.strip() == "Cronometer credentials: configured"
+
+
+def test_env_shape_reports_only_shape(fake_cronometer, capsys):
+    assert cronometer_sync.main(["--diagnose-env"]) == 0
+    out = capsys.readouterr().out.strip()
+    shape = json.loads(out)
+    assert shape["username_set"] is True
+    assert shape["password_set"] is True
+    assert shape["username_has_at"] is True
+    assert shape["username_edge_space"] is False
+    assert shape["password_edge_space"] is False
+    assert shape["username_equals_key"] is False
+    assert shape["password_equals_key"] is False
+    assert USER not in out
+    assert PASSWORD not in out
+
+
+def test_login_errors_are_classified_without_echoing_the_body():
+    assert cronometer_sync._login_error_reason(
+        '{"error":"Invalid username or password"}'
+    ) == "credentials rejected by Cronometer"
+    assert cronometer_sync._login_error_reason(
+        '{"error":"AntiCSRF Token Invalid"}'
+    ) == "anti-CSRF token rejected"
+    assert cronometer_sync._login_error_reason("{broken") == (
+        "login endpoint returned an unreadable response")
+    assert cronometer_sync._login_error_reason('{"error":"odd"}') == (
+        "login endpoint returned a sanitised error message")
 
 
 def test_dashboard_sync_reports_the_nutrition_step(monkeypatch, tmp_path):

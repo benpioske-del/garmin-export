@@ -52,6 +52,67 @@ class CronometerError(Exception):
     """A step of the pull failed, with a message safe to log."""
 
 
+def _length_bucket(value):
+    """Coarse size class, never the length or the value itself."""
+    if not value:
+        return "0"
+    if len(value) < 8:
+        return "1-7"
+    if len(value) < 16:
+        return "8-15"
+    if len(value) < 32:
+        return "16-31"
+    return "32+"
+
+
+def env_shape():
+    """Describe credential shape only, so support can debug without secrets."""
+    username = os.environ.get("CRONOMETER_USERNAME") or ""
+    password = os.environ.get("CRONOMETER_PASSWORD") or ""
+    return {
+        "username_set": bool(username),
+        "username_has_at": "@" in username,
+        "username_edge_space": username != username.strip(),
+        "username_len_bucket": _length_bucket(username),
+        "password_set": bool(password),
+        "password_edge_space": password != password.strip(),
+        "password_len_bucket": _length_bucket(password),
+        "username_equals_key": username.upper() == "CRONOMETER_USERNAME",
+        "password_equals_key": password.upper() == "CRONOMETER_PASSWORD",
+    }
+
+
+def _login_error_reason(body):
+    """Map Cronometer's login response to a safe category, never its text.
+
+    A rejected-login body can echo parts of the submitted form, so it is never
+    logged. Only a small set of known phrases are translated into a category;
+    everything else becomes a generic message.
+    """
+    if not body.strip():
+        return "login endpoint returned an empty response"
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        return "login endpoint returned an unreadable response"
+    if not isinstance(payload, dict) or "error" not in payload:
+        return "login endpoint returned an unexpected response"
+    error = payload.get("error")
+    if error is None:
+        return "login endpoint reported no error"
+    if not isinstance(error, str):
+        return "login endpoint returned an error object"
+    text = error.lower()
+    if "anticsrf" in text or "csrf" in text:
+        return "anti-CSRF token rejected"
+    if any(word in text for word in ("password", "username", "email",
+                                     "credential", "invalid", "incorrect")):
+        return "credentials rejected by Cronometer"
+    if "captcha" in text or "verify" in text:
+        return "Cronometer asked for verification"
+    return "login endpoint returned a sanitised error message"
+
+
 def status_path():
     """Local-only status file. Never published or committed."""
     return (os.environ.get("CRONOMETER_SYNC_STATUS")
@@ -181,9 +242,9 @@ class CronometerClient:
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             label="login")
         # Cronometer's error body is deliberately not surfaced: it can echo
-        # parts of the submitted form.
+        # parts of the submitted form. Classify it instead.
         if '"error"' in body:
-            raise CronometerError("login was rejected by Cronometer")
+            raise CronometerError(_login_error_reason(body))
         reply = self._gwt(authenticate_body(self.permutation,
                                             _utc_offset_minutes()))
         user = USER_ID_RE.match(reply)
@@ -269,6 +330,9 @@ def main(argv=None):
         print("Cronometer credentials: %s"
               % ("configured" if ready else "not configured"))
         return 0 if ready else 1
+    if "--diagnose-env" in args:
+        print(json.dumps(env_shape(), sort_keys=True, indent=2))
+        return 0
     days = 7
     if "--days" in args:
         index = args.index("--days")

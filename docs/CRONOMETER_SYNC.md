@@ -63,8 +63,16 @@ instead of appending a duplicate.
 
 ## 4. Troubleshooting
 
-- **`login was rejected by Cronometer`** — check the two secret values and
-  whether Cronometer requires a verification step on that account.
+- **`credentials rejected by Cronometer`** — the two values reached the
+  container but Cronometer did not accept them. Confirm you used the email and
+  password for the Cronometer website, not the app-only login or the dashboard
+  password. Run `python3 cronometer_sync.py --diagnose-env` for a shape-only
+  report: it prints booleans and length buckets, never the values. If
+  `username_equals_key` or `password_equals_key` is true, you typed the variable
+  name into the Value field. Cronometer's own error text is never echoed.
+- **`anti-CSRF token rejected`** — the login page changed or the session cookie
+  was not returned. Retry once; if it persists, Cronometer changed its login
+  flow.
 - **`GWT authentication response not understood`** — Cronometer rotated its
   GWT permutation. In Chrome DevTools, open cronometer.com, trigger an export,
   open a `/cronometer/app` request in the Network tab, copy the
