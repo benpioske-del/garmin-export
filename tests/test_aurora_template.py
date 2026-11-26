@@ -90,12 +90,12 @@ def test_bootstrap_dom_targets_exist_in_template(template):
 
 def test_analysis_keeps_all_chart_slots(template):
     """Every run chart plus the split and fuel charts; losing one is the regression."""
-    assert template.count('class="chartbox"') == 24
+    assert template.count('class="chartbox"') == 25
     for canvas in ("split", "load", "weekly", "monthly", "cumulative", "dist",
                    "pacehr", "tss", "calories", "hrmax", "ascentpace",
-                   "cadence", "elevation", "fit", "bubble", "fade", "fuelfade",
-                   "pacedist", "best5k", "latesplits", "gaps", "monthruns",
-                   "bodyweight", "e1rm"):
+                   "cadence", "elevation", "fit", "bubble", "fade", "fadepoint",
+                   "fuelfade", "pacedist", "best5k", "latesplits", "gaps",
+                   "monthruns", "bodyweight", "e1rm"):
         assert 'id="%s"' % canvas in template, canvas
 
 
@@ -166,6 +166,23 @@ def test_fade_onset_is_shown_in_the_fuel_card_and_worst_table(template):
     assert "estimated onset &middot; mile" in template
     assert "<th>Est. onset</th>" in template
     assert "onsetText=onset?" in template
+
+
+def test_fade_point_box_and_in_run_fuel_view_are_visible(template):
+    """The calculation and the fuel entries need a visible home, not a buried table."""
+    assert "function fadePointBox()" in template
+    assert "+fadePointBox()" in template
+    assert "X &middot; onset" in template
+    assert "Y &middot; pace" in template
+    assert "function fadeScoreChip" in template
+    assert 'id="fadepoint"' in template
+    assert 'id="fadepoint-table"' in template
+    assert 'chartOrEmpty("fadepoint"' in template
+    assert "function inRunFuelCard()" in template
+    assert "return inRunFuelCard()" in template
+    assert "<th>Status</th>" in template
+    assert "athlete&apos;s own notes" in template
+    assert "athlete\\'s own notes" not in template
 
 
 def test_fuel_editor_posts_to_the_server_and_shows_fade(template):

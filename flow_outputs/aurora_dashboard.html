@@ -676,7 +676,7 @@ function home(){
     +card('<div class="eyebrow">This week</div><div class="stat">'+Number(miles).toFixed(2)+'</div><div class="muted">miles &middot; '+RUNS.slice(-7).length+' runs</div>')
     +card('<div class="eyebrow">ACWR &middot; official</div><div class="stat">'+acwr+'</div><div class="muted">from coaching analysis</div>')
     +'</div>'
-    +card('<div class="eyebrow">Your weak spot</div><div class="h2">Long-run durability</div><p class="muted">Long runs fade in the final third. Open Analysis for the full breakdown.</p><a class="chip" href="#analysis">Open analysis &rarr;</a>')
+    +fadePointBox()
     +card('<div class="eyebrow">Needs your attention</div><div class="list"><p class="risk">&bull; ACWR is '+acwr+'.</p><p class="risk">&bull; Long-run durability needs review.</p><p class="risk">&bull; Lifting and nutrition logs are incomplete.</p></div>');
 }
 
@@ -724,6 +724,54 @@ function fadeOnsetHtml(p){
   var when=o.onset_time_s==null?null:durStr(o.onset_time_s);
   return '<div class="chip" style="margin-top:10px">estimated onset &middot; mile '+esc(o.onset_mile)+'</div>'
     +'<p class="muted">'+(when?'Elapsed '+esc(when)+' &middot; split '+esc(pstr(o.onset_split_s_per_mi))+'/mi &middot; '+esc(o.confidence)+' confidence. ':'')+esc(o.caveat)+'</p>';
+}
+function fadePointData(){
+  return RUNS.map(function(r){
+    var p=r&&r.fadePoint, o=p&&p.fade_onset;
+    if(!o)return null;
+    return {
+      date:r.date,
+      distance:r.distance,
+      mile:o.onset_mile,
+      time:o.onset_time_s,
+      pace:o.onset_split_s_per_mi,
+      score:(o.composite_score==null?p.fade_composite:o.composite_score),
+      pct:p.fade_pct,
+      confidence:o.confidence,
+      basis:o.composite_basis||""
+    };
+  }).filter(Boolean).sort(function(a,b){return (b.score||0)-(a.score||0)});
+}
+function fadeScoreChip(score){
+  var n=Number(score);
+  if(!isFinite(n))return '<span class="chip">--</span>';
+  var cls=n>=70?"risk":n>=40?"warn":"good";
+  return '<span class="chip '+cls+'">'+Math.round(n)+'/100</span>';
+}
+function fadePointBox(){
+  var rows=fadePointData().slice(0,5);
+  return card('<div class="eyebrow">Fade point</div><h2 class="h2">Where the run starts to go</h2>'
+    +'<p class="muted">X is the estimated onset mile, Y is the pace at that mile. The composite ranks the strength of the split pattern only - it is not a grade or a cause.</p>'
+    +(rows.length?'<div class="tablewrap"><table><thead><tr><th>Run</th><th>X &middot; onset</th><th>Y &middot; pace</th><th>Composite</th></tr></thead><tbody>'+rows.map(function(x){
+      return '<tr><td><a href="#runs/'+esc(x.date)+'">'+esc(x.date)+'</a> &middot; '+x.distance+' mi</td><td>mile '+esc(x.mile)+(x.time==null?"":" &middot; "+esc(durStr(x.time)))+'</td><td>'+esc(pstr(x.pace))+'/mi</td><td>'+fadeScoreChip(x.score)+'</td></tr>';
+    }).join("")+'</tbody></table></div>'
+      :'<div class="empty"><strong>No fade points yet</strong>At least four laps and a positive fade are needed.</div>')
+    +'<a class="chip" href="#analysis" style="margin-top:10px">All fade points &rarr;</a>');
+}
+function inRunFuelCard(){
+  var rows=RUNS.filter(function(r){return r.fuel}).map(function(r){
+    var f=r.fuel, t=f.totals||{}, items=f.items||[];
+    var where=items.map(function(e){return fuelWhere(e)+" "+e.kind}).join(", ");
+    return {date:r.date,count:items.length,review:f.needs_review,note:f.note||"",
+            where:where,oz:t.oz,kcal:t.kcal,carbs:t.carbs_g,sodium:t.sodium_mg};
+  }).sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0});
+  return card('<div class="row"><div><div class="eyebrow">In-run fuel</div><h2 class="h2">What was taken during the run</h2></div><span class="chip">'+rows.length+' runs</span></div>'
+    +'<p class="muted">These are the athlete&apos;s own notes and logged events. A blank amount stays blank; a deliberate zero stays zero. Open a run to edit or review it.</p>'
+    +(rows.length?'<div class="tablewrap"><table><thead><tr><th>Run</th><th>Events</th><th>Fluid</th><th>Energy</th><th>Carbs</th><th>Sodium</th><th>Status</th></tr></thead><tbody>'+rows.map(function(x){
+      var detail=x.where||(x.note?"note only":"journal note");
+      return '<tr><td><a href="#runs/'+esc(x.date)+'">'+esc(x.date)+'</a><div class="muted">'+esc(detail.slice(0,90))+'</div></td><td>'+x.count+'</td><td>'+esc(fuelAmt(x.oz," oz"))+'</td><td>'+esc(fuelAmt(x.kcal," kcal"))+'</td><td>'+esc(fuelAmt(x.carbs," g"))+'</td><td>'+esc(fuelAmt(x.sodium," mg"))+'</td><td><span class="chip '+(x.review?"warn":"good")+'">'+(x.review?"needs review":"recorded")+'</span></td></tr>';
+    }).join("")+'</tbody></table></div>'
+      :'<div class="empty"><strong>No in-run fuel yet</strong>Open a run report to record what you drank or ate.</div>'));
 }
 function fuelWhere(e){
   if(e.mile!=null)return "mi "+e.mile;
@@ -1006,7 +1054,8 @@ function saveRun(e){
 
 function fuel(date){
   var rows=NUTRITION.filter(function(x){return !date||x.date===date});
-  return card('<div class="row"><div><div class="eyebrow">Nutrition</div><h1 class="title">'+esc(date||"Today")+'</h1></div><label class="btn secondary">Import CSV<input id="fuelcsv" type="file" accept=".csv,.json,text/csv,application/json" hidden onchange="importCSV(event)"></label></div>')
+  return inRunFuelCard()
+    +card('<div class="row"><div><div class="eyebrow">Nutrition</div><h1 class="title">'+esc(date||"Today")+'</h1></div><label class="btn secondary">Import CSV<input id="fuelcsv" type="file" accept=".csv,.json,text/csv,application/json" hidden onchange="importCSV(event)"></label></div>')
     +(rows.length?rows.map(function(x){
       return card('<a class="run-card" href="#fuel/'+esc(x.date)+'"><div><b>'+esc(x.date)+'</b><div class="muted">Calories '+(x.kcal==null?"not recorded":x.kcal)+' &middot; Protein '+(x.protein==null?"not recorded":x.protein)+'g</div></div><div class="stat">'+(x.carbs==null?"--":x.carbs)+'<small class="label"> g carbs</small></div></a>');
     }).join(""):card('<div class="empty"><strong>Nutrition unavailable</strong>No nutrition days yet. Export Daily Nutrition from cronometer.com and import the CSV below, or set up automatic upload.</div>'))
@@ -1035,6 +1084,7 @@ function analysis(){
     +card('<div class="eyebrow">Fitness trend</div><div class="chartbox"><canvas id="fit"></canvas></div><p class="muted">Recorded pace against average heart rate.</p>')
     +card('<div class="eyebrow">Run bubbles</div><div class="chartbox"><canvas id="bubble"></canvas></div><p class="muted">Sequence, pace and distance at a glance.</p>')
     +card('<div class="eyebrow">Pacing fade</div><div class="chartbox"><canvas id="fade"></canvas></div><p class="muted">Second-half pace vs first-half pace, per run with splits. Below zero is a negative split.</p>')
+    +card('<div class="eyebrow">Fade point</div><div class="chartbox"><canvas id="fadepoint"></canvas></div><div id="fadepoint-table" class="tablewrap"></div><p class="muted">X is the estimated onset mile, Y is the pace at that mile. The composite 0-100 ranks the strength of the split pattern only; it is not a performance grade or a cause.</p>')
     +card('<div class="eyebrow">Fuel vs fade</div><div class="chartbox"><canvas id="fuelfade"></canvas></div><p class="muted">Recorded in-run energy against fade, for runs that have both. More fuel is not automatically better; the question is whether the runs that fell apart are also the runs with nothing recorded.</p>')
     +card('<div class="eyebrow">Worst fades</div><div id="worstfade" class="tablewrap"></div><p class="muted">Every run with at least four laps, worst fade first, next to what was recorded as taken in. Open a run report to add or correct its intake.</p>')
     +card('<div class="eyebrow">Fade intersections</div><div id="fadeanalysis" class="tablewrap"></div><p class="muted">Median fade by hydration, fuel, electrolytes and notes-temperature. Groups under three runs are hidden. Descriptive only: distance, hills and effort also move fade, and an unlogged amount is not a zero.</p>')
@@ -1193,6 +1243,16 @@ function drawAnalysis(){
   chartOrEmpty("bubble","bubble",{datasets:[{label:"Runs",data:RUNS.map(function(r,i){return {x:i+1,y:paceSec(r.pace),r:Math.max(3,r.distance)}}).filter(function(p){return isFinite(p.y)}),backgroundColor:"#7c3aed99"}]},{scales:{x:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Run sequence",color:"#91a0b7"}},y:paceAxis("Pace m:ss/mi")}},"No runs yet.");
   var fades=RUNS.map(function(r){return {date:r.date,pct:fadePct(r.splits)}}).filter(function(x){return x.pct!==null});
   chartOrEmpty("fade","line",{labels:fades.map(function(x){return x.date.slice(5)}),datasets:[{label:"Fade %",data:fades.map(function(x){return x.pct}),borderColor:"#ffb300",backgroundColor:"#ffb30022",fill:true,tension:.3,pointBackgroundColor:fades.map(function(x){return x.pct>0?"#ff3d5a":"#10ffa0"})}]},{scales:{x:tick,y:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Second half vs first half %",color:"#91a0b7"}}}},"Pacing fade needs per-mile splits, which appear with the live split data.");
+  var fp=fadePointData();
+  chartOrEmpty("fadepoint","scatter",{datasets:[{label:"Fade onset",data:fp.map(function(x){return {x:x.mile,y:x.pace,date:x.date}}),backgroundColor:"#ff3d5a",pointRadius:5}]},{scales:{x:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"X · estimated onset mile",color:"#91a0b7"}},y:paceAxis("Y · pace at onset (m:ss/mi)")}},"No fade point yet: at least four laps and a positive fade are needed.");
+  var fpt=document.getElementById("fadepoint-table");
+  if(fpt){
+    fpt.innerHTML=(fp.length
+      ?'<table><thead><tr><th>Run</th><th>X &middot; onset</th><th>Y &middot; pace</th><th>Fade</th><th>Composite</th></tr></thead><tbody>'+fp.slice(0,12).map(function(x){
+        return '<tr><td><a href="#runs/'+esc(x.date)+'">'+esc(x.date)+'</a> &middot; '+x.distance+' mi</td><td>mile '+esc(x.mile)+(x.time==null?"":" &middot; "+esc(durStr(x.time)))+'</td><td>'+esc(pstr(x.pace))+'/mi</td><td>'+(x.pct>0?"+":"")+x.pct+'%</td><td>'+fadeScoreChip(x.score)+'</td></tr>';
+      }).join("")+'</tbody></table>'
+      :'<div class="empty"><strong>No fade points yet</strong>At least four laps and a positive fade are needed.</div>');
+  }
   var pb=paceBuckets(RUNS);
   chartOrEmpty("pacedist","bar",{labels:pb.labels,datasets:[{label:"Runs",data:pb.counts,backgroundColor:"#00f5ff"}]},{scales:{x:tick,y:yAxis}},"No pace distribution yet.");
   var b5=RUNS.filter(function(r){return r.best5k!=null&&isFinite(paceSec(r.best5k))});

@@ -317,21 +317,30 @@ artifact's `analysis()` view had an unclosed template literal that stopped the
 app from initialising; that was corrected in the committed file.
 
 Chart parity was restored and then expanded in the artifact's `analysis()` view:
-nineteen run-based charts in seven labelled groups (Volume, Intensity & effort,
+twenty run-based charts in seven labelled groups (Volume, Intensity & effort,
 Mechanics & terrain, Performance & pacing, Consistency, Body & strength,
 Coaching), plus the per-mile splits chart on a run detail. The new charts are
 monthly and cumulative mileage, calories, average vs maximum HR, climbing
-cost, cadence, elevation gain, pace distribution, best 5K trend, latest-run
-splits, a training-calendar heatmap, days between runs, and runs per month.
-The intensity chart is an estimated HR-based load from `load-1.0.0`, not Garmin
-TSS: every FIT session has a `training_stress_score` field with a null value,
-so source TSS stays blank and is never filled with a surrogate. Charts with no
+cost, cadence, elevation gain, fade point, pace distribution, best 5K trend,
+latest-run splits, a training-calendar heatmap, days between runs, and runs per
+month. The intensity chart is an estimated HR-based load from `load-1.0.0`, not
+Garmin TSS: every FIT session has a `training_stress_score` field with a null
+value, so source TSS stays blank and is never filled with a surrogate. The fade
+point chart plots X = estimated onset mile against Y = pace at that mile, with
+a bounded descriptive composite score in the table below it. Charts with no
 data use `chartOrEmpty()` to show a named empty state instead of a blank canvas;
 bodyweight and strength have no data at all. Chart.js v4.4.4 is vendored at
 `flow_outputs/vendor/chart.umd.min.js`; `inject_aurora_live()` rewrites the
 artifact's `cdn.jsdelivr.net` URL to `/vendor/chart.umd.min.js`, which the server
 serves above the token gate. Chart creation is synchronous, because the original
 `requestAnimationFrame` never ran in a background tab and left blank canvases.
+
+The Fuel and nutrition view leads with an **In-run fuel** table built from the
+`fuel` summaries attached to `/api/activities`. Earlier it only showed daily
+Cronometer totals, so the recovered intake and note-only entries had no visible
+home outside a run's detail report. The table links each entry back to its run,
+shows deliberate zeros and unmeasured blanks distinctly, and flags ambiguous
+prose for review without turning it into data.
 
 The CrewAI flow rewrote this artifact as a static snapshot in `60baa53` and
 `b43d125`, dropping live data, Garmin sync, the upload card, server-side import

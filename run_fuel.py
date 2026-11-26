@@ -442,8 +442,24 @@ FADE_ONSET_CAVEAT = (
     "Estimated from lap splits only: the mile where the mean pace after it is "
     "furthest above the mean pace before it. Descriptive, not a cause: hills, "
     "turns, effort, heat and fueling can all move fade. Not a weather or "
-    "personalised performance claim."
+    "personalised performance claim. The 0-100 composite only ranks the "
+    "strength of this split pattern; it is not a performance grade."
 )
+
+FADE_SCORE_BASIS = (
+    "descriptive 0-100: min(60, 2 x fade%) + min(30, onset separation/4) "
+    "+ confidence (5 low, 10 medium) + min(5, supporting splits), capped at 100"
+)
+
+
+def _fade_composite(measured, delta, support, confidence):
+    """A bounded descriptive score for the strength of the fade pattern."""
+    fade_part = min(60.0, 2.0 * max(0.0, float(measured["fade_pct"])))
+    delta_part = min(30.0, max(0.0, float(delta)) / 4.0)
+    confidence_part = 10 if confidence == "medium" else 5
+    support_part = min(5.0, float(support))
+    return int(round(min(
+        100.0, fade_part + delta_part + confidence_part + support_part)))
 
 
 def fade_onset(splits, measured=None):
@@ -512,6 +528,9 @@ def fade_onset(splits, measured=None):
         "delta_s_per_mi": round(delta),
         "confidence": confidence,
         "splits_used": len(values),
+        "composite_score": _fade_composite(
+            measured, delta, support, confidence),
+        "composite_basis": FADE_SCORE_BASIS,
         "caveat": FADE_ONSET_CAVEAT,
     }
 

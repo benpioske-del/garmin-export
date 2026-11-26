@@ -402,19 +402,27 @@ previous PWA `start_url` keep working. If the committed artifact is absent (a
 clean checkout), `/` falls back to the local page rather than returning `404`.
 
 - **Chart parity, then expansion.** The flow artifact had only three canvases
-  (load, fitness, splits). The Analysis view now renders nineteen run-based
+  (load, fitness, splits). The Analysis view now renders twenty run-based
   charts in seven labelled groups: Volume (training load, weekly mileage,
   monthly mileage, cumulative mileage, distance by run), Intensity & effort
   (pace and heart rate, estimated HR-based load, calories, average vs maximum
   HR, climbing cost), Mechanics & terrain (cadence, elevation gain), Performance
-  & pacing (fitness scatter, run bubbles, pacing fade, pace distribution, best
-  5K trend, latest-run splits), Consistency (training-calendar heatmap, days
-  between runs, runs per month), Body & strength, and Coaching. The run detail
-  keeps the per-mile splits chart. Charts with no data show a named empty state
+  & pacing (fitness scatter, run bubbles, pacing fade, fade point, pace
+  distribution, best 5K trend, latest-run splits), Consistency
+  (training-calendar heatmap, days between runs, runs per month), Body &
+  strength, and Coaching. The fade point chart plots X = estimated onset mile
+  against Y = pace at that mile; the table ranks runs by a bounded descriptive
+  composite that is explicitly not a performance grade. The run detail keeps
+  the per-mile splits chart. Charts with no data show a named empty state
   (`chartOrEmpty`) rather than a blank canvas: FIT files carry an empty
   `training_stress_score` in every session, so the chart uses the separately
   labelled `load-1.0.0` HR/duration estimate and never calls it Garmin TSS.
   Bodyweight and strength have no data at all.
+- **In-run fuel is visible.** The Fuel and nutrition tab now leads with an
+  In-run fuel table built from the `fuel` summaries on `/api/activities`, so
+  recovered intake and note-only entries are visible without opening every run
+  report. Blank amounts stay blank, explicit zeros stay zero and ambiguous
+  prose stays flagged for review.
 - **No CDN.** Chart.js v4.4.4 is vendored at
   `flow_outputs/vendor/chart.umd.min.js` (205,749 bytes, SHA-256
   `B38076762F7363BC9E912B68B8E034826798DB5DF26BB61F000EC2E7A3137BC7`) and

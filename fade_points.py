@@ -197,6 +197,7 @@ def point(row, notes=None):
     date = str(row.get("start_local") or row.get("start_utc") or "")[:10]
     journal = (notes or {}).get(date) or {}
     note = fuel.get("note") or journal.get("note") or ""
+    onset = run_fuel.fade_onset(row.get("splits"), measured)
 
     return {
         "date": date,
@@ -210,7 +211,10 @@ def point(row, notes=None):
         "fade_pct": measured["fade_pct"],
         # Estimated onset of the fade, in distance, elapsed time and split.
         # It is a descriptive composite of the same splits, never a cause.
-        "fade_onset": run_fuel.fade_onset(row.get("splits"), measured),
+        # The score is repeated at the point level so a table can rank runs
+        # without reaching into the nested onset object.
+        "fade_onset": onset,
+        "fade_composite": (onset["composite_score"] if onset else None),
         "intake": {
             "water_oz": totals.get("oz"),
             "kcal": totals.get("kcal"),

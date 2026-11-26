@@ -718,7 +718,7 @@ MANIFEST_JSON = {
 # the login page, or a non-2xx origin-outage page. Requires a secure context
 # (https via the tunnel, or localhost); over plain http on the LAN the browser
 # refuses to register it and the page still works as a live shortcut.
-SW_CACHE = "coach-dashboard-v1"
+SW_CACHE = "coach-dashboard-v2"
 SW_JS = (
     "// Coach Dashboard service worker: network-first with an offline fallback.\n"
     "// It keeps the last dashboard page and its API data on this device so the\n"

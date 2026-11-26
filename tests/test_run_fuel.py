@@ -242,7 +242,9 @@ def test_fade_onset_locates_the_split_where_slowing_starts():
     assert onset["onset_split_s_per_mi"] == 700
     assert onset["delta_s_per_mi"] == 105
     assert onset["confidence"] == "low"
-    assert "Descriptive" in onset["caveat"]
+    assert 0 < onset["composite_score"] <= 100
+    assert "min(60, 2 x fade%)" in onset["composite_basis"]
+    assert "not a performance grade" in onset["caveat"]
 
 
 def test_fade_onset_needs_a_positive_fade_and_enough_splits():

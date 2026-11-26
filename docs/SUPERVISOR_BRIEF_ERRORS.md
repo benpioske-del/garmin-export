@@ -1932,3 +1932,33 @@ replace the twenty-eighth correction's 820/3 and 791/32.
   `cronometer_sync.py` explicitly. Both are real pipeline modules rather than
   scratch scripts, and the sync tests cover the three-step pipeline: Garmin
   download, database import, best-effort Cronometer pull.
+
+# Thirtieth correction: 2026-11-26, visible fade point and in-run fuel
+
+## The gap
+
+The fade maths and the recovered fuel were attached to `/api/activities` and
+rendered inside a run's detail report, but the athlete could not find them:
+the Fuel and nutrition tab showed only daily Cronometer totals, and the Home
+and Analysis views had no dedicated fade-point box. The onset was buried in a
+worst-fades table without an X/Y view or an overall ranking. A cached PWA shell
+could also keep the old page after a deploy.
+
+## What changed
+
+- `fadePointData()` drives a new Fade point card on Home and a fade-point chart
+  plus ranked table in Analysis. X is the estimated onset mile, Y is the split
+  pace at that mile, and elapsed time is shown alongside. A bounded 0-100
+  composite ranks the strength of the split pattern; it is not a performance
+  grade and is labelled as descriptive only.
+- `run_fuel.fade_onset()` now returns `composite_score` and `composite_basis`;
+  `fade_points.point()` repeats the score at point level so the page does not
+  need to reach into a nested object. The formula is fade percentage, onset
+  separation, sample support and confidence, capped at 100.
+- `inRunFuelCard()` puts every athlete-recorded intake and note-only entry at
+  the top of the Fuel and nutrition tab, with links back to the run report and
+  a review chip for ambiguous prose.
+- The service-worker cache name moved from `coach-dashboard-v1` to
+  `coach-dashboard-v2` so an installed PWA drops its old shell on the next
+  online open. Chart creation remains synchronous, so hidden or restored tabs
+  still render.
