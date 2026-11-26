@@ -334,6 +334,12 @@ function normalizeRun(r){
     bestPace:r.bestPace==null?null:r.bestPace,
     best5k:r.best5k==null?null:r.best5k,
     tss:r.tss==null?null:Number(r.tss),
+    // Garmin never recorded TSS in this corpus. The separately named estimate
+    // must survive the same rebuild as the source TSS field.
+    estimatedLoad:r.estimatedLoad==null?null:Number(r.estimatedLoad),
+    loadBasis:r.loadBasis||null,
+    loadConfidence:r.loadConfidence||null,
+    loadVersion:r.loadVersion||null,
     splits:splits,
     ascent:r.ascent==null?null:Number(r.ascent),
     descent:r.descent==null?null:Number(r.descent),
@@ -712,6 +718,13 @@ function runFade(r){
   if(f&&f.fade)return {first:f.fade.first_half_s_per_mi,second:f.fade.second_half_s_per_mi,delta:f.fade.fade_s_per_mi,pct:f.fade.fade_pct,n:f.fade.splits_used};
   return fuelDelta(r&&r.splits);
 }
+function fadeOnsetHtml(p){
+  var o=p&&p.fade_onset;
+  if(!o)return "";
+  var when=o.onset_time_s==null?null:durStr(o.onset_time_s);
+  return '<div class="chip" style="margin-top:10px">estimated onset &middot; mile '+esc(o.onset_mile)+'</div>'
+    +'<p class="muted">'+(when?'Elapsed '+esc(when)+' &middot; split '+esc(pstr(o.onset_split_s_per_mi))+'/mi &middot; '+esc(o.confidence)+' confidence. ':'')+esc(o.caveat)+'</p>';
+}
 function fuelWhere(e){
   if(e.mile!=null)return "mi "+e.mile;
   return e.at||"unmarked";
@@ -756,7 +769,7 @@ function fuelCard(r){
     }).join("")+'</tbody></table></div>'
     :'<div class="empty"><strong>No intake events</strong>Nothing recorded for this run yet. Use the editor below, or let the journal note suggest events.</div>';
   var fadeHtml=d
-    ?'<div class="grid g3"><div><div class="stat">'+mss(d.delta)+'</div><div class="label">m:ss/mi fade</div></div><div><div class="stat">'+(d.pct>0?"+":"")+d.pct+'%</div><div class="label">second half vs first</div></div><div><div class="stat">'+d.n+'</div><div class="label">laps used</div></div></div><p class="muted">First half '+pstr(d.first)+'/mi, second half '+pstr(d.second)+'/mi. Positive fade means slowing down.</p>'
+    ?'<div class="grid g3"><div><div class="stat">'+mss(d.delta)+'</div><div class="label">m:ss/mi fade</div></div><div><div class="stat">'+(d.pct>0?"+":"")+d.pct+'%</div><div class="label">second half vs first</div></div><div><div class="stat">'+d.n+'</div><div class="label">laps used</div></div></div><p class="muted">First half '+pstr(d.first)+'/mi, second half '+pstr(d.second)+'/mi. Positive fade means slowing down.</p>'+fadeOnsetHtml(r.fadePoint)
     :'<p class="muted">Fade needs at least four lap splits; this run has '+(r.splits?r.splits.length:0)+'.</p>';
   var note=f&&f.note?'<p class="muted">Journal note: '+esc(f.note)+'</p>':"";
   var rows=items.map(fuelRowHtml).join("");
@@ -1011,7 +1024,7 @@ function analysis(){
     +card('<div class="eyebrow">Distance by run</div><div class="chartbox"><canvas id="dist"></canvas></div><p class="muted">Each bar is a run in chronological order, coloured by distance band.</p>')
     +groupHead("Intensity &amp; effort","Heart rate, training stress and the cost of each run.")
     +card('<div class="eyebrow">Pace and heart rate</div><div class="chartbox"><canvas id="pacehr"></canvas></div><p class="muted">Average pace and average heart rate over time.</p>')
-    +card('<div class="eyebrow">Training stress score</div><div class="chartbox"><canvas id="tss"></canvas></div><p class="muted">Per-run TSS as reported by the live activity API.</p>')
+    +card('<div class="eyebrow">Estimated HR-based load</div><div class="chartbox"><canvas id="tss"></canvas></div><p class="muted">Not Garmin TSS. The watch never recorded a training stress score; this is load-1.0.0 estimated from average heart rate and duration. Source TSS stays blank.</p>')
     +card('<div class="eyebrow">Calories per run</div><div class="chartbox"><canvas id="calories"></canvas></div><p class="muted">Energy recorded by the watch for each run.</p>')
     +card('<div class="eyebrow">Average vs maximum HR</div><div class="chartbox"><canvas id="hrmax"></canvas></div><p class="muted">How much headroom each run left between average and peak effort.</p>')
     +card('<div class="eyebrow">Climbing cost</div><div class="chartbox"><canvas id="ascentpace"></canvas></div><p class="muted">Ascent against pace. Points above the cloud are slower for the same climbing.</p>')
@@ -1169,8 +1182,8 @@ function drawAnalysis(){
   chartOrEmpty("cumulative","line",{labels:dates,datasets:[{label:"Cumulative miles",data:cumulativeMiles(RUNS),borderColor:"#10ffa0",backgroundColor:"#10ffa022",fill:true,tension:.25}]},{scales:{x:tick,y:yAxis}},"No mileage yet.");
   chartOrEmpty("dist","bar",{labels:dates,datasets:[{label:"Distance",data:RUNS.map(function(r){return r.distance}),backgroundColor:RUNS.map(function(r){return bandColor(r.band)})}]},{scales:{x:tick,y:{beginAtZero:true,ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Miles",color:"#91a0b7"}}}},"No distance history yet.");
   chartOrEmpty("pacehr","line",{labels:dates,datasets:[{label:"Pace m:ss/mi",data:RUNS.map(function(r){return paceSec(r.pace)}),borderColor:"#00f5ff",backgroundColor:"#00f5ff22",yAxisID:"y",tension:.3},{label:"Avg HR",data:RUNS.map(function(r){return r.avgHR}),borderColor:"#ff3d5a",backgroundColor:"#ff3d5a22",yAxisID:"y1",tension:.3}]},{scales:{x:tick,y:paceAxis("Pace m:ss/mi"),y1:{position:"right",grid:{drawOnChartArea:false},ticks:{color:"#91a0b7"},title:{display:true,text:"HR",color:"#91a0b7"}}}},"No pace or heart-rate history yet.");
-  var tss=RUNS.filter(function(r){return r.tss!=null});
-  chartOrEmpty("tss","bar",{labels:tss.map(function(r){return r.date.slice(5)}),datasets:[{label:"TSS",data:tss.map(function(r){return r.tss}),backgroundColor:"#ffb300"}]},{scales:{x:tick,y:yAxis}},"Training stress score appears once the live activity API supplies it.");
+  var loads=RUNS.filter(function(r){return r.estimatedLoad!=null});
+  chartOrEmpty("tss","bar",{labels:loads.map(function(r){return r.date.slice(5)}),datasets:[{label:"Estimated HR-based load (not TSS)",data:loads.map(function(r){return r.estimatedLoad}),backgroundColor:"#ffb300"}]},{scales:{x:tick,y:yAxis}},"Garmin did not record TSS. Estimated HR-based load appears when HR and duration are available; source TSS is never filled in.");
   chartOrEmpty("calories","bar",{labels:dates,datasets:[{label:"Calories",data:RUNS.map(function(r){return r.calories}),backgroundColor:"#ff3d5a"}]},{scales:{x:tick,y:yAxis}},"Calories were not recorded.");
   chartOrEmpty("hrmax","line",{labels:dates,datasets:[{label:"Avg HR",data:RUNS.map(function(r){return r.avgHR}),borderColor:"#00f5ff",backgroundColor:"#00f5ff22",tension:.3},{label:"Max HR",data:RUNS.map(function(r){return r.maxHR}),borderColor:"#ff3d5a",backgroundColor:"#ff3d5a22",tension:.3}]},{scales:{x:tick,y:ySoft}},"Max heart rate appears with the live activity API.");
   chartOrEmpty("ascentpace","scatter",{datasets:[{label:"Runs",data:RUNS.filter(function(r){return r.ascent!=null&&isFinite(paceSec(r.pace))}).map(function(r){return {x:r.ascent,y:paceSec(r.pace)}}),backgroundColor:"#7c3aed"}]},{scales:{x:{ticks:{color:"#91a0b7"},grid:{color:"#ffffff0b"},title:{display:true,text:"Ascent (ft)",color:"#91a0b7"}},y:paceAxis("Pace m:ss/mi")}},"Ascent and pace are needed.");
@@ -1212,15 +1225,17 @@ function drawAnalysis(){
     var desc=f?((f.events||0)+" event"+((f.events||0)===1?"":"s")+" &middot; "+fuelAmt(t.oz," oz")+" &middot; "+fuelAmt(t.kcal," kcal")):"not recorded";
     var tp=p&&p.temperature;
     var temp=tp?(tp.temp_f!=null?Math.round(tp.temp_f)+"F":(tp.feels_like_f!=null?"feels "+Math.round(tp.feels_like_f)+"F":"--")):"--";
-    return {date:r.date,dist:r.distance,delta:d.delta,pct:d.pct,desc:desc,temp:temp};
+    var onset=p&&p.fade_onset;
+    var onsetText=onset?("mi "+onset.onset_mile+" &middot; "+(onset.onset_time_s==null?"--":durStr(onset.onset_time_s))):"--";
+    return {date:r.date,dist:r.distance,delta:d.delta,pct:d.pct,onset:onsetText,desc:desc,temp:temp};
   }).filter(Boolean).sort(function(a,b){return b.delta-a.delta});
   var worst=document.getElementById("worstfade");
   if(worst){
     var withFuel=fades.filter(function(x){return x.desc!=="not recorded"}).length;
     worst.innerHTML=(fades.length
       ?'<p class="muted" style="padding:10px">'+fades.length+' runs with laps &middot; '+withFuel+' with intake recorded. Showing the '+Math.min(12,fades.length)+' worst fades.</p>'
-        +'<table><thead><tr><th>Date</th><th>Miles</th><th>Fade m:ss/mi</th><th>Fade %</th><th>Intake</th><th>Temp</th></tr></thead><tbody>'+fades.slice(0,12).map(function(x){
-          return '<tr><td><a href="#runs/'+esc(x.date)+'">'+esc(x.date)+'</a></td><td>'+x.dist+'</td><td>'+mss(x.delta)+'</td><td>'+(x.pct>0?"+":"")+x.pct+'%</td><td>'+x.desc+'</td><td>'+x.temp+'</td></tr>';
+        +'<table><thead><tr><th>Date</th><th>Miles</th><th>Fade m:ss/mi</th><th>Fade %</th><th>Est. onset</th><th>Intake</th><th>Temp</th></tr></thead><tbody>'+fades.slice(0,12).map(function(x){
+          return '<tr><td><a href="#runs/'+esc(x.date)+'">'+esc(x.date)+'</a></td><td>'+x.dist+'</td><td>'+mss(x.delta)+'</td><td>'+(x.pct>0?"+":"")+x.pct+'%</td><td>'+x.onset+'</td><td>'+x.desc+'</td><td>'+x.temp+'</td></tr>';
         }).join("")+'</tbody></table>'
       :'<div class="empty"><strong>No lap splits yet</strong>Fade appears once a run has at least four laps.</div>');
   }

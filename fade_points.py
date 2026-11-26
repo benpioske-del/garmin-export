@@ -208,6 +208,9 @@ def point(row, notes=None):
         "second_half_s_per_mi": measured["second_half_s_per_mi"],
         "fade_s_per_mi": measured["fade_s_per_mi"],
         "fade_pct": measured["fade_pct"],
+        # Estimated onset of the fade, in distance, elapsed time and split.
+        # It is a descriptive composite of the same splits, never a cause.
+        "fade_onset": run_fuel.fade_onset(row.get("splits"), measured),
         "intake": {
             "water_oz": totals.get("oz"),
             "kcal": totals.get("kcal"),

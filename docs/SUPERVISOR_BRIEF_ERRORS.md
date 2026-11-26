@@ -1039,16 +1039,18 @@ and the chart expansion.
 - The Analysis view now renders nineteen run-based charts in seven labelled
   groups: Volume, Intensity & effort, Mechanics & terrain, Performance &
   pacing, Consistency, Body & strength, Coaching.
-- New data-backed charts: monthly mileage, cumulative mileage, TSS, calories,
-  average vs maximum HR, climbing cost, cadence, elevation gain, pace
-  distribution, best 5K trend, latest-run splits, training-calendar heatmap,
-  days between runs, and runs per month.
+- New data-backed charts: monthly mileage, cumulative mileage, estimated
+  HR-based load, calories, average vs maximum HR, climbing cost, cadence,
+  elevation gain, pace distribution, best 5K trend, latest-run splits,
+  training-calendar heatmap, days between runs, and runs per month.
 - `chartOrEmpty()` gives every no-data chart a named empty state instead of a
-  blank canvas. TSS is blank in every source record; bodyweight and strength
-  have no data at all.
+  blank canvas. FIT files carry `training_stress_score` as null in every
+  session, so the chart plots the separately labelled `load-1.0.0` HR/duration
+  estimate and never presents it as Garmin TSS. Bodyweight and strength have
+  no data at all.
 - The live layer exposes `window.auroraReloadAll` and
-  `window.auroraReloadNutrition`, and `mapRun` now carries `tss` and
-  `maxCadence`.
+  `window.auroraReloadNutrition`, and `mapRun` now carries source `tss`, the
+  estimated load fields, and `maxCadence`.
 
 ## Verification
 
@@ -1884,3 +1886,49 @@ contract tests (`fadePoint` carry-through, payload shape, no fourth route).
 Full suite: **853 passed, 3 skipped (856 collected)**. Empty `GARMIN_DATA_DIR`:
 **832 passed, 24 skipped (856 collected)**. `ruff check .` is clean. These
 replace the twenty-eighth correction's 820/3 and 791/32.
+
+# Twenty-ninth correction: 2026-11-25, honest load, recovered fuel notes and fade onset
+
+## The gaps
+
+- The Aurora intensity chart was labelled "Training stress score" but stayed
+  empty. The pipeline was correct: all 76 FIT sessions contain the
+  `training_stress_score` field with a `null` value, and the Garmin CSV uses
+  `0.0` only as a placeholder. Computing TSS would need normalized power and
+  FTP, neither of which the watch exported.
+- Fourteen post-run notes typed into classic mode lived only in Edge
+  localStorage (`season-report-v1:custom-runs` and
+  `season-report-v1:run-overrides`). They were absent from `run_fuel.json`, so
+  Aurora showed "not recorded" for runs the athlete had actually documented.
+- `fade_points.py` reported how much a run faded, but not where in the run the
+  slowdown most likely began.
+
+## What changed
+
+- `training_stress_score` remains null end to end. `/api/activities` now adds
+  `estimated_run_load`, `estimated_load_basis`, `estimated_load_confidence` and
+  `estimated_load_version` from `loadcalc.run_session_load()` with the
+  confirmed `hr_max`; Aurora's chart is explicitly labelled "Estimated
+  HR-based load" and "not Garmin TSS". A missing HR or duration stays
+  unavailable instead of becoming zero.
+- `browser_journal.py` is a read-only, allowlisted importer for the two classic
+  localStorage keys on loopback origins only. It strips the generated Garmin
+  prefix, maps the journal's sequence number to a local date, and upserts
+  through `run_fuel.normalize_entry()`. `0 oz` and lower-case `electrolytes
+  none` become deliberate zeros; capital `None`, `1500 ml`, `1.5 Liters oz` and
+  prose gel/LMNT rows stay as text with all numeric fields null and
+  `needs_review: true`. Note-only entries become `journal-note` entries with no
+  events and the same review flag. The default action is a dry run; `--apply`
+  is the explicit write step. `cramjam` is imported only inside the importer.
+- `run_fuel.fade_onset()` compares the mean pace before each candidate mile
+  with the mean pace from that mile onward and returns the best positive
+  separation as `fade_onset` on every canonical fade point: onset mile, elapsed
+  seconds, split pace, confidence and a descriptive caveat. Runs with fewer
+  than four splits or no positive fade get no onset. The worst-fades table and
+  the run's Fuel card display the estimate; heat, hills, distance, effort and
+  fueling remain confounders, and no causal or personalised weather claim is
+  made.
+- The publisher allowlist now names `build_run_context.py` and
+  `cronometer_sync.py` explicitly. Both are real pipeline modules rather than
+  scratch scripts, and the sync tests cover the three-step pipeline: Garmin
+  download, database import, best-effort Cronometer pull.

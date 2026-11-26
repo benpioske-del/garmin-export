@@ -147,6 +147,27 @@ def test_fade_points_survive_the_live_and_normalize_copies(template):
     assert "Fade intersections" in template
 
 
+def test_estimated_load_is_labelled_and_survives_the_normalize_copy(template):
+    """A computed HR/duration load must never be presented as Garmin TSS."""
+    assert "Estimated HR-based load" in template
+    assert "Not Garmin TSS" in template
+    assert "never presented as Garmin TSS" in G.AURORA_LIVE_SCRIPT
+    assert ("estimatedLoad:r.estimatedLoad==null?null:Number(r.estimatedLoad)"
+            in template)
+    assert ("estimatedLoad: a.estimated_run_load == null ? null"
+            in G.AURORA_LIVE_SCRIPT)
+    assert "var loads=RUNS.filter(function(r){return r.estimatedLoad!=null})" \
+        in template
+
+
+def test_fade_onset_is_shown_in_the_fuel_card_and_worst_table(template):
+    assert "function fadeOnsetHtml(p)" in template
+    assert "fadeOnsetHtml(r.fadePoint)" in template
+    assert "estimated onset &middot; mile" in template
+    assert "<th>Est. onset</th>" in template
+    assert "onsetText=onset?" in template
+
+
 def test_fuel_editor_posts_to_the_server_and_shows_fade(template):
     """The recovered intake must be editable, not read-only."""
     assert 'fetch("/api/fuel"' in template

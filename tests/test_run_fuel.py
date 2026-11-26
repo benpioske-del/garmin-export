@@ -233,6 +233,36 @@ def test_fade_ignores_blank_and_non_numeric_splits():
     assert result["splits_used"] == 4
 
 
+def test_fade_onset_locates_the_split_where_slowing_starts():
+    splits = [600, 610, 700, 720]
+    onset = run_fuel.fade_onset(splits)
+    assert onset["onset_mile"] == 3
+    assert onset["onset_split"] == 3
+    assert onset["onset_time_s"] == 1210
+    assert onset["onset_split_s_per_mi"] == 700
+    assert onset["delta_s_per_mi"] == 105
+    assert onset["confidence"] == "low"
+    assert "Descriptive" in onset["caveat"]
+
+
+def test_fade_onset_needs_a_positive_fade_and_enough_splits():
+    assert run_fuel.fade_onset([600, 610, 620]) is None
+    assert run_fuel.fade_onset([700, 720, 600, 610]) is None
+
+
+def test_fade_onset_prefers_an_early_break_when_that_separation_is_bigger():
+    onset = run_fuel.fade_onset([600, 720, 720, 720])
+    assert onset["onset_mile"] == 2
+    assert onset["onset_time_s"] == 600
+
+
+def test_fade_onset_confidence_rises_with_a_larger_balanced_sample():
+    splits = [600, 605, 610, 720, 725, 730, 735, 740]
+    onset = run_fuel.fade_onset(splits)
+    assert onset["confidence"] == "medium"
+    assert onset["splits_used"] == 8
+
+
 # ------------------------------------------------------------------- summary
 
 def test_summary_totals_ignore_unmeasured_events(tmp_path):

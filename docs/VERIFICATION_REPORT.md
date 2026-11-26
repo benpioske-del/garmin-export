@@ -405,14 +405,16 @@ clean checkout), `/` falls back to the local page rather than returning `404`.
   (load, fitness, splits). The Analysis view now renders nineteen run-based
   charts in seven labelled groups: Volume (training load, weekly mileage,
   monthly mileage, cumulative mileage, distance by run), Intensity & effort
-  (pace and heart rate, training stress score, calories, average vs maximum HR,
-  climbing cost), Mechanics & terrain (cadence, elevation gain), Performance &
-  pacing (fitness scatter, run bubbles, pacing fade, pace distribution, best 5K
-  trend, latest-run splits), Consistency (training-calendar heatmap, days
+  (pace and heart rate, estimated HR-based load, calories, average vs maximum
+  HR, climbing cost), Mechanics & terrain (cadence, elevation gain), Performance
+  & pacing (fitness scatter, run bubbles, pacing fade, pace distribution, best
+  5K trend, latest-run splits), Consistency (training-calendar heatmap, days
   between runs, runs per month), Body & strength, and Coaching. The run detail
   keeps the per-mile splits chart. Charts with no data show a named empty state
-  (`chartOrEmpty`) rather than a blank canvas: TSS is blank in every source
-  record, and bodyweight and strength have no data at all.
+  (`chartOrEmpty`) rather than a blank canvas: FIT files carry an empty
+  `training_stress_score` in every session, so the chart uses the separately
+  labelled `load-1.0.0` HR/duration estimate and never calls it Garmin TSS.
+  Bodyweight and strength have no data at all.
 - **No CDN.** Chart.js v4.4.4 is vendored at
   `flow_outputs/vendor/chart.umd.min.js` (205,749 bytes, SHA-256
   `B38076762F7363BC9E912B68B8E034826798DB5DF26BB61F000EC2E7A3137BC7`) and

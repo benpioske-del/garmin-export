@@ -1068,6 +1068,8 @@ def test_aurora_bootstrap_exposes_reload_hooks_and_tss_fields(server,
     assert "window.auroraReloadNutrition" in text
     assert "maxCadence" in text
     assert "training_stress_score" in text
+    assert "estimated_run_load" in text
+    assert "never presented as Garmin TSS" in text
 
 
 # --------------------------------------- phone webhook (Health Connect bridge)

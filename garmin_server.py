@@ -243,8 +243,13 @@ def _csv_run_extras():
     return out
 
 
-def api_activities(conn):
-    """GET /api/activities - canonical activities with review state preserved."""
+def api_activities(conn, hr_max=None):
+    """GET /api/activities - canonical activities with review state preserved.
+
+    ``training_stress_score`` stays null when the watch recorded none. The
+    separate estimated HR-based load comes from the same versioned formula as
+    /api/load and is labelled so it can never be mistaken for Garmin TSS.
+    """
     src = _source_files(conn)
     extras = _csv_run_extras()
     out = []
@@ -253,6 +258,7 @@ def api_activities(conn):
         reviews = _open_reviews(conn, aid)
         source_file = src.get(aid)
         extra = extras.get(source_file) or {}
+        load, load_conf, load_note = loadcalc.run_session_load(r, hr_max)
         out.append({
             # Stable identity. Never the array index, never the FIT filename.
             "activity_id": aid,
@@ -278,7 +284,17 @@ def api_activities(conn):
             "avg_pace_s_per_mi": r["avg_pace_s_per_mi"],
             "best_pace_s_per_mi": r["best_pace_s_per_mi"],
             "calories": r["calories"],
+            # Device-reported TSS is passed through verbatim. Every FIT session
+            # currently has this field with a null value; a null is never
+            # replaced by a computed surrogate.
             "training_stress_score": r["training_stress_score"],
+            # A separately named, versioned estimate. The label and version
+            # travel with the number so a later chart cannot relabel it TSS.
+            "estimated_run_load": load,
+            "estimated_load_basis": load_note,
+            "estimated_load_confidence": load_conf,
+            "estimated_load_version": loadcalc.LOAD_VERSION,
+            "estimated_load_label": "Estimated HR-based load (not Garmin TSS)",
             "total_ascent_ft": r["total_ascent_ft"],
             "total_descent_ft": r["total_descent_ft"],
             # Splits live only in the published CSV; null when it has none.
@@ -395,7 +411,7 @@ API_ROUTES = {
     # including runs with no intake entry at all. They stay display-only too and
     # add no fourth route to the pinned API surface.
     "/api/activities": lambda conn, hr, at: fade_points.attach(
-        run_fuel.attach(manual_runs.merge(api_activities(conn)))),
+        run_fuel.attach(manual_runs.merge(api_activities(conn, hr_max=hr)))),
     "/api/load": lambda conn, hr, at: api_load(conn, hr, as_of=at),
     "/api/coaching": lambda conn, hr, at: api_coaching(conn, hr, as_of=at),
 }
@@ -454,7 +470,7 @@ def _run_step(argv, timeout, label):
 
 
 def _run_sync():
-    """Download new activities, then import them into trainloop.db.
+    """Download activities, import them, then make a best-effort nutrition pull.
 
     Downloading and importing are separate steps. garmin_sync.py only writes
     .FIT files; the dashboard, the audit and the supervisor briefs read
@@ -463,7 +479,8 @@ def _run_sync():
 
     The import is attempted even when the download fails, so any FIT file that
     did arrive (by an earlier run, or by copying one in by hand) is still
-    picked up. `ok` is true only when both steps succeed.
+    picked up. `ok` covers those two required steps; Cronometer is a separate
+    best-effort pull whose result lives in `nutrition_ok`.
     """
     if not os.path.isfile(SYNC_SCRIPT):
         return {"ok": False, "exit": None,
@@ -867,6 +884,13 @@ AURORA_LIVE_SCRIPT = """
       maxCadence: a.max_cadence == null ? null : Number(a.max_cadence),
       tss: a.training_stress_score == null ? null
         : Number(a.training_stress_score),
+      // The watch has no TSS. This is the versioned HR/duration estimate from
+      // /api/load, kept under its own name and never presented as Garmin TSS.
+      estimatedLoad: a.estimated_run_load == null ? null
+        : Number(a.estimated_run_load),
+      loadBasis: a.estimated_load_basis || null,
+      loadConfidence: a.estimated_load_confidence || null,
+      loadVersion: a.estimated_load_version || null,
       avgPace: pace(a.avg_pace_s_per_mi != null ? Number(a.avg_pace_s_per_mi)
         : (mi > 0 ? sec / mi : null)),
       bestPace: a.best_pace_s_per_mi == null ? null

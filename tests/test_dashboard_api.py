@@ -123,6 +123,24 @@ def test_activity_exposes_device_summary_fields(conn):
     assert a["training_stress_score"] == 88
 
 
+def test_estimated_load_is_separate_from_garmin_tss(conn):
+    _seed_run(conn, "garmin:111", _iso(1), hr=140)
+    a = G.api_activities(conn, hr_max=200)["activities"][0]
+    assert a["training_stress_score"] is None
+    assert a["estimated_run_load"] == 125.0
+    assert a["estimated_load_basis"] == "hr 140/200 x2.5"
+    assert a["estimated_load_confidence"] == loadcalc.terms.MEDIUM
+    assert a["estimated_load_version"] == loadcalc.LOAD_VERSION
+    assert "not Garmin TSS" in a["estimated_load_label"]
+
+
+def test_missing_hr_max_leaves_the_estimate_unavailable(conn):
+    _seed_run(conn, "garmin:111", _iso(1), hr=140)
+    a = G.api_activities(conn)["activities"][0]
+    assert a["estimated_run_load"] is None
+    assert a["estimated_load_basis"] == "no hr_max supplied"
+
+
 def test_lap_splits_are_read_from_the_published_csv(conn, tmp_path, monkeypatch):
     """The database has no splits table, so the API joins the published CSV by
     source file. Without this the run detail has a canvas and no data."""

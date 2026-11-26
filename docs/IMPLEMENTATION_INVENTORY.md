@@ -320,12 +320,14 @@ Chart parity was restored and then expanded in the artifact's `analysis()` view:
 nineteen run-based charts in seven labelled groups (Volume, Intensity & effort,
 Mechanics & terrain, Performance & pacing, Consistency, Body & strength,
 Coaching), plus the per-mile splits chart on a run detail. The new charts are
-monthly and cumulative mileage, TSS, calories, average vs maximum HR, climbing
+monthly and cumulative mileage, calories, average vs maximum HR, climbing
 cost, cadence, elevation gain, pace distribution, best 5K trend, latest-run
 splits, a training-calendar heatmap, days between runs, and runs per month.
-Charts with no data use `chartOrEmpty()` to show a named empty state instead of
-a blank canvas; TSS is blank in every source record and bodyweight/strength have
-no data at all. Chart.js v4.4.4 is vendored at
+The intensity chart is an estimated HR-based load from `load-1.0.0`, not Garmin
+TSS: every FIT session has a `training_stress_score` field with a null value,
+so source TSS stays blank and is never filled with a surrogate. Charts with no
+data use `chartOrEmpty()` to show a named empty state instead of a blank canvas;
+bodyweight and strength have no data at all. Chart.js v4.4.4 is vendored at
 `flow_outputs/vendor/chart.umd.min.js`; `inject_aurora_live()` rewrites the
 artifact's `cdn.jsdelivr.net` URL to `/vendor/chart.umd.min.js`, which the server
 serves above the token gate. Chart creation is synchronous, because the original

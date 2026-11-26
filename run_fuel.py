@@ -438,6 +438,84 @@ def fade(splits):
     }
 
 
+FADE_ONSET_CAVEAT = (
+    "Estimated from lap splits only: the mile where the mean pace after it is "
+    "furthest above the mean pace before it. Descriptive, not a cause: hills, "
+    "turns, effort, heat and fueling can all move fade. Not a weather or "
+    "personalised performance claim."
+)
+
+
+def fade_onset(splits, measured=None):
+    """Locate where a positive fade most likely begins.
+
+    This is a composite of the canonical ``fade()`` magnitude and the split
+    sequence. For each candidate mile the mean pace before it is compared with
+    the mean pace from it onwards; the best separation wins. ``None`` is
+    returned when there is no positive fade or too little split data, so a run
+    that got faster is never given a made-up onset.
+
+    The result is deliberately descriptive: it gives a distance, an elapsed
+    time and the split pace at the onset, plus a confidence and a caveat. It is
+    not a diagnosis and says nothing about what caused the slowdown.
+    """
+    values = []
+    for value in splits or []:
+        if isinstance(value, bool):
+            continue
+        try:
+            seconds = float(value)
+        except (TypeError, ValueError):
+            continue
+        if seconds > 0:
+            values.append(seconds)
+    if len(values) < 4:
+        return None
+    if measured is None:
+        measured = fade(values)
+    if measured is None or measured["fade_s_per_mi"] <= 0:
+        return None
+
+    best = None
+    # A candidate must leave at least one earlier split and two later splits.
+    # One later split would make the "after" mean a single anecdote.
+    for index in range(1, len(values) - 1):
+        before = values[:index]
+        after = values[index:]
+        first = sum(before) / len(before)
+        second = sum(after) / len(after)
+        delta = second - first
+        if delta <= 0:
+            continue
+        support = min(len(before), len(after))
+        # Balanced evidence is worth a small bonus; a one-split "before" is
+        # still allowed but stays low confidence.
+        score = delta * (1.25 if support >= 2 else 1.0)
+        key = (score, delta, support)
+        if best is None or key > best[0]:
+            best = (key, index, first, second, delta, support)
+    if best is None:
+        return None
+
+    _, index, first, second, delta, support = best
+    confidence = ("medium"
+                  if support >= 2 and len(values) >= 6
+                  and delta >= 15 and delta >= measured["fade_s_per_mi"] / 2.0
+                  else "low")
+    return {
+        "onset_mile": index + 1,
+        "onset_time_s": round(sum(values[:index])),
+        "onset_split": index + 1,
+        "onset_split_s_per_mi": round(values[index]),
+        "before_s_per_mi": round(first),
+        "after_s_per_mi": round(second),
+        "delta_s_per_mi": round(delta),
+        "confidence": confidence,
+        "splits_used": len(values),
+        "caveat": FADE_ONSET_CAVEAT,
+    }
+
+
 def _total(events, field):
     values = [event[field] for event in events if event.get(field) is not None]
     if not values:

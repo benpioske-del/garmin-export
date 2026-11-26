@@ -115,6 +115,9 @@ def test_point_exists_without_any_fuel_entry():
     assert item is not None
     assert item["fade_s_per_mi"] == run_fuel.fade(SPLITS)["fade_s_per_mi"]
     assert item["fade_pct"] == run_fuel.fade(SPLITS)["fade_pct"]
+    assert item["fade_onset"]["onset_mile"] == 3
+    assert item["fade_onset"]["onset_time_s"] == 1210
+    assert "Descriptive" in item["fade_onset"]["caveat"]
     assert item["intake"]["water_oz"] is None
     assert item["intake"]["kcal"] is None
     assert item["hydration"] == "not recorded"
@@ -125,6 +128,12 @@ def test_point_exists_without_any_fuel_entry():
 def test_point_requires_four_usable_splits():
     assert fade_points.point(_row(splits=[600, 610, 620])) is None
     assert fade_points.point(_row(splits=None)) is None
+
+
+def test_a_run_that_got_faster_has_no_invented_onset():
+    item = fade_points.point(_row(splits=[700, 720, 600, 610]))
+    assert item is not None
+    assert item["fade_onset"] is None
 
 
 def test_explicit_zeros_are_recorded_zeros_not_missing_values():
